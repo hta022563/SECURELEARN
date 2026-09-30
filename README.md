@@ -7,6 +7,7 @@ Dự án SecureLearn là hệ thống nền tảng học trực tuyến (LMS) h�
 ##  *Dự Kiến*
 * **Frontend (`client` - ReactJS):**
   * Giao diện Admin: Quản lý khóa học và upload video.
+  * Giao diện User: Để xem video Khóa học
   * Trình phát video: Tích hợp **Hls.js** và **Watermark động** chống quay lén
 * **Backend (`server` - Java Spring Boot):**
   * Xác thực & Phân quyền: Đăng nhập, phân vai trò, cấp mã **JWT**
