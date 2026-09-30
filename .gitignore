@@ -1,0 +1,15 @@
+# Bỏ qua thư viện nặng của cả client và server
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Bỏ qua các file biến môi trường chứa pass database, api key
+.env
+client/.env
+server/.env
+
+# Bỏ qua thư mục build
+dist/
+build/
+client/dist/
+server/dist/
