@@ -4,13 +4,21 @@
  */
 package FCAJ.SecureLearn.Model;
 
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
 import java.time.LocalDateTime;
 
 /**
  *
  * @author ngoct
  */
+@Entity
 public class Enrollment {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private long id;
     enum status {NOTSTARTED, INPROGRESS, COMPLETED};
     int userId;
     int courseId;
