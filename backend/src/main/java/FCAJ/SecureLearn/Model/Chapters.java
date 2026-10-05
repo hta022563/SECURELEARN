@@ -5,19 +5,25 @@
 package FCAJ.SecureLearn.Model;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
 
 /**
  *
  * @author ngoct
  */
 @Entity
-public class Chapter {
+public class Chapters {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private long id;
     int courseId;
     int chapterNumber;
     String title;
     String description;
 
-    public Chapter(int courseId, int chapterNumber, String title, String description) {
+    public Chapters(int courseId, int chapterNumber, String title, String description) {
         this.courseId = courseId;
         this.chapterNumber = chapterNumber;
         this.title = title;

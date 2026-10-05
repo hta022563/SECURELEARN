@@ -4,24 +4,41 @@
  */
 package FCAJ.SecureLearn.Model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.LocalDateTime;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  *
  * @author ngoct
  */
 @Entity
-public class User {
-    enum Role{INSTRUCTOR, STUDENT, ADMIN};
+public class Users {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private long id;
+    public enum Role{INSTRUCTOR, STUDENT, ADMIN};
     String username;
-    String password;
-    Role role;
-    LocalDateTime creationDate;
+    @JsonIgnore String password_hash;
+    @Enumerated(EnumType.STRING) @JdbcTypeCode(SqlTypes.NAMED_ENUM) Role role;
+    LocalDateTime created_at;
 
+    public Users(String username, String password_hash, Role role, LocalDateTime created_at) {
+        this.username = username;
+        this.password_hash = password_hash;
+        this.role = role;
+        this.created_at = created_at;
+    }
+
+    
+    
     public Role getRole() {
         return role;
     }
@@ -40,32 +57,23 @@ public class User {
     }
 
     public String getPassword() {
-        return password;
+        return password_hash;
     }
 
     public void setPassword(String password) {
-        this.password = password;
+        this.password_hash = password;
     }
 
     
     public LocalDateTime getCreationDate() {
-        return creationDate;
+        return created_at;
     }
 
     public void setCreationDate(LocalDateTime creationDate) {
-        this.creationDate = creationDate;
-    }
+        this.created_at = creationDate;
+    }    
 
-    public User(String username, String password, Role role, LocalDateTime creationDate) {
-        this.username = username;
-        this.password = password;
-        this.role = role;
-        this.creationDate = creationDate;
-    }
-
-    
-
-    public User() {
+    public Users() {
     }
     
 }
