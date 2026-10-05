@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useLocation, Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -17,36 +17,36 @@ import Logo from '../components/Logo';
 
 // Map Role trong mockDb → Role trong RBAC routing
 const ROLE_MAP = {
-  admin:      'Administrator',
+  admin: 'Administrator',
   instructor: 'Instructor',
-  student:    'Student',
+  student: 'Student',
 };
 
 // Redirect mặc định theo Role
 const ROLE_REDIRECT = {
   Administrator: '/admin',
-  Instructor:    '/instructor/videos',
-  Student:       '/student/courses',
+  Instructor: '/instructor/videos',
+  Student: '/student/courses',
 };
 
 /**
  * Tài khoản demo để điền nhanh — lấy thẳng từ mockDb.users
  */
 const DEMO_ACCOUNTS = [
-  { label: 'Admin',      user: users.find(u => u.Role === 'admin')      },
+  { label: 'Admin', user: users.find(u => u.Role === 'admin') },
   { label: 'Instructor', user: users.find(u => u.Role === 'instructor') },
-  { label: 'Student',    user: users.find(u => u.Role === 'student')    },
+  { label: 'Student', user: users.find(u => u.Role === 'student') },
 ];
 
 export default function Login() {
-  const [email, setEmail]           = useState('');
-  const [password, setPassword]     = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { login }  = useAuth();
-  const navigate   = useNavigate();
-  const location   = useLocation();
+  const { login } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { lang } = useParams();
   const { t } = useTranslation();
   const currentLang = lang || 'vi';
@@ -95,15 +95,15 @@ export default function Login() {
         return;
       }
 
-      const rbacRole  = ROLE_MAP[found.Role] || 'Student';
+      const rbacRole = ROLE_MAP[found.Role] || 'Student';
       const targetPath = ROLE_REDIRECT[rbacRole] || '/home';
 
       const userData = {
-        userId:   found.ID,
-        name:     found.Username.split('@')[0],   // hiển thị phần trước @
-        email:    found.Username,
-        role:     rbacRole,
-        token:    `mock_jwt_${found.Role}_${found.ID}_${Date.now()}`,
+        userId: found.ID,
+        name: found.Username.split('@')[0],   // hiển thị phần trước @
+        email: found.Username,
+        role: rbacRole,
+        token: `mock_jwt_${found.Role}_${found.ID}_${Date.now()}`,
       };
 
       login(userData);
@@ -111,7 +111,7 @@ export default function Login() {
       const from = location.state?.from?.pathname || targetPath;
       // Nếu path chưa có /lang/, tự động thêm vào
       const finalPath = from.startsWith(`/${currentLang}`) ? from : `/${currentLang}${from}`;
-      
+
       navigate(finalPath, { replace: true });
     }, 400);
   };

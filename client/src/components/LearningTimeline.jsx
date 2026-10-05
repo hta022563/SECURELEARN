@@ -3,6 +3,11 @@ import { Container, Row, Col } from 'react-bootstrap';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import MeshGradientBackground from './MeshGradientBackground';
+import step1Img from '../assets/timeline/timeline_step1_1791094283433.jpg';
+import step2Img from '../assets/timeline/timeline_step2_1791094295409.jpg';
+import step3Img from '../assets/timeline/timeline_step3_1791094304858.jpg';
+import step4Img from '../assets/timeline/timeline_step4_1791094316191.jpg';
+import step5Img from '../assets/timeline/timeline_step5_1791094326365.jpg';
 
 export default function LearningTimeline() {
   const { t } = useTranslation();
@@ -13,31 +18,31 @@ export default function LearningTimeline() {
       id: 1,
       title: t('home.timeline.step1_title', 'Khám phá khóa học'),
       desc: t('home.timeline.step1_desc', 'Tìm kiếm và lựa chọn lộ trình học tập phù hợp từ danh sách các khóa học chất lượng cao trên nền tảng.'),
-      image: '/images/timeline/timeline_step1_1791094283433.jpg'
+      image: step1Img
     },
     {
       id: 2,
       title: t('home.timeline.step2_title', 'Không gian học tập'),
       desc: t('home.timeline.step2_desc', 'Trải nghiệm môi trường học tập tĩnh lặng, tập trung, với giao diện quản lý tiến trình cá nhân thân thiện.'),
-      image: '/images/timeline/timeline_step2_1791094295409.jpg'
+      image: step2Img
     },
     {
       id: 3,
       title: t('home.timeline.step3_title', 'Bài giảng trực quan'),
       desc: t('home.timeline.step3_desc', 'Tiếp thu kiến thức hiệu quả thông qua video giảng dạy sắc nét, cấu trúc bài học rõ ràng và tài liệu phong phú.'),
-      image: '/images/timeline/timeline_step3_1791094304858.jpg'
+      image: step3Img
     },
     {
       id: 4,
       title: t('home.timeline.step4_title', 'Luyện tập & Đánh giá'),
       desc: t('home.timeline.step4_desc', 'Áp dụng ngay lý thuyết vào thực hành thông qua các bài tập và củng cố kỹ năng sau mỗi chương học.'),
-      image: '/images/timeline/timeline_step4_1791094316191.jpg'
+      image: step4Img
     },
     {
       id: 5,
       title: t('home.timeline.step5_title', 'Chứng nhận hoàn thành'),
       desc: t('home.timeline.step5_desc', 'Tổng kết quá trình nỗ lực, nhận chứng chỉ hoàn thành để nâng cấp hồ sơ năng lực và mở rộng cơ hội.'),
-      image: '/images/timeline/timeline_step5_1791094326365.jpg',
+      image: step5Img,
       isFinal: true
     }
   ];
@@ -144,7 +149,7 @@ export default function LearningTimeline() {
                     >
                       <img 
                         src={STICKY_STEPS.find(s => s.id === activeStep)?.image} 
-                        alt="Illustration"
+                        alt={STICKY_STEPS.find(s => s.id === activeStep)?.title || "Illustration"}
                         className="w-100 h-100 object-fit-cover"
                         style={{ transform: 'scale(1.05)' }}
                       />
