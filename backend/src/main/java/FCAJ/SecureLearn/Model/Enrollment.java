@@ -4,12 +4,14 @@
  */
 package FCAJ.SecureLearn.Model;
 
+import jakarta.persistence.Entity;
 import java.time.LocalDateTime;
 
 /**
  *
  * @author ngoct
  */
+@Entity
 public class Enrollment {
     enum status {NOTSTARTED, INPROGRESS, COMPLETED};
     int userId;

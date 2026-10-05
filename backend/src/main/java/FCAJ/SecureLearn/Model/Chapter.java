@@ -4,13 +4,56 @@
  */
 package FCAJ.SecureLearn.Model;
 
+import jakarta.persistence.Entity;
+
 /**
  *
  * @author ngoct
  */
+@Entity
 public class Chapter {
     int courseId;
     int chapterNumber;
     String title;
     String description;
+
+    public Chapter(int courseId, int chapterNumber, String title, String description) {
+        this.courseId = courseId;
+        this.chapterNumber = chapterNumber;
+        this.title = title;
+        this.description = description;
+    }
+
+    public int getCourseId() {
+        return courseId;
+    }
+
+    public void setCourseId(int courseId) {
+        this.courseId = courseId;
+    }
+
+    public int getChapterNumber() {
+        return chapterNumber;
+    }
+
+    public void setChapterNumber(int chapterNumber) {
+        this.chapterNumber = chapterNumber;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+    
 }

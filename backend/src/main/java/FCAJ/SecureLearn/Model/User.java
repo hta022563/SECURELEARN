@@ -5,11 +5,16 @@
 package FCAJ.SecureLearn.Model;
 
 import java.time.LocalDateTime;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
 
 /**
  *
  * @author ngoct
  */
+@Entity
 public class User {
     enum Role{INSTRUCTOR, STUDENT, ADMIN};
     String username;
