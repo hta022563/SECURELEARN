@@ -4,33 +4,40 @@
  */
 package FCAJ.SecureLearn.Model;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+
 import java.time.LocalDateTime;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortKey;
 
 /**
  *
  * @author ngoct
  */
-@Entity
+@DynamoDbBean
 public class Courses {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private long id;
-    String title;
-    String description;
+    String id;
+    String Chapter;
+    String title, description,instructor;
     float price;
-    LocalDateTime CreationDate;
-    String owner;
+    LocalDateTime creationTime;
+    LocalDateTime lastUpdatedTime;
 
-    public Courses(String title, String description, float price, LocalDateTime CreationDate, String owner) {
-        this.title = title;
-        this.description = description;
-        this.price = price;
-        this.CreationDate = CreationDate;
-        this.owner = owner;
+    public LocalDateTime getLastUpdatedTime() {
+        return lastUpdatedTime;
+    }
+
+    public void setLastUpdatedTime(LocalDateTime lastUpdatedTime) {
+        this.lastUpdatedTime = lastUpdatedTime;
+    }
+    String videoURL;
+
+    public String getVideoURL() {
+        return videoURL;
+    }
+
+    public void setVideoURL(String videoURL) {
+        this.videoURL = videoURL;
     }
 
     public String getTitle() {
@@ -49,6 +56,14 @@ public class Courses {
         this.description = description;
     }
 
+    public String getInstructor() {
+        return instructor;
+    }
+
+    public void setInstructor(String instructor) {
+        this.instructor = instructor;
+    }
+
     public float getPrice() {
         return price;
     }
@@ -57,20 +72,33 @@ public class Courses {
         this.price = price;
     }
 
-    public LocalDateTime getCreationDate() {
-        return CreationDate;
+    public LocalDateTime getCreationTime() {
+        return creationTime;
     }
 
-    public void setCreationDate(LocalDateTime CreationDate) {
-        this.CreationDate = CreationDate;
+    public void setCreationTime(LocalDateTime creationTime) {
+        this.creationTime = creationTime;
     }
 
-    public String getOwner() {
-        return owner;
+    public Courses(String id, String Chapter) {
+        this.id = id;
+        this.Chapter = Chapter;
     }
-
-    public void setOwner(String owner) {
-        this.owner = owner;
+    @DynamoDbPartitionKey
+    public String getId() {
+        return id;
     }
+    public void setId(String id) {
+        this.id = id;
+    }
+    
+    @DynamoDbSortKey
+    public String getChapter() {
+        return Chapter;
+    }
+    public void setChapter(String Chapter) {
+        this.Chapter = Chapter;
+    }
+    
     
 }
