@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef } from 'react';
 import PropTypes from 'prop-types';
 import {
   Container,
@@ -7,161 +7,160 @@ import {
   Card,
   Spinner,
   Alert,
-  Badge,
   Button,
 } from 'react-bootstrap';
+import { useSecurePlayer } from '../hooks/useSecurePlayer';
 import { useSecureHls } from '../hooks/useSecureHls';
 
 /**
  * Component: SecureVideoPlayer
- * 
- * Trình phát video bảo vệ bản quyền DRM nội bộ SecureLearn:
- * - HLS AES-128 mã hóa đầu cuối.
- * - Trao đổi khóa bảo mật ECDH qua Web Crypto API can thiệp fLoader của HLS.js.
- * - Giao diện chuẩn React-Bootstrap responsive cho máy tính và di động.
- * 
- * @param {Object} props
- * @param {string} props.videoId ID video bài giảng
- * @param {string|number} props.studentId ID sinh viên xem video
- * @param {string} [props.title] Tiêu đề bài giảng
+ * Trình phát video bảo vệ bản quyền nâng cao (Client-Side DRM & Anti-Piracy):
+ * - Focus-based Blackout (Tự động phủ đen & pause khi mất tiêu điểm / rời tab / mở Snipping Tool)
+ * - Anti-PrintScreen (Ghi đè Clipboard và phủ đen màn hình 3 giây khi chụp màn hình)
+ * - Anti-Debugging (Chặn F12, DevTools, Inspect Element, View Source, Copy, Chuột phải)
+ * - Chặn Picture-in-Picture & Tải xuống (disablePictureInPicture, nodownload)
+ * - Tương thích luồng HLS mã hóa AES-128 & ECDH hoặc Video URL trực tiếp
  */
 export default function SecureVideoPlayer({
+  videoUrl,
   videoId,
-  studentId,
+  studentId = 'STUDENT',
   title = 'Bài giảng SecureLearn',
   embedded = false,
 }) {
   const videoRef = useRef(null);
 
-  // Hook xử lý Signed URL, fLoader HLS.js và Handshake ECDH
+  // Hook bảo vệ Client-side: Focus Blackout, Anti-PrintScreen, Anti-Debugging
+  const { isScreenHidden, hideReason } = useSecurePlayer(videoRef);
+
+  // Hook xử lý Signed URL HLS và giải mã ECDH (chỉ chạy khi có videoId và không truyền trực tiếp videoUrl)
+  const activeVideoId = videoUrl ? null : videoId;
   const { isLoading, error, isReady, securityStatus, reload } = useSecureHls(
-    videoId,
+    activeVideoId,
     studentId,
     videoRef
   );
 
   const playerCard = (
     <Card className="card-clean shadow-sm border rounded-4 overflow-hidden bg-white">
-      {/* Card Header: Tiêu đề và Badges trạng thái DRM */}
-      <Card.Header className="bg-white border-bottom py-3 px-4 d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <div className="d-flex align-items-center gap-2">
-          <span className="badge-status-ready">● DRM Protected</span>
-          <h5 className="mb-0 text-truncate fw-bold text-dark" style={{ maxWidth: '420px' }}>
-            {title}
-          </h5>
-        </div>
-
-        <div className="d-flex align-items-center gap-2 flex-wrap">
-          <span className="badge-status-ready">HLS AES-128</span>
-          <span className="badge-pill-cyan">ECDH P-256</span>
-          <span className="badge bg-light text-secondary border rounded-pill px-3 py-2">
-            ID: {studentId}
-          </span>
-        </div>
+      {/* Card Header: Tiêu đề bài giảng */}
+      <Card.Header className="bg-white border-bottom py-3 px-4">
+        <h5 className="mb-0 fw-bold text-dark text-truncate">
+          {title}
+        </h5>
       </Card.Header>
 
-            {/* Khung chứa Video & Overlays (Responsive 16:9 Aspect Ratio) */}
-            <div
-              className="position-relative w-100 bg-black overflow-hidden"
-              style={{
-                aspectRatio: '16 / 9',
-                maxHeight: '75vh',
-                minHeight: '260px',
-              }}
-            >
-              {/* Thẻ Video HTML5 */}
-              <video
-                ref={videoRef}
-                className="w-100 h-100 d-block"
-                controls
-                controlsList="nodownload" // Chặn nút tải xuống trên trình duyệt Chromium
-                playsInline
-                style={{ objectFit: 'contain' }}
-              />
+      {/* Khung chứa Video & Overlays (Responsive 16:9 Aspect Ratio) */}
+      <div
+        className="position-relative w-100 bg-black overflow-hidden"
+        style={{
+          aspectRatio: '16 / 9',
+          maxHeight: '75vh',
+          minHeight: '260px',
+        }}
+        onContextMenu={(e) => e.preventDefault()}
+      >
+        {/* Thẻ Video HTML5 với đầy đủ các thuộc tính bảo mật theo yêu cầu */}
+        <video
+          ref={videoRef}
+          src={videoUrl || undefined}
+          className="w-100 h-100 d-block"
+          controls
+          controlsList="nodownload" // Chặn nút tải xuống trên trình duyệt Chromium
+          disablePictureInPicture // Chặn Picture-in-Picture để tránh lách thu nhỏ cửa sổ
+          onContextMenu={(e) => e.preventDefault()} // Chặn menu chuột phải trên video
+          playsInline
+          style={{ objectFit: 'contain' }}
+        />
 
-              {/* 1. Loading State Overlay (Spinner căn giữa khi đang fetch Signed URL / tải Key) */}
-              {isLoading && !error && (
-                <div
-                  className="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column justify-content-center align-items-center bg-black bg-opacity-75"
-                  style={{ zIndex: 30 }}
-                >
-                  <Spinner
-                    animation="border"
-                    variant="primary"
-                    role="status"
-                    style={{ width: '3.5rem', height: '3.5rem' }}
-                  >
-                    <span className="visually-hidden">Loading...</span>
-                  </Spinner>
-                  <p className="mt-3 text-light text-center px-3 small">
-                    {securityStatus}
-                  </p>
-                </div>
-              )}
-
-              {/* 2. Error State Overlay (Alert variant="danger") */}
-              {error && (
-                <div
-                  className="position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center p-3 bg-black bg-opacity-90"
-                  style={{ zIndex: 40 }}
-                >
-                  <Alert
-                    variant="danger"
-                    className="w-100 text-center shadow-lg border-danger mb-0"
-                    style={{ maxWidth: '520px' }}
-                  >
-                    <Alert.Heading className="fs-5 fw-bold mb-2">
-                      <i className="bi bi-shield-x me-2"></i>Không Thể Phát Video Bảo Mật
-                    </Alert.Heading>
-                    <p className="small mb-3">{error}</p>
-                    <hr className="my-2 border-danger opacity-25" />
-                    <div className="d-flex justify-content-center gap-2">
-                      <Button variant="outline-danger" size="sm" onClick={reload}>
-                        Thử Lại (Retry)
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => window.location.reload()}
-                      >
-                        Tải Lại Trang
-                      </Button>
-                    </div>
-                  </Alert>
-                </div>
-              )}
-              {/* 3. Dynamic Watermark Overlay (Chống quay lén) */}
-              {isReady && !error && (
-                <DynamicWatermark studentId={studentId} />
-              )}
+        {/* =========================================================================
+            GIAO DIỆN BÔI ĐEN (BLACKOUT OVERLAY): Render khi isScreenHidden === true
+            z-index cực cao (9999), nền đen tuyền, che phủ hoàn toàn video
+            ========================================================================= */}
+        {isScreenHidden && (
+          <div
+            className="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column justify-content-center align-items-center text-center p-4 user-select-none"
+            style={{
+              backgroundColor: '#000000',
+              zIndex: 9999, // z-index cực cao đè kín hoàn toàn video
+            }}
+          >
+            <div style={{ maxWidth: '480px' }}>
+              <h4 className="text-white fw-bold mb-2 text-uppercase tracking-wider">
+                Nội dung đã được bảo vệ bản quyền
+              </h4>
+              <p className="text-secondary small mb-3">
+                {hideReason === 'print_screen'
+                  ? 'Phát hiện thao tác chụp màn hình (PrintScreen). Hình ảnh đã bị vô hiệu hóa trong Clipboard và màn hình tạm thời bị ẩn trong 3 giây.'
+                  : 'Phát hiện mất tiêu điểm cửa sổ hoặc thao tác ghi màn hình. Video đã tạm dừng và phủ đen để bảo vệ nội dung bài giảng.'}
+              </p>
+              <div className="p-2 border border-secondary border-opacity-25 rounded-3 bg-dark bg-opacity-50">
+                <small className="text-light text-opacity-75">
+                  Vui lòng quay lại cửa sổ bài học và bấm phát tiếp tục để theo dõi.
+                </small>
+              </div>
             </div>
+          </div>
+        )}
 
-            {/* Card Footer: Thông tin phiên bảo mật và tình trạng bảo vệ bản quyền */}
-            <Card.Footer className="bg-light border-top py-3 px-4">
-              <Row className="align-items-center gy-2">
-                <Col xs={12} sm={7}>
-                  <div className="d-flex align-items-center gap-2">
-                    <span
-                      className={`badge rounded-pill ${
-                        isReady ? 'badge-status-ready' : error ? 'badge-status-failed' : 'badge-status-processing'
-                      }`}
-                    >
-                      {isReady ? 'Đã kích hoạt' : error ? 'Lỗi' : 'Đang xử lý'}
-                    </span>
-                    <small className="text-secondary text-truncate">
-                      {securityStatus}
-                    </small>
-                  </div>
-                </Col>
+        {/* 1. Loading State Overlay (khi tải HLS) */}
+        {!videoUrl && isLoading && !error && (
+          <div
+            className="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column justify-content-center align-items-center bg-black bg-opacity-75"
+            style={{ zIndex: 30 }}
+          >
+            <Spinner
+              animation="border"
+              variant="primary"
+              role="status"
+              style={{ width: '3.5rem', height: '3.5rem' }}
+            >
+              <span className="visually-hidden">Loading...</span>
+            </Spinner>
+            <p className="mt-3 text-light text-center px-3 small">
+              {securityStatus}
+            </p>
+          </div>
+        )}
 
-                <Col xs={12} sm={5} className="text-sm-end">
-                  <small className="text-muted">
-                    Mã phiên: <code className="text-primary">{videoId}-{studentId}</code>
-                  </small>
-                </Col>
-              </Row>
-            </Card.Footer>
-          </Card>
+        {/* 2. Error State Overlay (khi tải HLS gặp sự cố) */}
+        {!videoUrl && error && (
+          <div
+            className="position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center p-3 bg-black bg-opacity-90"
+            style={{ zIndex: 40 }}
+          >
+            <Alert
+              variant="danger"
+              className="w-100 text-center shadow-lg border-danger mb-0"
+              style={{ maxWidth: '520px' }}
+            >
+              <Alert.Heading className="fs-5 fw-bold mb-2">
+                <i className="bi bi-shield-x me-2"></i>Không Thể Phát Video Bảo Mật
+              </Alert.Heading>
+              <p className="small mb-3">{error}</p>
+              <hr className="my-2 border-danger opacity-25" />
+              <div className="d-flex justify-content-center gap-2">
+                <Button variant="outline-danger" size="sm" onClick={reload}>
+                  Thử Lại (Retry)
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => window.location.reload()}
+                >
+                  Tải Lại Trang
+                </Button>
+              </div>
+            </Alert>
+          </div>
+        )}
+
+        {/* 3. Dynamic Watermark Overlay */}
+        {(!isLoading || videoUrl) && !error && (
+          <DynamicWatermark studentId={studentId} />
+        )}
+      </div>
+    </Card>
   );
 
   if (embedded) {
@@ -180,9 +179,11 @@ export default function SecureVideoPlayer({
 }
 
 SecureVideoPlayer.propTypes = {
-  videoId: PropTypes.string.isRequired,
-  studentId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+  videoUrl: PropTypes.string,
+  videoId: PropTypes.string,
+  studentId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   title: PropTypes.string,
+  embedded: PropTypes.bool,
 };
 
 /**
@@ -207,7 +208,7 @@ function DynamicWatermark({ studentId }) {
         textAlign: 'right',
       }}
     >
-      User: {studentId} <br/> SecureLearn DRM
+      User: {studentId} <br /> SecureLearn
     </div>
   );
 }

@@ -135,7 +135,7 @@ export default function UserProfile() {
           <Card className="h-100 card-clean shadow-sm border rounded-4 overflow-hidden bg-white">
             <Card.Header className="bg-white border-bottom py-3 px-4 d-flex justify-content-between align-items-center">
               <h5 className="mb-0 fw-bold text-dark">
-                <i className="bi bi-person-badge-fill text-primary me-2"></i>{t('profile.account_info')}
+                {t('profile.account_info')}
               </h5>
               <span
                 className={`badge rounded-pill px-3 py-1 ${
@@ -254,7 +254,7 @@ export default function UserProfile() {
           <Card className="h-100 card-clean shadow-sm border rounded-4 overflow-hidden bg-white">
             <Card.Header className="bg-white border-bottom py-3 px-4">
               <h5 className="mb-0 fw-bold text-dark">
-                <i className="bi bi-shield-lock-fill text-primary me-2"></i>{t('profile.change_pwd')}
+                {t('profile.change_pwd')}
               </h5>
             </Card.Header>
 

@@ -13,6 +13,7 @@ import {
   Modal,
   Toast,
   ToastContainer,
+  Nav,
 } from 'react-bootstrap';
 import { useTranslation } from 'react-i18next';
 import {
@@ -87,6 +88,33 @@ export default function AdminAnomalyDashboard() {
   // State Toast thông báo
   const [toastMessage, setToastMessage] = useState(null);
 
+  // State 2 bảng (Chưa xử lý / Đã xử lý) & Tìm kiếm theo tên user
+  const [activeTableTab, setActiveTableTab] = useState('pending'); // 'pending' | 'resolved'
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+
+  // Lọc danh sách cảnh báo CHỈ THEO TÊN USER (studentName hoặc studentId)
+  const filteredAlerts = useMemo(() => {
+    if (!userSearchTerm.trim()) return alerts;
+    const term = userSearchTerm.toLowerCase().trim();
+    return alerts.filter(
+      (a) =>
+        (a.studentName && a.studentName.toLowerCase().includes(term)) ||
+        (a.studentId && a.studentId.toLowerCase().includes(term))
+    );
+  }, [alerts, userSearchTerm]);
+
+  // Bảng 1: Chưa xử lý
+  const pendingAlerts = useMemo(
+    () => filteredAlerts.filter((a) => a.status !== 'Resolved'),
+    [filteredAlerts]
+  );
+
+  // Bảng 2: Đã xử lý
+  const resolvedAlerts = useMemo(
+    () => filteredAlerts.filter((a) => a.status === 'Resolved'),
+    [filteredAlerts]
+  );
+
   /**
    * 1. Xử lý Truy vết rò rỉ từ Mã Watermark (Student ID) - 100% dữ liệu mềm từ DB
    */
@@ -145,7 +173,7 @@ export default function AdminAnomalyDashboard() {
   };
 
   /**
-   * 2. Xử lý nút "Resolve" -> Cập nhật trạng thái thành "Resolved"
+   * 2. Xử lý nút "Resolve" -> Cập nhật trạng thái thành "Resolved" (Chuyển sang bảng Đã Xử Lý)
    */
   const handleResolveAlert = (alertId) => {
     setAlerts((prevAlerts) =>
@@ -158,7 +186,24 @@ export default function AdminAnomalyDashboard() {
     const alertInDb = dbAlerts.find((a) => a.ID === alertId);
     if (alertInDb) alertInDb.Status = 'resolved';
 
-    setToastMessage(`${t('admin_alerts.marked_alert')} ${alertId}${t('admin_alerts.as_resolved')}`);
+    setToastMessage(`${t('admin_alerts.marked_alert')} ${alertId}${t('admin_alerts.as_resolved')} (Đã chuyển sang bảng Đã Xử Lý)`);
+  };
+
+  /**
+   * 2b. Xử lý nút "Reopen" -> Cập nhật trạng thái thành "New" (Chuyển ngược lại về bảng Chưa Xử Lý)
+   */
+  const handleReopenAlert = (alertId) => {
+    setAlerts((prevAlerts) =>
+      prevAlerts.map((item) =>
+        item.id === alertId ? { ...item, status: 'New' } : item
+      )
+    );
+
+    // Cập nhật CSDL mềm
+    const alertInDb = dbAlerts.find((a) => a.ID === alertId);
+    if (alertInDb) alertInDb.Status = 'open';
+
+    setToastMessage(`Đã hoàn tác cảnh báo ${alertId} (Đã chuyển về bảng Chưa Xử Lý)`);
   };
 
   /**
@@ -202,7 +247,6 @@ export default function AdminAnomalyDashboard() {
     if (score > 80) {
       return (
         <Badge bg="danger" className="px-2 py-1 fs-7">
-          <i className="bi bi-shield-fill-x me-1"></i>
           {score} / 100 {t('admin_alerts.high')}
         </Badge>
       );
@@ -210,14 +254,12 @@ export default function AdminAnomalyDashboard() {
     if (score >= 50) {
       return (
         <Badge bg="warning" text="dark" className="px-2 py-1 fs-7">
-          <i className="bi bi-shield-fill-exclamation me-1"></i>
           {score} / 100 {t('admin_alerts.medium')}
         </Badge>
       );
     }
     return (
       <Badge bg="info" className="px-2 py-1 fs-7">
-        <i className="bi bi-shield-fill-check me-1"></i>
         {score} / 100 {t('admin_alerts.low')}
       </Badge>
     );
@@ -248,7 +290,6 @@ export default function AdminAnomalyDashboard() {
       <div className="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4 pb-3 border-bottom">
         <div>
           <div className="badge-pill-soft mb-2">
-            <i className="bi bi-cpu text-primary"></i>
             <span>{t('admin_alerts.ai_anomaly_detection_erd')}</span>
           </div>
           <h2 className="fw-bold text-dark mb-1">
@@ -339,10 +380,7 @@ export default function AdminAnomalyDashboard() {
                       <span>{t('admin_alerts.searching')}</span>
                     </>
                   ) : (
-                    <>
-                      <i className="bi bi-shield-check"></i>
-                      <span>{t('admin_alerts.trace_identity')}</span>
-                    </>
+                    <span>{t('admin_alerts.trace_identity')}</span>
                   )}
                 </Button>
               </Col>
@@ -362,7 +400,7 @@ export default function AdminAnomalyDashboard() {
               <div className="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
                 <div>
                   <Badge bg="danger" className="px-3 py-1 mb-2">
-                    <i className="bi bi-exclamation-octagon me-1"></i>{t('admin_alerts.watermark_matched')}
+                    {t('admin_alerts.watermark_matched')}
                   </Badge>
                   <h5 className="fw-bold text-dark mb-0">
                     {tracedStudent.name} ({t('admin_alerts.code_prefix')}<code>{tracedStudent.id}</code>)
@@ -404,12 +442,88 @@ export default function AdminAnomalyDashboard() {
         </Card.Body>
       </Card>
 
-      {/* SECTION 2: BẢNG CẢNH BÁO BẤT THƯỜNG AI */}
+      {/* SECTION 2: BẢNG CẢNH BÁO BẤT THƯỜNG AI (CHIA 2 BẢNG: CHƯA XỬ LÝ & ĐÃ XỬ LÝ) */}
       <Card className="card-clean shadow-sm border rounded-4 overflow-hidden bg-white">
-        <Card.Header className="bg-white border-bottom py-3 px-4 d-flex justify-content-between align-items-center">
-          <h5 className="mb-0 fw-bold text-dark">{t('admin_alerts.ai_anomaly_list')}</h5>
+        <Card.Header className="bg-white border-bottom py-3 px-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div>
+            <h5 className="mb-0 fw-bold text-dark">{t('admin_alerts.ai_anomaly_list')}</h5>
+            <small className="text-secondary">Quản lý và đối soát cảnh báo phân tách theo trạng thái xử lý</small>
+          </div>
           <span className="badge-pill-cyan">ERD Table: anomalyAlerts</span>
         </Card.Header>
+
+        {/* Thanh điều khiển: Chuyển giữa 2 bảng & Tìm kiếm theo tên user */}
+        <div className="p-3 border-bottom bg-light d-flex justify-content-between align-items-center flex-wrap gap-3">
+          {/* 2 Tab chuyển đổi giữa 2 bảng */}
+          <Nav variant="pills" activeKey={activeTableTab} onSelect={(k) => setActiveTableTab(k)} className="gap-2">
+            <Nav.Item>
+              <Nav.Link
+                eventKey="pending"
+                className={`d-flex align-items-center gap-2 px-3 py-2 fw-semibold rounded-pill ${
+                  activeTableTab === 'pending'
+                    ? 'bg-danger text-white shadow-sm'
+                    : 'bg-white text-secondary border'
+                }`}
+                style={{ cursor: 'pointer' }}
+              >
+                <span>Chưa Xử Lý</span>
+                <Badge
+                  bg={activeTableTab === 'pending' ? 'light' : 'danger'}
+                  text={activeTableTab === 'pending' ? 'danger' : 'light'}
+                  className="rounded-pill"
+                >
+                  {pendingAlerts.length}
+                </Badge>
+              </Nav.Link>
+            </Nav.Item>
+            <Nav.Item>
+              <Nav.Link
+                eventKey="resolved"
+                className={`d-flex align-items-center gap-2 px-3 py-2 fw-semibold rounded-pill ${
+                  activeTableTab === 'resolved'
+                    ? 'bg-success text-white shadow-sm'
+                    : 'bg-white text-secondary border'
+                }`}
+                style={{ cursor: 'pointer' }}
+              >
+                <span>Đã Xử Lý</span>
+                <Badge
+                  bg={activeTableTab === 'resolved' ? 'light' : 'success'}
+                  text={activeTableTab === 'resolved' ? 'success' : 'light'}
+                  className="rounded-pill"
+                >
+                  {resolvedAlerts.length}
+                </Badge>
+              </Nav.Link>
+            </Nav.Item>
+          </Nav>
+
+          {/* Ô Tìm kiếm chỉ theo tên user */}
+          <div style={{ maxWidth: '300px', width: '100%' }}>
+            <InputGroup size="sm">
+              <InputGroup.Text className="bg-white border-end-0">
+                <i className="bi bi-search text-muted"></i>
+              </InputGroup.Text>
+              <Form.Control
+                type="text"
+                placeholder="Tìm kiếm theo tên user..."
+                value={userSearchTerm}
+                onChange={(e) => setUserSearchTerm(e.target.value)}
+                className="border-start-0 bg-white"
+              />
+              {userSearchTerm && (
+                <Button
+                  variant="outline-secondary"
+                  onClick={() => setUserSearchTerm('')}
+                  title="Xóa tìm kiếm"
+                  className="border-start-0 bg-white"
+                >
+                  ✕
+                </Button>
+              )}
+            </InputGroup>
+          </div>
+        </div>
 
         <Card.Body className="p-0">
           <div className="table-responsive">
@@ -423,64 +537,111 @@ export default function AdminAnomalyDashboard() {
                   <th style={{ width: '130px' }}>{t('admin_alerts.risk_score')}</th>
                   <th style={{ width: '150px' }}>{t('admin_alerts.time')}</th>
                   <th style={{ width: '110px' }}>{t('admin_alerts.status')}</th>
-                  <th style={{ width: '160px' }} className="text-center">{t('admin_alerts.actions')}</th>
+                  <th style={{ width: '180px' }} className="text-center">{t('admin_alerts.actions')}</th>
                 </tr>
               </thead>
               <tbody>
-                {alerts.map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      <code>{item.id}</code>
-                    </td>
-                    <td>
-                      <div className="fw-bold text-dark">{item.studentName}</div>
-                      <small className="text-muted font-monospace">{item.studentId}</small>
-                    </td>
-                    <td>
-                      <div className="fw-semibold text-dark">{item.anomalyType}</div>
-                      <small className="text-secondary text-truncate d-inline-block" style={{ maxWidth: '280px' }}>
-                        {item.details}
-                      </small>
-                    </td>
-                    <td>
-                      <span className="small text-secondary">{item.courseTitle}</span>
-                    </td>
-                    <td>{renderRiskScoreBadge(item.riskScore)}</td>
-                    <td className="small text-muted">{item.timestamp}</td>
-                    <td>{renderStatusBadge(item.status)}</td>
-                    <td className="text-center">
-                      <div className="d-flex justify-content-center gap-1">
-                        {item.status !== 'Resolved' && (
-                          <Button
-                            variant="outline-success"
-                            size="sm"
-                            className="rounded-pill px-2"
-                            title={t('admin_alerts.mark_resolved')}
-                            onClick={() => handleResolveAlert(item.id)}
-                          >
-                            <i className="bi bi-check-lg"></i>
-                          </Button>
-                        )}
-                        <Button
-                          variant="outline-danger"
-                          size="sm"
-                          className="rounded-pill px-2"
-                          title={t('admin_alerts.block_student_rights')}
-                          onClick={() => handleOpenBanModal(item)}
-                        >
-                          <i className="bi bi-shield-x"></i>
-                        </Button>
-                      </div>
+                {(activeTableTab === 'pending' ? pendingAlerts : resolvedAlerts).length === 0 ? (
+                  <tr>
+                    <td colSpan="8" className="text-center py-5 text-muted">
+                      {userSearchTerm ? (
+                        <div>
+                          <p className="mb-1 fw-semibold text-secondary">
+                            Không tìm thấy học viên nào khớp với tên "{userSearchTerm}".
+                          </p>
+                          <small>Vui lòng thử tìm với từ khóa khác hoặc xóa tìm kiếm.</small>
+                        </div>
+                      ) : activeTableTab === 'pending' ? (
+                        <div>
+                          <p className="mb-1 fw-semibold text-success">
+                            Không có cảnh báo nào chưa xử lý!
+                          </p>
+                          <small>Tất cả cảnh báo đã được giải quyết hoặc chưa phát sinh cảnh báo mới.</small>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="mb-1 fw-semibold text-secondary">
+                            Chưa có cảnh báo nào ở bảng Đã Xử Lý.
+                          </p>
+                          <small>Bấm nút "Xử lý" ở bảng "Chưa Xử Lý" để chuyển cảnh báo sang đây.</small>
+                        </div>
+                      )}
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  (activeTableTab === 'pending' ? pendingAlerts : resolvedAlerts).map((item) => (
+                    <tr key={item.id}>
+                      <td>
+                        <code>{item.id}</code>
+                      </td>
+                      <td>
+                        <div className="fw-bold text-dark">{item.studentName}</div>
+                        <small className="text-muted font-monospace">{item.studentId}</small>
+                      </td>
+                      <td>
+                        <div className="fw-semibold text-dark">{item.anomalyType}</div>
+                        <small className="text-secondary text-truncate d-inline-block" style={{ maxWidth: '280px' }}>
+                          {item.details}
+                        </small>
+                      </td>
+                      <td>
+                        <span className="small text-secondary">{item.courseTitle}</span>
+                      </td>
+                      <td>{renderRiskScoreBadge(item.riskScore)}</td>
+                      <td className="small text-muted">{item.timestamp}</td>
+                      <td>{renderStatusBadge(item.status)}</td>
+                      <td className="text-center">
+                        <div className="d-flex justify-content-center gap-1">
+                          {activeTableTab === 'pending' ? (
+                            <Button
+                              variant="outline-success"
+                              size="sm"
+                              className="rounded-pill px-2 d-flex align-items-center gap-1"
+                              title="Đánh dấu đã xử lý (Chuyển sang bảng Đã Xử Lý)"
+                              onClick={() => handleResolveAlert(item.id)}
+                            >
+                              <i className="bi bi-check-lg"></i>
+                              <span style={{ fontSize: '0.75rem' }}>Xử lý</span>
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="outline-warning"
+                              size="sm"
+                              className="rounded-pill px-2 d-flex align-items-center gap-1"
+                              title="Mở lại (Chuyển về bảng Chưa Xử Lý)"
+                              onClick={() => handleReopenAlert(item.id)}
+                            >
+                              <i className="bi bi-arrow-counterclockwise"></i>
+                              <span style={{ fontSize: '0.75rem' }}>Mở lại</span>
+                            </Button>
+                          )}
+                          <Button
+                            variant="outline-danger"
+                            size="sm"
+                            className="rounded-pill px-2"
+                            title={t('admin_alerts.block_student_rights')}
+                            onClick={() => handleOpenBanModal(item)}
+                          >
+                            <i className="bi bi-shield-x"></i>
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </Table>
           </div>
         </Card.Body>
 
-        <Card.Footer className="bg-light border-top py-3 px-4 text-muted small">
-          {t('admin_alerts.displaying')} <strong>{alerts.length}</strong> {t('admin_alerts.alerts_in_db')}
+        <Card.Footer className="bg-light border-top py-3 px-4 d-flex justify-content-between align-items-center text-muted small flex-wrap gap-2">
+          <span>
+            Đang hiển thị <strong>{(activeTableTab === 'pending' ? pendingAlerts : resolvedAlerts).length}</strong> cảnh báo trong bảng <strong>{activeTableTab === 'pending' ? 'Chưa Xử Lý' : 'Đã Xử Lý'}</strong>
+            {userSearchTerm && ` (Lọc theo tên user: "${userSearchTerm}")`}.
+          </span>
+          <span className="text-secondary">
+            Tổng cộng: <strong>{alerts.length}</strong> cảnh báo trên toàn hệ thống.
+          </span>
         </Card.Footer>
       </Card>
 

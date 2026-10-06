@@ -112,7 +112,6 @@ export default function MyCourses() {
       <div className="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4 pb-3 border-bottom">
         <div>
           <div className="badge-pill-soft mb-2">
-            <i className="bi bi-mortarboard-fill text-primary"></i>
             <span>{t('dashboard.personal_space')}</span>
           </div>
           <h2 className="fw-bold text-dark mb-1">
@@ -124,9 +123,6 @@ export default function MyCourses() {
         </div>
 
         <div className="d-flex align-items-center gap-2">
-          <span className="badge-status-ready">
-            <i className="bi bi-shield-check me-1"></i>{t('dashboard.hls_drm_active')}
-          </span>
           <span className="badge-pill-cyan">
             {courses.length} {t('dashboard.enrolled_courses')}
           </span>

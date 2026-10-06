@@ -31,6 +31,14 @@ export function useSecureHls(videoId, studentId, videoRef) {
 
   useEffect(() => {
     let isCancelled = false;
+
+    if (!videoId) {
+      setIsLoading(false);
+      setIsReady(true);
+      setSecurityStatus('Sẵn sàng phát video');
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     setIsReady(false);

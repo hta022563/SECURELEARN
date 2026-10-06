@@ -125,7 +125,7 @@ export default function Login() {
               {/* Card Header Trắng Xanh */}
               <Card.Header className="bg-white border-bottom text-center py-4">
                 <div className="mb-3 d-flex justify-content-center">
-                  <Logo size="lg" showBadge={true} badgeText="DRM PLATFORM" />
+                  <Logo size="lg" showBadge={true} badgeText="E-LEARNING" />
                 </div>
                 <h4 className="fw-bold mb-1 text-dark">
                   {t('login.title')}

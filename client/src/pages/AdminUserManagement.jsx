@@ -225,7 +225,6 @@ export default function AdminUserManagement() {
       <div className="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4 pb-3 border-bottom">
         <div>
           <div className="badge-pill-soft mb-2">
-            <i className="bi bi-people-fill text-primary"></i>
             <span>{t('admin_users.user_management_erd')}</span>
           </div>
           <h2 className="fw-bold text-dark mb-1">

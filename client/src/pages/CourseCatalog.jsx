@@ -86,10 +86,6 @@ export default function CourseCatalog() {
          * 1. HEADER BANNER
          * ===================================================================== */}
         <div className="text-center mb-5 pb-2">
-          <div className="badge-pill-soft mb-2">
-            <i className="bi bi-collection-play-fill text-primary"></i>
-            <span>{t('catalog.badge')}</span>
-          </div>
           <h1 className="display-5 fw-extrabold text-dark mb-2">
             {t('catalog.title')}<span className="text-primary">{t('catalog.title_highlight')}</span>
           </h1>
@@ -154,7 +150,7 @@ export default function CourseCatalog() {
                     className="rounded-pill px-3"
                     onClick={() => setFilterType('ENTITLED')}
                   >
-                    <i className="bi bi-shield-check me-1"></i>{t('catalog.filter_entitled')} ({entitledIds.length})
+                    {t('catalog.filter_entitled')} ({entitledIds.length})
                   </Button>
                   <Button
                     variant={filterType === 'UNENTITLED' ? 'secondary' : 'outline-secondary'}
@@ -162,7 +158,7 @@ export default function CourseCatalog() {
                     className="rounded-pill px-3"
                     onClick={() => setFilterType('UNENTITLED')}
                   >
-                    <i className="bi bi-lock me-1"></i>{t('catalog.filter_unentitled')} ({courses.length - entitledIds.length})
+                    {t('catalog.filter_unentitled')} ({courses.length - entitledIds.length})
                   </Button>
                 </>
               )}
@@ -216,11 +212,11 @@ export default function CourseCatalog() {
                       <div className="d-flex justify-content-between align-items-center">
                         {isEntitled ? (
                           <Badge bg="success" className="px-3 py-2 rounded-pill fw-semibold shadow-sm">
-                            <i className="bi bi-shield-check me-1"></i>{t('catalog.entitled')}
+                            {t('catalog.entitled')}
                           </Badge>
                         ) : (
                           <Badge bg="secondary" className="px-3 py-2 rounded-pill fw-semibold bg-opacity-75">
-                            <i className="bi bi-lock-fill me-1"></i>{t('catalog.not_entitled')}
+                            {t('catalog.not_entitled')}
                           </Badge>
                         )}
                         <span className="small text-muted font-monospace">

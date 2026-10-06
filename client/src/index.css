@@ -732,7 +732,19 @@ h6 {
 
 [data-bs-theme="dark"] .form-control::placeholder,
 [data-bs-theme="dark"] .form-control-clean::placeholder {
-  color: transparent !important; /* Ẩn placeholder trong FloatingLabel để tránh chồng chữ */
+  color: #94a3b8 !important; /* Màu gợi ý (placeholder) hiển thị sáng rõ ràng trong chế độ tối */
+  opacity: 1 !important;
+}
+
+/* Chỉ ẩn placeholder khi nằm trong form-floating để tránh đè chữ label */
+[data-bs-theme="dark"] .form-floating > .form-control::placeholder,
+[data-bs-theme="dark"] .form-floating > .form-control-clean::placeholder {
+  color: transparent !important;
+}
+
+[data-bs-theme="dark"] .form-floating > .form-control:focus::placeholder,
+[data-bs-theme="dark"] .form-floating > .form-control-clean:focus::placeholder {
+  color: #94a3b8 !important;
 }
 
 [data-bs-theme="dark"] .form-control:focus,

@@ -109,7 +109,6 @@ export default function AdminSystemConfig() {
         <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
           <div>
             <div className="badge-pill-soft mb-2">
-              <i className="bi bi-sliders text-primary"></i>
               <span>{t('admin_config.drm_sys_admin_erd')}</span>
             </div>
             <h2 className="fw-bold text-dark mb-1">
@@ -136,7 +135,7 @@ export default function AdminSystemConfig() {
             <Card className="card-clean border-0 shadow-sm p-4 mb-4 bg-white">
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <h5 className="fw-bold text-dark mb-0">
-                  <i className="bi bi-cloud-check text-primary me-2"></i>{t('admin_config.r2_storage_cost')}
+                  {t('admin_config.r2_storage_cost')}
                 </h5>
                 <Badge bg={budgetPercent > 75 ? 'danger' : 'success'} className="rounded-pill">
                   {budgetPercent}{t('admin_config.percent_limit')}
@@ -186,7 +185,7 @@ export default function AdminSystemConfig() {
             {/* Trạng Thái An Toàn DRM */}
             <Card className="card-clean border-0 shadow-sm p-4 bg-white">
               <h5 className="fw-bold text-dark mb-3">
-                <i className="bi bi-shield-lock-fill text-primary me-2"></i>{t('admin_config.kms_drm_status')}
+                {t('admin_config.kms_drm_status')}
               </h5>
               <div className="d-flex flex-column gap-3 small">
                 <div className="d-flex justify-content-between align-items-center pb-2 border-bottom">
@@ -216,7 +215,7 @@ export default function AdminSystemConfig() {
             <Card className="card-clean border-0 shadow-sm p-4 bg-white">
               <Form id="config-form" onSubmit={handleSave}>
                 <h5 className="fw-bold text-dark mb-3">
-                  <i className="bi bi-gear-fill text-primary me-2"></i>{t('admin_config.security_sys_params')}
+                  {t('admin_config.security_sys_params')}
                 </h5>
 
                 <Row className="g-3 mb-4">
@@ -298,7 +297,7 @@ export default function AdminSystemConfig() {
                 </Row>
 
                 <h5 className="fw-bold text-dark mb-3 pt-3 border-top">
-                  <i className="bi bi-shield-check text-primary me-2"></i>{t('admin_config.auto_safety_rules')}
+                  {t('admin_config.auto_safety_rules')}
                 </h5>
 
                 <div className="d-flex flex-column gap-3 mb-4">

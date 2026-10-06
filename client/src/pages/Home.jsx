@@ -134,56 +134,76 @@ export default function Home() {
                   )}
                   {user?.role === 'Administrator' && (
                     <Link to={`/${lang}/admin/alerts`} className="btn-primary-pill text-decoration-none d-flex align-items-center gap-2">
-                      <i className="bi bi-shield-check"></i>
                       <span>{t('common.ai_dashboard')}</span>
                     </Link>
                   )}
                   <Link to={`/${lang}/catalog`} className="btn-secondary-pill text-decoration-none d-flex align-items-center gap-2">
                     <span>{t('common.explore_more')}</span>
-                    <i className="bi bi-arrow-right"></i>
                   </Link>
                 </>
               )}
             </div>
           </Col>
 
-          {/* Cột phải: Thống kê số liệu quy mô nền tảng */}
-          <Col lg={5} className="d-flex align-items-center">
-            <div className="card-clean bg-white p-4 p-lg-5 rounded-4 shadow-sm border w-100">
+          {/* Cột phải: Thẻ Thống Kê Nền Tảng (Thiết kế phẳng tinh tế, sạch sẽ, chuẩn Dark & Light Mode) */}
+          <Col lg={5} className="d-flex align-items-center justify-content-center">
+            <div className="card-clean rounded-4 p-4 p-md-5 border shadow-sm position-relative w-100">
+              {/* Hàng trên: 2 Cột chỉ số số to, không icon, cực kỳ gọn gàng và sắc nét */}
               <div className="row g-0 align-items-center text-center">
                 {/* Chỉ số 1: Khóa học */}
-                <div className="col-6 px-2">
-                  <div className="d-flex justify-content-center mb-2">
-                    <i className="bi bi-mortarboard text-primary" style={{ fontSize: '2.5rem' }}></i>
+                <div className="col-6 px-3">
+                  <div
+                    className="display-4 fw-extrabold text-dark mb-1"
+                    style={{
+                      letterSpacing: '-0.03em',
+                      fontWeight: 800,
+                    }}
+                  >
+                    {totalCourses.toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US')}
                   </div>
-                  <div className="display-4 fw-extrabold text-dark mb-1" style={{ letterSpacing: '-0.03em', fontWeight: 800 }}>
-                    {totalCourses.toLocaleString('vi-VN')}
-                  </div>
-                  <div className="text-secondary fw-medium" style={{ fontSize: '1rem' }}>
-                    {t('common.courses_count')}
+                  <div className="text-secondary fw-semibold">
+                    {lang === 'vi' ? 'Khóa học' : 'Courses'}
                   </div>
                 </div>
 
                 {/* Chỉ số 2: Lượt đăng ký học (ngăn cách bởi vạch dọc) */}
-                <div className="col-6 px-2 border-start border-light-subtle">
-                  <div className="d-flex justify-content-center mb-2">
-                    <i className="bi bi-people text-primary" style={{ fontSize: '2.5rem' }}></i>
-                  </div>
-                  <div className="display-4 fw-extrabold text-dark mb-1" style={{ letterSpacing: '-0.03em', fontWeight: 800 }}>
+                <div className="col-6 px-3 border-start border-light-subtle">
+                  <div
+                    className="display-4 fw-extrabold text-dark mb-1"
+                    style={{
+                      letterSpacing: '-0.03em',
+                      fontWeight: 800,
+                    }}
+                  >
                     {totalEnrollments.toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US')}
                   </div>
-                  <div className="text-secondary fw-medium" style={{ fontSize: '1rem' }}>
-                    {t('common.enrollments_count')}
+                  <div className="text-secondary fw-semibold">
+                    {lang === 'vi' ? 'Học viên' : 'Students'}
                   </div>
                 </div>
               </div>
 
-              {/* Dòng cam kết bảo mật & bản quyền số */}
-              <div className="mt-4 pt-3 border-top border-light-subtle d-flex align-items-center justify-content-between small text-muted">
-                <div className="d-flex align-items-center gap-2">
-                  <span>{lang === 'vi' ? 'Bảo vệ bản quyền HLS AES-128' : 'HLS AES-128 Protection'}</span>
-                </div>
-                <span className="badge-pill-cyan">{t('common.drm_live')}</span>
+              {/* Vạch ngăn cách ngang */}
+              <div className="border-top border-light-subtle my-4" />
+
+              {/* Hàng dưới: Giới thiệu nền tảng thân thiện & Huy hiệu trực tuyến rõ nét trên mọi nền */}
+              <div className="d-flex align-items-center justify-content-between gap-3">
+                <span className="text-secondary fw-medium small mb-0">
+                  {lang === 'vi' ? 'Nền tảng học trực tuyến chất lượng cao' : 'High quality online learning platform'}
+                </span>
+
+                <span className="badge-pill-soft small text-nowrap flex-shrink-0">
+                  <span
+                    style={{
+                      width: '7px',
+                      height: '7px',
+                      borderRadius: '50%',
+                      backgroundColor: 'currentColor',
+                      display: 'inline-block',
+                    }}
+                  />
+                  <span>{lang === 'vi' ? 'Học trực tuyến' : 'Live Online'}</span>
+                </span>
               </div>
             </div>
           </Col>
@@ -239,11 +259,11 @@ export default function Home() {
                       <div className="d-flex justify-content-between align-items-center">
                         {isEntitled ? (
                           <Badge bg="success" className="px-3 py-2 rounded-pill fw-semibold shadow-sm">
-                            <i className="bi bi-shield-check me-1"></i>{t('home.entitled')}
+                            {t('home.entitled')}
                           </Badge>
                         ) : (
                           <Badge bg="secondary" className="px-3 py-2 rounded-pill fw-semibold bg-opacity-75">
-                            <i className="bi bi-lock-fill me-1"></i>{t('home.not_entitled')}
+                            {t('home.not_entitled')}
                           </Badge>
                         )}
                         <span className="small text-muted font-monospace">
@@ -498,7 +518,6 @@ export default function Home() {
               )}
               {user?.role === 'Administrator' && (
                 <Link to={`/${lang}/admin/alerts`} className="btn-primary-pill text-decoration-none px-4 d-inline-flex align-items-center gap-2">
-                  <i className="bi bi-shield-check"></i>
                   <span>{t('common.ai_dashboard')}</span>
                 </Link>
               )}

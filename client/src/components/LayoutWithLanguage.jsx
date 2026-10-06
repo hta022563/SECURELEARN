@@ -73,7 +73,7 @@ export default function LayoutWithLanguage() {
       <Navbar bg="white" expand="lg" sticky="top" className="border-bottom py-2 shadow-sm" style={{ zIndex: 1030 }}>
         <Container fluid className="px-3 px-lg-4 px-xxl-5">
           <Navbar.Brand as={Link} to={`/${lang}/home`} className="d-flex align-items-center me-3 me-xl-4 text-decoration-none py-0">
-            <Logo size="sm" showBadge={true} badgeText="DRM E-LEARNING" />
+            <Logo size="sm" showBadge={true} badgeText="E-LEARNING" />
           </Navbar.Brand>
 
           <Navbar.Toggle aria-controls="main-navbar">
@@ -85,10 +85,10 @@ export default function LayoutWithLanguage() {
               {!isAuthenticated && (
                 <>
                   <Nav.Link as={Link} to={`/${lang}/home`} className={isActive('/home') ? 'nav-pill-active' : 'nav-link-custom'}>
-                    <i className="bi bi-house-door me-1"></i>{t('common.home', 'Home')}
+                    {t('common.home', 'Home')}
                   </Nav.Link>
                   <Nav.Link as={Link} to={`/${lang}/catalog`} className={isActive('/catalog') ? 'nav-pill-active' : 'nav-link-custom'}>
-                    <i className="bi bi-collection me-1"></i>{t('common.catalog', 'Catalog')}
+                    {t('common.catalog', 'Catalog')}
                   </Nav.Link>
                 </>
               )}
@@ -96,10 +96,10 @@ export default function LayoutWithLanguage() {
               {isAuthenticated && user?.role === 'Student' && (
                 <>
                   <Nav.Link as={Link} to={`/${lang}/student/courses`} className={isActive('/student/courses') ? 'nav-pill-active' : 'nav-link-custom'}>
-                    <i className="bi bi-mortarboard me-1"></i>{t('navbar.my_courses')}
+                    {t('navbar.my_courses')}
                   </Nav.Link>
                   <Nav.Link as={Link} to={`/${lang}/catalog`} className={isActive('/catalog') ? 'nav-pill-active' : 'nav-link-custom'}>
-                    <i className="bi bi-compass me-1"></i>{t('navbar.course_catalog')}
+                    {t('navbar.course_catalog')}
                   </Nav.Link>
                 </>
               )}
@@ -107,13 +107,13 @@ export default function LayoutWithLanguage() {
               {isAuthenticated && user?.role === 'Instructor' && (
                 <>
                   <Nav.Link as={Link} to={`/${lang}/instructor/videos`} className={isActive('/instructor/videos') ? 'nav-pill-active' : 'nav-link-custom'}>
-                    <i className="bi bi-film me-1"></i>{t('navbar.manage_videos')}
+                    {t('navbar.manage_videos')}
                   </Nav.Link>
                   <Nav.Link as={Link} to={`/${lang}/instructor/upload`} className={isActive('/instructor/upload') ? 'nav-pill-active' : 'nav-link-custom'}>
-                    <i className="bi bi-cloud-arrow-up me-1"></i>{t('navbar.upload_drm')}
+                    {t('navbar.upload_drm')}
                   </Nav.Link>
                   <Nav.Link as={Link} to={`/${lang}/catalog`} className={isActive('/catalog') ? 'nav-pill-active' : 'nav-link-custom'}>
-                    <i className="bi bi-compass me-1"></i>{t('navbar.explore_courses')}
+                    {t('navbar.explore_courses')}
                   </Nav.Link>
                 </>
               )}
@@ -121,16 +121,16 @@ export default function LayoutWithLanguage() {
               {isAuthenticated && user?.role === 'Administrator' && (
                 <>
                   <Nav.Link as={Link} to={`/${lang}/admin/users`} className={isActive('/admin/users') ? 'nav-pill-active' : 'nav-link-custom'}>
-                    <i className="bi bi-people me-1"></i>{t('navbar.manage_users')}
+                    {t('navbar.manage_users')}
                   </Nav.Link>
                   <Nav.Link as={Link} to={`/${lang}/admin/alerts`} className={isActive('/admin/alerts') ? 'nav-pill-active' : 'nav-link-custom'}>
-                    <i className="bi bi-shield-check me-1"></i>{t('navbar.ai_alerts')}
+                    {t('navbar.ai_alerts')}
                   </Nav.Link>
                   <Nav.Link as={Link} to={`/${lang}/admin/config`} className={isActive('/admin/config') ? 'nav-pill-active' : 'nav-link-custom'}>
-                    <i className="bi bi-sliders me-1"></i>{t('navbar.r2_config')}
+                    {t('navbar.r2_config')}
                   </Nav.Link>
                   <Nav.Link as={Link} to={`/${lang}/admin/trace`} className={isActive('/admin/trace') ? 'nav-pill-active' : 'nav-link-custom'}>
-                    <i className="bi bi-fingerprint me-1"></i>{t('navbar.watermark_tracing')}
+                    {t('navbar.watermark_tracing')}
                   </Nav.Link>
                 </>
               )}
@@ -219,10 +219,10 @@ export default function LayoutWithLanguage() {
               ) : (
                 <div className="d-flex align-items-center gap-2 mt-2 mt-lg-0">
                   <Link to={`/${lang}/login`} className="btn-secondary-pill text-decoration-none small">
-                    {t('common.login', 'Sign In')}
+                    {t('common.login', 'Login')}
                   </Link>
                   <Link to={`/${lang}/register`} className="btn-primary-pill text-decoration-none small">
-                    {t('common.register', 'Sign Up')}
+                    {t('common.register', 'Register')}
                   </Link>
                 </div>
               )}

@@ -161,8 +161,7 @@ export default function LeakTracing() {
       <div className="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4 pb-3 border-bottom">
         <div>
           <div className="badge-pill-soft mb-2">
-            <i className="bi bi-fingerprint text-primary"></i>
-            <span>Bảo Mật DRM Bản Quyền (Dữ Liệu Mềm ERD)</span>
+            <span>Bảo Mật DRM Bản Quyền</span>
           </div>
           <h2 className="fw-bold text-dark mb-1">
             Đối Soát Dấu Vân Tay &amp; <span className="text-primary">Truy Vết Rò Rỉ Video</span>
@@ -216,7 +215,7 @@ export default function LeakTracing() {
                 <div className="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
                   <div>
                     <Badge bg="danger" className="px-3 py-1 mb-2">
-                      <i className="bi bi-exclamation-octagon me-1"></i>Trùng Khớp Watermark
+                      Trùng Khớp Watermark
                     </Badge>
                     <h5 className="fw-bold text-dark mb-0">
                       {tracedStudent.name} (Mã: <code>{tracedStudent.id}</code>)
@@ -261,7 +260,7 @@ export default function LeakTracing() {
         <Col lg={5}>
           <Card className="card-clean shadow-sm border rounded-4 p-4 bg-white h-100">
             <h5 className="fw-bold text-dark mb-3">
-              <i className="bi bi-shield-check text-primary me-2"></i>Cơ Chế Dynamic Watermarking
+              Cơ Chế Dynamic Watermarking
             </h5>
             <div className="d-flex flex-column gap-3 small text-secondary">
               <div className="p-3 bg-light rounded-3 border">

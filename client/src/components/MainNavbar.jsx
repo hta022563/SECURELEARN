@@ -66,7 +66,7 @@ export default function MainNavbar() {
          * 1. LOGO THƯƠNG HIỆU SECURELEARN HIỆN ĐẠI
          * ===================================================================== */}
         <Navbar.Brand as={Link} to="/" className="d-flex align-items-center me-3 me-xl-4 text-decoration-none py-0">
-          <Logo size="sm" showBadge={true} badgeText="DRM E-LEARNING" />
+          <Logo size="sm" showBadge={true} badgeText="E-LEARNING" />
         </Navbar.Brand>
 
         {/* Nút Hamburger Toggle trên màn hình di động */}
@@ -87,14 +87,14 @@ export default function MainNavbar() {
                   to="/"
                   className={isActive('/') ? 'nav-pill-active' : 'nav-link-custom'}
                 >
-                  <i className="bi bi-house-door me-1"></i>{t('common.home')}
+                  {t('common.home')}
                 </Nav.Link>
                 <Nav.Link
                   as={Link}
                   to="/catalog"
                   className={isActive('/catalog') ? 'nav-pill-active' : 'nav-link-custom'}
                 >
-                  <i className="bi bi-collection me-1"></i>{t('common.catalog')}
+                  {t('common.catalog')}
                 </Nav.Link>
               </>
             )}
@@ -107,14 +107,14 @@ export default function MainNavbar() {
                   to="/student/courses"
                   className={isActive('/student/courses') ? 'nav-pill-active' : 'nav-link-custom'}
                 >
-                  <i className="bi bi-mortarboard me-1"></i>{t('navbar.my_courses')}
+                  {t('navbar.my_courses')}
                 </Nav.Link>
                 <Nav.Link
                   as={Link}
                   to="/catalog"
                   className={isActive('/catalog') ? 'nav-pill-active' : 'nav-link-custom'}
                 >
-                  <i className="bi bi-compass me-1"></i>{t('navbar.course_catalog')}
+                  {t('navbar.course_catalog')}
                 </Nav.Link>
               </>
             )}
@@ -127,28 +127,28 @@ export default function MainNavbar() {
                   to="/instructor/videos"
                   className={isActive('/instructor/videos') ? 'nav-pill-active' : 'nav-link-custom'}
                 >
-                  <i className="bi bi-film me-1"></i>{t('navbar.manage_videos')}
+                  {t('navbar.manage_videos')}
                 </Nav.Link>
                 <Nav.Link
                   as={Link}
                   to="/instructor/upload"
                   className={isActive('/instructor/upload') ? 'nav-pill-active' : 'nav-link-custom'}
                 >
-                  <i className="bi bi-cloud-arrow-up me-1"></i>{t('navbar.upload_drm')}
+                  {t('navbar.upload_drm')}
                 </Nav.Link>
                 <Nav.Link
                   as={Link}
                   to="/instructor/preview/v-001"
                   className={location.pathname.startsWith('/instructor/preview') ? 'nav-pill-active' : 'nav-link-custom'}
                 >
-                  <i className="bi bi-eye me-1"></i>{t('navbar.preview_video')}
+                  {t('navbar.preview_video')}
                 </Nav.Link>
                 <Nav.Link
                   as={Link}
                   to="/catalog"
                   className={isActive('/catalog') ? 'nav-pill-active' : 'nav-link-custom'}
                 >
-                  <i className="bi bi-compass me-1"></i>{t('navbar.explore_courses')}
+                  {t('navbar.explore_courses')}
                 </Nav.Link>
               </>
             )}
@@ -161,28 +161,28 @@ export default function MainNavbar() {
                   to="/admin/users"
                   className={isActive('/admin/users') ? 'nav-pill-active' : 'nav-link-custom'}
                 >
-                  <i className="bi bi-people me-1"></i>{t('navbar.manage_users')}
+                  {t('navbar.manage_users')}
                 </Nav.Link>
                 <Nav.Link
                   as={Link}
                   to="/admin/alerts"
                   className={isActive('/admin/alerts') ? 'nav-pill-active' : 'nav-link-custom'}
                 >
-                  <i className="bi bi-shield-check me-1"></i>{t('navbar.ai_alerts')}
+                  {t('navbar.ai_alerts')}
                 </Nav.Link>
                 <Nav.Link
                   as={Link}
                   to="/admin/config"
                   className={isActive('/admin/config') ? 'nav-pill-active' : 'nav-link-custom'}
                 >
-                  <i className="bi bi-sliders me-1"></i>{t('navbar.r2_config')}
+                  {t('navbar.r2_config')}
                 </Nav.Link>
                 <Nav.Link
                   as={Link}
                   to="/admin/trace"
                   className={isActive('/admin/trace') ? 'nav-pill-active' : 'nav-link-custom'}
                 >
-                  <i className="bi bi-fingerprint me-1"></i>{t('navbar.watermark_tracing')}
+                  {t('navbar.watermark_tracing')}
                 </Nav.Link>
               </>
             )}

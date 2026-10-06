@@ -13,7 +13,7 @@ import PropTypes from 'prop-types';
 export default function Logo({
   size = 'md',
   showBadge = true,
-  badgeText = 'DRM SECURE',
+  badgeText = 'E-LEARNING',
   iconOnly = false,
   className = '',
 }) {

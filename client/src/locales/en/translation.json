@@ -1,7 +1,7 @@
 {
   "common": {
-    "login": "Sign In",
-    "register": "Sign Up",
+    "login": "Login",
+    "register": "Register",
     "home": "Home",
     "catalog": "Course Catalog",
     "my_courses": "My Courses",
@@ -10,7 +10,7 @@
     "explore_courses": "Explore All Courses",
     "explore_more": "Explore More Courses",
     "courses_count": "Courses",
-    "enrollments_count": "Enrollments",
+    "enrollments_count": "Students",
     "drm_live": "DRM Live",
     "search": "Search",
     "sign_out": "Sign Out",
@@ -61,7 +61,7 @@
     "new_releases": "New Releases",
     "latest_videos": "Latest ",
     "latest_videos_highlight": "Videos & Courses",
-    "latest_videos_desc": "Newly published topics protected by advanced DRM video encryption.",
+    "latest_videos_desc": "Newly published courses and practical topics, continuously updated with high quality content.",
     "view_all": "View all",
     "entitled": "Entitled",
     "not_entitled": "Not Entitled",
@@ -87,7 +87,7 @@
     "cta_guest_desc": "Thousands of students and software engineers are taking in-depth programs at SecureLearn. Start experiencing the secure e-learning environment today.",
     "cta_user_badge": "Active Session:",
     "cta_user_title": "Continue your learning journey at SecureLearn",
-    "cta_user_desc": "Quickly access your copyrighted lectures with HLS AES-128 encryption and digital watermark protection."
+    "cta_user_desc": "Quickly access your lectures, resume where you left off, and continue reaching your learning goals."
   },
   "login": {
     "title": "Account Login",
@@ -109,7 +109,7 @@
     "badge": "DRM Video Library",
     "title": "Explore ",
     "title_highlight": "Course Catalog",
-    "subtitle": "Learn safely with HLS AES-128 encrypted video lectures and authenticate student privileges via dynamic watermarks.",
+    "subtitle": "Explore high-quality courses to enhance your knowledge and develop your skills anytime, anywhere.",
     "search_placeholder": "Search courses by title or description...",
     "add_course": "Add New Course",
     "filter_all": "All Courses",
@@ -314,7 +314,7 @@
     "high": "(High)",
     "medium": "(Medium)",
     "low": "(Low)",
-    "ai_anomaly_detection_erd": "AI Anomaly Detection (ERD Mock Data)",
+    "ai_anomaly_detection_erd": "AI Anomaly Detection",
     "anomaly_alerts_board": "Anomaly Alerts Board & ",
     "leak_tracing": "Leak Tracing",
     "sync_desc": "Real-time sync with anomalyAlerts, accessLogs and sessions tables.",
@@ -361,7 +361,7 @@
   "admin_config": {
     "config_parse_error": "Config parse error",
     "config_saved_success": "System configuration and R2 budget threshold saved successfully!",
-    "drm_sys_admin_erd": "DRM System Administration (ERD Mock Data)",
+    "drm_sys_admin_erd": "DRM System Administration",
     "system_config": "System Configuration & ",
     "budget_alerts": "Budget Alerts",
     "config_desc": "Control Cloudflare R2 storage costs, Web Crypto KMS encryption parameters, and dynamically calculated AI alert thresholds from the database.",
@@ -412,7 +412,7 @@
     "updated_entitlements": "Updated entitlements for",
     "courses_for_student": "courses for student",
     "grant_success": "Entitlement Successful",
-    "user_management_erd": "User & Entitlement Management (ERD Mock Data)",
+    "user_management_erd": "User & Entitlement Management",
     "user_management_title": "User Management",
     "user_entitlement": "(User Entitlement)",
     "sync_desc": "Real-time sync with users and entitlements tables in the database.",
