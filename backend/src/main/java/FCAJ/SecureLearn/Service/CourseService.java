@@ -58,23 +58,23 @@ public class CourseService {
         return courseTable.getItem(searchKey);
     }
     
-    public void updateCourse(String id, String title, String description, String instructor, float prices, LocalDateTime creationTime, LocalDateTime lastUpdatedTime){
-        Courses newCourse = new Courses(id,"Meta");
-        newCourse.setTitle(title);
-        newCourse.setDescription(description);
-        newCourse.setInstructor(instructor);
-        newCourse.setPrice(prices);
-        newCourse.setCreationTime(creationTime);
-        newCourse.setLastUpdatedTime(lastUpdatedTime);
-        courseTable.updateItem(newCourse);
+    public void updateCourse(String id, String title, String description, String instructor, float prices, LocalDateTime lastUpdatedTime){
+        Courses updatedCourse = getLesson(id, "Meta");
+        updatedCourse.setTitle(title);
+        updatedCourse.setDescription(description);
+        updatedCourse.setInstructor(instructor);
+        updatedCourse.setPrice(prices);
+        updatedCourse.setCreationTime(updatedCourse.getCreationTime());
+        updatedCourse.setLastUpdatedTime(lastUpdatedTime);
+        courseTable.updateItem(updatedCourse);
     }
     
     public void updateLesson(String id, String Chapter, String title, String description, String videoURL){
-        Courses newCourse = new Courses(id, Chapter);
-        newCourse.setTitle(title);
-        newCourse.setDescription(description);
-        newCourse.setVideoURL(videoURL);
-        courseTable.updateItem(newCourse);
+        Courses updatedLesson = getLesson(id, Chapter);
+        updatedLesson.setTitle(title);
+        updatedLesson.setDescription(description);
+        updatedLesson.setVideoURL(videoURL);
+        courseTable.updateItem(updatedLesson);
     }
     
     public void deleteLesson(String id, String Chapter){

@@ -59,7 +59,7 @@ public class CourseController {
     }
     @PostMapping("/updateCourse")
     public ResponseEntity<?> updateCourse(@RequestBody CourseCreationRequest request){
-        courseService.updateCourse(request.getId(), request.getTitle(),request.getDescription(), request.getInstructor(), request.getPrices(),LocalDateTime.now(),LocalDateTime.now());
+        courseService.updateCourse(request.getId(), request.getTitle(),request.getDescription(), request.getInstructor(), request.getPrices(), LocalDateTime.now());
         return ResponseEntity.ok().body(Map.of("success","Courses updated successfully"));
     }
     
