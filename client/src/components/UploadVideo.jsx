@@ -19,7 +19,7 @@ import {
 import { useVideoUpload, UPLOAD_STATUS } from '../hooks/useVideoUpload';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
-import { createChapter } from '../services/courseService';
+import { createChapter, createLesson } from '../services/courseService';
 import {
   courses as dbCourses,
   chapters as dbChapters,
@@ -279,6 +279,17 @@ export default function UploadVideo() {
           return prev;
         }
         return [...prev, newVideoRecord];
+      });
+
+      // 3. Gọi API Backend để lưu bài học vào DynamoDB (/lesson)
+      createLesson({
+        courseId: selectedCourseId,
+        chapter: selectedChapterId,
+        title: lessonTitle.trim(),
+        description: currentChapter?.Title ? `Bài học thuộc chương ${currentChapter.Title}` : '',
+        videoURL: newVideoRecord.ID || '',
+      }).catch((err) => {
+        console.warn('Lỗi đồng bộ bài học lên Backend:', err.message);
       });
 
       setRecentUploadedVideoId(newVideoRecord.ID);
