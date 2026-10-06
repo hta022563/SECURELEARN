@@ -5,7 +5,6 @@
 package FCAJ.SecureLearn.Controller;
 
 import FCAJ.SecureLearn.Model.Users;
-import FCAJ.SecureLearn.Service.AuthService;
 import java.time.LocalDateTime;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
@@ -22,24 +21,4 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 public class UserController {
-    private final AuthService authentication;
-
-    public UserController(AuthService authentication) {
-        this.authentication = authentication;
-    }
-    
-    @PostMapping("/login")
-    public ResponseEntity<?> login (@RequestBody LoginRequest request){
-        Users loggedInUser = authentication.login(request.getUsername(), request.getPassword());
-        if(loggedInUser != null){
-            return ResponseEntity.ok(loggedInUser);
-        }else return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid username or password"));
-    }
-    
-    @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody RegisterRequest request){
-        LocalDateTime currentTime = LocalDateTime.now();
-        authentication.addNewUsers(request.getUsername(), request.getPassword(), request.getRole(), currentTime);
-        return ResponseEntity.ok().body("Created New Account successfully");
-    }
 }
