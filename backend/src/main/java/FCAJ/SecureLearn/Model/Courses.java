@@ -23,6 +23,9 @@ public class Courses {
     LocalDateTime creationTime;
     LocalDateTime lastUpdatedTime;
 
+    public Courses() {
+    }
+
     public LocalDateTime getLastUpdatedTime() {
         return lastUpdatedTime;
     }

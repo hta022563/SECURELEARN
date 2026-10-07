@@ -4,28 +4,33 @@
  */
 package FCAJ.SecureLearn.Controller;
 
-import FCAJ.SecureLearn.Model.Courses;
-import FCAJ.SecureLearn.Request.LessonCreationRequest;
-import FCAJ.SecureLearn.Request.CourseCreationRequest;
-import FCAJ.SecureLearn.Request.KeySchemaRequest;
-import FCAJ.SecureLearn.Request.PartitionKeyRequest;
-import FCAJ.SecureLearn.Service.CourseService;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import software.amazon.awssdk.enhanced.dynamodb.model.PageIterable;
+
+import FCAJ.SecureLearn.Model.Courses;
+import FCAJ.SecureLearn.Request.CourseCreationRequest;
+import FCAJ.SecureLearn.Request.KeySchemaRequest;
+import FCAJ.SecureLearn.Request.LessonCreationRequest;
+import FCAJ.SecureLearn.Request.PartitionKeyRequest;
+import FCAJ.SecureLearn.Service.CourseService;
 
 /**
- *
+ * REST Controller for Course and Lesson management.
+ * Base path: /api/v1
+ * 
  * @author ngoct
  */
 @RestController
+@RequestMapping("/api/v1")
 public class CourseController {
     private final CourseService courseService;
 
