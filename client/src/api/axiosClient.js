@@ -6,7 +6,7 @@ import axios from 'axios';
  * - Tự động định tuyến baseURL theo biến môi trường
  */
 const axiosClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1',
   headers: {
     'Content-Type': 'application/json',
   },

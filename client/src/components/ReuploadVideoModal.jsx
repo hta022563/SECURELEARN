@@ -208,9 +208,8 @@ export default function ReuploadVideoModal({ show, onHide, video, onSuccess }) {
             </label>
 
             <div
-              className={`border border-2 rounded-4 p-4 text-center ${
-                selectedFile ? 'border-primary bg-primary bg-opacity-10' : 'border-dashed bg-white'
-              }`}
+              className={`border border-2 rounded-4 p-4 text-center ${selectedFile ? 'border-primary bg-primary bg-opacity-10' : 'border-dashed bg-white'
+                }`}
               style={{
                 cursor: isUploading ? 'not-allowed' : 'pointer',
                 transition: 'all 0.2s ease',

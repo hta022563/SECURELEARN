@@ -133,6 +133,7 @@ export default function UploadVideo() {
   // State Form nhập liệu bài giảng nhỏ
   const [lessonTitle, setLessonTitle] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
+  const [customVideoUrl, setCustomVideoUrl] = useState('');
   const [validationError, setValidationError] = useState(null);
   const [recentUploadedVideoId, setRecentUploadedVideoId] = useState(null);
 
@@ -251,13 +252,60 @@ export default function UploadVideo() {
     showToast(`${t('upload.created_chapter')} ${nextChapNum} - ${createdChapter.Title}`, 'success', t('upload.success'));
   };
 
-  // Xử lý gửi Form tải lên bài giảng nhỏ (Lưu bền vững vào LocalStorage)
+  // Xử lý gửi Form tải lên bài giảng nhỏ (Lưu bền vững vào LocalStorage & Backend API DynamoDB)
   const handleSubmitUpload = (e) => {
     e.preventDefault();
-    if (!lessonTitle.trim() || !selectedFile || !selectedChapterId) {
+    if (!lessonTitle.trim() || (!selectedFile && !customVideoUrl.trim()) || !selectedChapterId) {
       return;
     }
 
+    // Trường hợp 1: Nhập trực tiếp Video URL từ Backend / CDN (không cần tải file)
+    if (customVideoUrl.trim() && !selectedFile) {
+      const generatedVidId = `v-${Date.now().toString().slice(-4)}`;
+      const targetVideoUrl = customVideoUrl.trim();
+
+      const newVideoRecord = {
+        ID: generatedVidId,
+        Title: lessonTitle.trim(),
+        Length: 1200,
+        Size: 100000000,
+        UploadTime: new Date().toISOString(),
+        UploadedBy: user?.userId || 'u-002',
+        AccessLogID: currentChapter?.AccessLogID || 'al-001',
+        AnomalyAlertID: null,
+        chapterId: selectedChapterId,
+        chapterNumber: currentChapter?.ChapterNumber || 1,
+        courseId: selectedCourseId,
+        videoURL: targetVideoUrl,
+        videoUrl: targetVideoUrl,
+      };
+
+      // Gửi lên Backend Spring Boot: POST /api/v1/lesson
+      createLesson({
+        courseId: selectedCourseId,
+        chapter: selectedChapterId,
+        title: lessonTitle.trim(),
+        description: currentChapter?.Title ? `Bài học thuộc chương ${currentChapter.Title}` : '',
+        videoURL: targetVideoUrl,
+      }).then(() => {
+        showToast(
+          `Đã lưu bài học "${lessonTitle.trim()}" vào CSDL Backend thành công!`,
+          'success',
+          'Lưu Bài Học Thành Công'
+        );
+      }).catch((err) => {
+        console.warn('Lỗi đồng bộ bài học lên Backend:', err.message);
+      });
+
+      if (!dbVideos.some((v) => v.ID === generatedVidId)) {
+        dbVideos.push(newVideoRecord);
+      }
+      setAllVideos((prev) => [...prev, newVideoRecord]);
+      setRecentUploadedVideoId(generatedVidId);
+      return;
+    }
+
+    // Trường hợp 2: Tải lên file video từ máy tính
     const metadata = {
       title: lessonTitle.trim(),
       courseId: selectedCourseId,
@@ -273,7 +321,7 @@ export default function UploadVideo() {
         dbVideos.push(newVideoRecord);
       }
 
-      // 2. Cập nhật state Cây bài học thời gian thực (đảm bảo không bị trùng ID)
+      // 2. Cập nhật state Cây bài học thời gian thực
       setAllVideos((prev) => {
         if (prev.some((v) => v.ID === newVideoRecord.ID)) {
           return prev;
@@ -281,13 +329,14 @@ export default function UploadVideo() {
         return [...prev, newVideoRecord];
       });
 
-      // 3. Gọi API Backend để lưu bài học vào DynamoDB (/lesson)
+      // 3. Gọi API Backend Spring Boot để lưu bài học vào DynamoDB (/lesson)
+      const effectiveVideoUrl = customVideoUrl.trim() || newVideoRecord.videoUrl || `https://stream.securelearn.edu/videos/${selectedCourseId}/${newVideoRecord.ID}.m3u8`;
       createLesson({
         courseId: selectedCourseId,
         chapter: selectedChapterId,
         title: lessonTitle.trim(),
         description: currentChapter?.Title ? `Bài học thuộc chương ${currentChapter.Title}` : '',
-        videoURL: newVideoRecord.ID || '',
+        videoURL: effectiveVideoUrl,
       }).catch((err) => {
         console.warn('Lỗi đồng bộ bài học lên Backend:', err.message);
       });
@@ -305,13 +354,14 @@ export default function UploadVideo() {
   const handleContinueNextLesson = () => {
     setLessonTitle('');
     setSelectedFile(null);
+    setCustomVideoUrl('');
     setValidationError(null);
     setRecentUploadedVideoId(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const isUploadDisabled =
-    !lessonTitle.trim() || !selectedFile || !selectedChapterId || Boolean(validationError) || isBusy;
+    !lessonTitle.trim() || (!selectedFile && !customVideoUrl.trim()) || !selectedChapterId || Boolean(validationError) || isBusy;
 
   return (
     <div className="py-4 bg-light min-vh-100">
@@ -355,12 +405,12 @@ export default function UploadVideo() {
                 </h5>
                 <span
                   className={`badge rounded-pill px-3 py-2 text-uppercase fs-6 fw-semibold ${status === UPLOAD_STATUS.READY
-                      ? 'badge-status-ready'
-                      : status === UPLOAD_STATUS.PROCESSING
-                        ? 'badge-pill-cyan'
-                        : status === UPLOAD_STATUS.UPLOADING
-                          ? 'badge-status-processing'
-                          : 'bg-light text-secondary border'
+                    ? 'badge-status-ready'
+                    : status === UPLOAD_STATUS.PROCESSING
+                      ? 'badge-pill-cyan'
+                      : status === UPLOAD_STATUS.UPLOADING
+                        ? 'badge-status-processing'
+                        : 'bg-light text-secondary border'
                     }`}
                 >
                   {status === UPLOAD_STATUS.UPLOADING && t('upload.uploading_chunk')}
@@ -485,6 +535,24 @@ export default function UploadVideo() {
                     />
                     <Form.Text className="text-muted small">
                       {t('upload.upload_recommendation')}
+                    </Form.Text>
+                  </Form.Group>
+
+                  {/* HOẶC NHẬP TRỰC TIẾP URL VIDEO TỪ BACKEND / CDN */}
+                  <Form.Group className="mb-4">
+                    <Form.Label className="fw-semibold text-dark small">
+                      <i className="bi bi-link-45deg me-1 text-primary"></i>
+                      Đường Dẫn Video Trực Tiếp (Backend API / CDN / S3 / HLS .m3u8 hoặc .mp4):
+                    </Form.Label>
+                    <Form.Control
+                      type="url"
+                      placeholder="https://example.com/stream/lesson.m3u8 hoặc https://example.com/video.mp4"
+                      value={customVideoUrl}
+                      onChange={(e) => setCustomVideoUrl(e.target.value)}
+                      className="form-control-clean"
+                    />
+                    <Form.Text className="text-muted small">
+                      (Tùy chọn) Lưu trực tiếp link phát này vào CSDL Backend qua endpoint <code>POST /api/v1/lesson</code>.
                     </Form.Text>
                   </Form.Group>
 
@@ -659,8 +727,8 @@ export default function UploadVideo() {
                                   <div
                                     key={vid.ID}
                                     className={`p-2 rounded-2 d-flex justify-content-between align-items-center small ${isJustUploaded
-                                        ? 'bg-success bg-opacity-10 border border-success'
-                                        : 'bg-light hover-bg-light'
+                                      ? 'bg-success bg-opacity-10 border border-success'
+                                      : 'bg-light hover-bg-light'
                                       }`}
                                   >
                                     <div className="d-flex align-items-center gap-2 text-truncate" style={{ maxWidth: '240px' }}>

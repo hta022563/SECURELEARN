@@ -20,6 +20,7 @@ import {
   videos as dbVideos,
   accessLogs as dbAccessLogs,
 } from '../data/mockDatabase';
+import { getCourseWithLessons } from '../services/courseService';
 
 /**
  * Helper format thời lượng từ giây sang mm:ss hoặc X phút
@@ -48,11 +49,7 @@ function formatBytes(bytes) {
  * =============================================================================
  * PAGE: InstructorVideoPreview (Xem Trước Video Phân Cấp Từng Chương)
  * =============================================================================
- * - Trải nghiệm giống hệt giao diện học tập của Student:
- *   + Cột trái: Trình phát DRM HLS AES-128 + Watermark Giảng viên + Thông tin bài học
- *   + Cột phải: Cây cấu trúc giáo trình phân theo từng Chương (Accordion),
- *     bấm vào bất kỳ bài nào để phát ngay bài học đó.
- * - 100% dữ liệu mềm tự động tra cứu từ mockDatabase & LocalStorage
+ * - Kết nối Backend API DynamoDB lấy bài giảng và videoURL thực tế
  * =============================================================================
  */
 export default function InstructorVideoPreview() {
@@ -61,14 +58,35 @@ export default function InstructorVideoPreview() {
   const { user } = useAuth();
   const [showReuploadModal, setShowReuploadModal] = useState(false);
 
+  // Nạp dữ liệu từ Backend API
+  const [backendData, setBackendData] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    getCourseWithLessons(videoId)
+      .then((res) => {
+        if (isMounted && res) {
+          setBackendData(res);
+        }
+      })
+      .catch((err) => {
+        console.warn('[InstructorVideoPreview] Lỗi tải từ Backend API:', err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [videoId]);
+
   // 1. Xác định video ban đầu từ params
   const initialVideo = useMemo(() => {
     if (!dbVideos || dbVideos.length === 0) return null;
     return dbVideos.find((v) => v.ID === videoId) || dbVideos[0];
   }, [videoId]);
 
-  // 2. Xác định Khóa học hiện tại (từ video -> chapter -> course hoặc direct courseId)
+  // 2. Xác định Khóa học hiện tại (ưu tiên Backend API)
   const currentCourse = useMemo(() => {
+    if (backendData?.course) return backendData.course;
     if (!dbCourses || dbCourses.length === 0) return null;
 
     // Nếu videoId chính là mã khóa học
@@ -95,7 +113,7 @@ export default function InstructorVideoPreview() {
     }
 
     return dbCourses[0];
-  }, [videoId, initialVideo]);
+  }, [videoId, initialVideo, backendData]);
 
   // 3. Lấy danh sách các Chương của khóa học này
   const courseChapters = useMemo(() => {
@@ -105,8 +123,29 @@ export default function InstructorVideoPreview() {
       .sort((a, b) => a.ChapterNumber - b.ChapterNumber);
   }, [currentCourse]);
 
-  // 4. Ghép các video vào từng chương (Curriculum Tree) - có khử trùng lặp và sắp xếp tăng dần
+  // 4. Ghép các video vào từng chương (Curriculum Tree)
   const curriculum = useMemo(() => {
+    if (backendData?.lessons && backendData.lessons.length > 0) {
+      const grouped = {};
+      backendData.lessons.forEach((l) => {
+        const chapKey = l.chapterId || 'ch-main';
+        if (!grouped[chapKey]) {
+          grouped[chapKey] = {
+            ID: chapKey,
+            ChapterNumber: Object.keys(grouped).length + 1,
+            Title: `Phần: ${l.chapterId || 'Bài học'}`,
+            Description: l.description || '',
+            videos: [],
+          };
+        }
+        grouped[chapKey].videos.push({
+          ...l,
+          videoUrl: l.videoURL || l.videoUrl,
+        });
+      });
+      return Object.values(grouped);
+    }
+
     if (courseChapters.length === 0) {
       return [
         {
@@ -126,7 +165,6 @@ export default function InstructorVideoPreview() {
         return isSeed && v.AccessLogID === chap.AccessLogID && chap.CoursesID === currentCourse?.ID;
       });
 
-      // Khử trùng lặp ID
       const unique = [];
       const seen = new Set();
       for (const v of chapVideos) {
@@ -136,7 +174,6 @@ export default function InstructorVideoPreview() {
         }
       }
 
-      // Sắp xếp bài học theo thời gian tạo tăng dần
       unique.sort((a, b) => new Date(a.UploadTime || 0) - new Date(b.UploadTime || 0));
 
       return {
@@ -144,7 +181,7 @@ export default function InstructorVideoPreview() {
         videos: unique,
       };
     });
-  }, [courseChapters, currentCourse, videoId]);
+  }, [courseChapters, currentCourse, videoId, backendData]);
 
   // 5. Danh sách phẳng tất cả bài giảng trong khóa học
   const allLectures = useMemo(() => {
@@ -296,6 +333,8 @@ export default function InstructorVideoPreview() {
             <div className="mb-3">
               <SecureVideoPlayer
                 videoId={activeLecture?.ID || currentCourse?.ID || 'v-001'}
+                courseId={currentCourse?.ID}
+                videoUrl={activeLecture?.videoURL || activeLecture?.videoUrl}
                 studentId={`INS-${user?.name || user?.userId || 'INSTRUCTOR'}`}
                 title={activeLecture?.Title || currentCourse?.Title || 'Video Bài Giảng'}
                 embedded={true}
@@ -493,20 +532,18 @@ export default function InstructorVideoPreview() {
                                   <li
                                     key={vid.ID}
                                     onClick={() => handleSelectLecture(vid.ID)}
-                                    className={`list-group-item list-group-item-action d-flex align-items-center justify-content-between p-3 border-0 border-bottom ${
-                                      isActive
+                                    className={`list-group-item list-group-item-action d-flex align-items-center justify-content-between p-3 border-0 border-bottom ${isActive
                                         ? 'bg-primary-subtle text-primary fw-bold border-start border-primary border-3'
                                         : 'text-dark hover-bg-light'
-                                    }`}
+                                      }`}
                                     style={{ cursor: 'pointer' }}
                                   >
                                     <div className="d-flex align-items-center gap-2 overflow-hidden me-2">
                                       <i
-                                        className={`bi ${
-                                          isActive
+                                        className={`bi ${isActive
                                             ? 'bi-play-circle-fill text-primary fs-6'
                                             : 'bi-play-circle text-secondary'
-                                        }`}
+                                          }`}
                                       ></i>
                                       <span className="text-truncate" title={vid.Title}>
                                         {vIdx + 1}. {vid.Title}

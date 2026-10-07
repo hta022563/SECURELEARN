@@ -21,7 +21,7 @@ export const UPLOAD_STATUS = {
  * @returns {Object} Các state và action điều khiển upload
  */
 export function useVideoUpload() {
-    const [status, setStatus] = useState(UPLOAD_STATUS.IDLE);
+  const [status, setStatus] = useState(UPLOAD_STATUS.IDLE);
   const [progress, setProgress] = useState(0);
   const [uploadStats, setUploadStats] = useState({ loaded: 0, total: 0 });
   const [chunkStats, setChunkStats] = useState({ current: 1, total: 1 });

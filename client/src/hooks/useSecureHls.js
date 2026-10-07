@@ -20,8 +20,9 @@ import {
  * @param {string} videoId ID bài giảng video
  * @param {string|number} studentId ID sinh viên
  * @param {React.RefObject} videoRef Ref đến thẻ <video>
+ * @param {string} courseId ID khóa học (nếu có để tra cứu chính xác trên BE)
  */
-export function useSecureHls(videoId, studentId, videoRef) {
+export function useSecureHls(videoId, studentId, videoRef, courseId = null) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isReady, setIsReady] = useState(false);
@@ -42,7 +43,7 @@ export function useSecureHls(videoId, studentId, videoRef) {
     setIsLoading(true);
     setError(null);
     setIsReady(false);
-    setSecurityStatus('Đang xin cấp Signed URL từ CDN Cloudflare R2...');
+    setSecurityStatus('Đang kết nối Backend lấy thông tin video...');
 
     // Hủy instance HLS cũ nếu đang chạy
     if (hlsInstanceRef.current) {
@@ -53,11 +54,23 @@ export function useSecureHls(videoId, studentId, videoRef) {
     const initSecurePlayback = async () => {
       try {
 
-        // BƯỚC 1: Lấy Signed URL của file manifest (.m3u8) từ CDN Cloudflare R2
-        const { streamUrl } = await fetchSignedUrl(videoId, studentId);
+        // BƯỚC 1: Lấy URL của bài giảng từ Backend API
+        const { streamUrl } = await fetchSignedUrl(videoId, studentId, courseId);
         if (isCancelled) return;
 
-        setSecurityStatus('Signed URL hợp lệ. Đang kiểm tra trình phát HLS...');
+        // Nếu là video trực tiếp (MP4 / WebM / link không phải manifest HLS)
+        if (!streamUrl.includes('.m3u8')) {
+          const videoElement = videoRef.current;
+          if (videoElement) {
+            videoElement.src = streamUrl;
+            setIsLoading(false);
+            setIsReady(true);
+            setSecurityStatus('Đang phát trực tiếp từ Backend');
+            return;
+          }
+        }
+
+        setSecurityStatus('Đã kết nối luồng HLS. Đang kiểm tra trình phát HLS...');
 
         // BƯỚC 2: Kiểm tra hỗ trợ HLS.js
         if (!Hls.isSupported()) {
@@ -251,7 +264,7 @@ export function useSecureHls(videoId, studentId, videoRef) {
         hlsInstanceRef.current = null;
       }
     };
-  }, [videoId, studentId, videoRef]);
+  }, [videoId, studentId, videoRef, courseId]);
 
   // Hàm reload chủ động khi gặp lỗi
   const reload = () => {

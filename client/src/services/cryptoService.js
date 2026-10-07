@@ -25,15 +25,15 @@ export function base64ToArrayBuffer(base64) {
   return bytes.buffer;
 }
 
-/**
- * 1. Mock API: Lấy Cloudflare HLS Signed URL
- * GET /api/v1/videos/{videoId}/signed-url
- */
-export async function fetchSignedUrl(videoId, studentId) {
-  // Giả lập độ trễ mạng (Network Latency)
-  await new Promise((resolve) => setTimeout(resolve, 800));
+import apiClient from '../api/axiosClient';
 
-  // Giả lập kiểm tra quyền truy cập của sinh viên
+/**
+ * Lấy URL luồng video từ Backend API (Spring Boot / DynamoDB / S3)
+ * Endpoint Backend:
+ * - GET /api/v1/lesson (với partitionKey và sortKey)
+ * - hoặc GET /api/v1/course (với partitionKey)
+ */
+export async function fetchSignedUrl(videoId, studentId, courseId = null) {
   if (!studentId || !videoId) {
     throw new Error('400: Thiếu thông tin xác thực Video ID hoặc Student ID.');
   }
@@ -46,12 +46,56 @@ export async function fetchSignedUrl(videoId, studentId) {
     throw new Error('410: Signed URL bài giảng đã hết hạn truy cập.');
   }
 
-  // URL mẫu HLS (HLS AES-128 stream thực tế hoặc mock URL)
-  // Trong môi trường production, link này là Cloudflare Stream HLS manifest URL có token
-  return {
-    streamUrl: `https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8?token=mock_signed_token_${videoId}_${studentId}&exp=${Date.now() + 3600000}`,
-    expiresAt: Date.now() + 3600000,
-  };
+  // 1. Thử gọi API Backend lấy Lesson theo partitionKey (courseId) & sortKey (videoId / chapter)
+  if (courseId) {
+    try {
+      const res = await apiClient.request({
+        method: 'GET',
+        url: '/lesson',
+        data: { partitionKey: courseId, sortKey: videoId },
+      });
+      if (res && (res.videoURL || res.videoUrl)) {
+        return {
+          streamUrl: res.videoURL || res.videoUrl,
+          expiresAt: Date.now() + 3600000,
+        };
+      }
+    } catch (e) {
+      console.warn('[cryptoService] Không tìm thấy bài học qua GET /lesson:', e.message);
+    }
+  }
+
+  // 2. Thử gọi API Backend lấy danh sách bản ghi của Course theo partitionKey = videoId hoặc courseId
+  try {
+    const targetPk = courseId || videoId;
+    const items = await apiClient.request({
+      method: 'GET',
+      url: '/course',
+      data: { partitionKey: targetPk },
+    });
+    if (Array.isArray(items)) {
+      const found = items.find((item) => (item.Chapter === videoId || item.chapter === videoId || item.videoURL));
+      if (found && (found.videoURL || found.videoUrl)) {
+        return {
+          streamUrl: found.videoURL || found.videoUrl,
+          expiresAt: Date.now() + 3600000,
+        };
+      }
+    }
+  } catch (e) {
+    console.warn('[cryptoService] Không tìm thấy qua GET /course:', e.message);
+  }
+
+  // 3. Nếu videoId tự thân là một URL trực tiếp (http://, https://, blob:)
+  if (typeof videoId === 'string' && (videoId.startsWith('http://') || videoId.startsWith('https://') || videoId.startsWith('blob:'))) {
+    return {
+      streamUrl: videoId,
+      expiresAt: Date.now() + 3600000,
+    };
+  }
+
+  // 4. Nếu không tìm thấy video trên Backend
+  throw new Error(`404: Không tìm thấy đường dẫn video (videoURL) cho bài giảng "${videoId}" trên hệ thống Backend.`);
 }
 
 /**

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Container,
   Row,
@@ -23,6 +23,7 @@ import {
   videos as dbVideos,
 } from '../data/mockDatabase';
 import {
+  getCourses,
   updateVideoTitle,
   deleteVideo,
   updateChapterTitle,
@@ -72,6 +73,20 @@ export default function InstructorVideos() {
   const [coursesList, setCoursesList] = useState(dbCourses);
   const [chaptersList, setChaptersList] = useState(dbChapters);
   const [videosList, setVideosList] = useState(dbVideos);
+
+  useEffect(() => {
+    let isMounted = true;
+    getCourses()
+      .then((data) => {
+        if (isMounted && Array.isArray(data) && data.length > 0) {
+          setCoursesList(data);
+        }
+      })
+      .catch((err) => console.warn('[InstructorVideos] Lỗi nạp khóa học:', err));
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateCourseModal, setShowCreateCourseModal] = useState(false);

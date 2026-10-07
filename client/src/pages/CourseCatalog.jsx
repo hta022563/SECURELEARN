@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -15,6 +15,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { courses, users } from '../data/mockDatabase';
 import { checkCourseAccess, getEntitledCourseIds } from '../services/entitlementService';
+import { getCourses } from '../services/courseService';
 import CreateCourseModal from '../components/CreateCourseModal';
 
 /**
@@ -34,6 +35,20 @@ export default function CourseCatalog() {
   const [filterType, setFilterType] = useState('ALL'); // 'ALL' | 'ENTITLED' | 'UNENTITLED'
   const [blockedModalCourse, setBlockedModalCourse] = useState(null);
   const [showCreateCourseModal, setShowCreateCourseModal] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    getCourses()
+      .then((data) => {
+        if (isMounted && Array.isArray(data) && data.length > 0) {
+          setCourseList(data);
+        }
+      })
+      .catch((err) => console.warn('[CourseCatalog] Lỗi nạp khóa học:', err));
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();

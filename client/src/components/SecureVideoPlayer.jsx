@@ -24,6 +24,7 @@ import { useSecureHls } from '../hooks/useSecureHls';
 export default function SecureVideoPlayer({
   videoUrl,
   videoId,
+  courseId,
   studentId = 'STUDENT',
   title = 'Bài giảng SecureLearn',
   embedded = false,
@@ -33,12 +34,20 @@ export default function SecureVideoPlayer({
   // Hook bảo vệ Client-side: Focus Blackout, Anti-PrintScreen, Anti-Debugging
   const { isScreenHidden, hideReason } = useSecurePlayer(videoRef);
 
+  // Tự động load lại video khi videoUrl thay đổi
+  React.useEffect(() => {
+    if (videoRef.current && videoUrl) {
+      videoRef.current.load();
+    }
+  }, [videoUrl]);
+
   // Hook xử lý Signed URL HLS và giải mã ECDH (chỉ chạy khi có videoId và không truyền trực tiếp videoUrl)
   const activeVideoId = videoUrl ? null : videoId;
   const { isLoading, error, isReady, securityStatus, reload } = useSecureHls(
     activeVideoId,
     studentId,
-    videoRef
+    videoRef,
+    courseId
   );
 
   const playerCard = (
