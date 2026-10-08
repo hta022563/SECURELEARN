@@ -4,35 +4,41 @@
  */
 package FCAJ.SecureLearn.Request;
 
+import java.util.UUID;
+
 /**
  *
  * @author ngoct
  */
 public class LessonCreationRequest {
-    String id, chapter, title, description, videoURL;
+    UUID course_id, chapter_id;
+    String title, description, url;
 
-    public LessonCreationRequest(String id, String chapter, String title, String description, String videoURL) {
-        this.id = id;
-        this.chapter = chapter;
+    public LessonCreationRequest() {
+    }
+
+    public LessonCreationRequest(UUID course_id, UUID chapter_id, String title, String description, String url) {
+        this.course_id = course_id;
+        this.chapter_id = chapter_id;
         this.title = title;
         this.description = description;
-        this.videoURL = videoURL;
+        this.url = url;
     }
 
-    public String getId() {
-        return id;
+    public UUID getCourse_id() {
+        return course_id;
     }
 
-    public void setId(String id) {
-        this.id = id;
+    public void setCourse_id(UUID course_id) {
+        this.course_id = course_id;
     }
 
-    public String getChapter() {
-        return chapter;
+    public UUID getChapter_id() {
+        return chapter_id;
     }
 
-    public void setChapter(String chapter) {
-        this.chapter = chapter;
+    public void setChapter_id(UUID chapter_id) {
+        this.chapter_id = chapter_id;
     }
 
     public String getTitle() {
@@ -51,12 +57,12 @@ public class LessonCreationRequest {
         this.description = description;
     }
 
-    public String getVideoURL() {
-        return videoURL;
+    public String getUrl() {
+        return url;
     }
 
-    public void setVideoURL(String videoURL) {
-        this.videoURL = videoURL;
+    public void setUrl(String url) {
+        this.url = url;
     }
     
 }

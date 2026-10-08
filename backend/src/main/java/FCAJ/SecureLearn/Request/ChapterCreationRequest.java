@@ -4,22 +4,31 @@
  */
 package FCAJ.SecureLearn.Request;
 
+import java.util.UUID;
+
 /**
  *
  * @author ngoct
  */
-public class CourseCreationRequest {
-    String title, description, instructor;
-    float prices;
+public class ChapterCreationRequest {
+    UUID course_id;
+    String title, description;
 
-    public CourseCreationRequest() {
+    public ChapterCreationRequest() {
     }
-
-    public CourseCreationRequest(String title, String description, String instructor, float prices) {
+    
+    public ChapterCreationRequest(UUID course_id, String title, String description) {
+        this.course_id = course_id;
         this.title = title;
         this.description = description;
-        this.instructor = instructor;
-        this.prices = prices;
+    }
+
+    public UUID getCourse_id() {
+        return course_id;
+    }
+
+    public void setCourse_id(UUID course_id) {
+        this.course_id = course_id;
     }
 
     public String getTitle() {
@@ -36,22 +45,6 @@ public class CourseCreationRequest {
 
     public void setDescription(String description) {
         this.description = description;
-    }
-
-    public String getInstructor() {
-        return instructor;
-    }
-
-    public void setInstructor(String instructor) {
-        this.instructor = instructor;
-    }
-
-    public float getPrices() {
-        return prices;
-    }
-
-    public void setPrices(float prices) {
-        this.prices = prices;
     }
     
 }
