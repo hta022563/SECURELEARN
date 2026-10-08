@@ -4,89 +4,67 @@
  */
 package FCAJ.SecureLearn.Service;
 
-import FCAJ.SecureLearn.Configuration.DynamoConfiguration;
-import FCAJ.SecureLearn.Model.Courses;
 import java.time.LocalDateTime;
 import java.util.List;
+
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import FCAJ.SecureLearn.Model.Course;
+import java.util.UUID;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.enhanced.dynamodb.model.PageIterable;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
+import FCAJ.SecureLearn.repositories.CourseRepo;
 
 /**
- *
+ * Service for managing courses and lessons in DynamoDB
+ * Uses dependency injection for DynamoDbEnhancedClient
+ * 
  * @author ngoct
  */
 @Service
 public class CourseService {
-    DynamoDbTable<Courses> courseTable = DynamoConfiguration.enhanced().table("Courses", TableSchema.fromBean(Courses.class));
-    public void addNewCourse(String id, String title, String description, String instructor, float prices, LocalDateTime creationTime, LocalDateTime lastUpdatedTime){
-        Courses newCourse = new Courses(id,"Meta");
-        newCourse.setTitle(title);
-        newCourse.setDescription(description);
-        newCourse.setInstructor(instructor);
-        newCourse.setPrice(prices);
-        newCourse.setCreationTime(creationTime);
-        newCourse.setLastUpdatedTime(lastUpdatedTime);
-        courseTable.putItem(newCourse);
+    
+    private static final Logger logger = LoggerFactory.getLogger(CourseService.class);
+    private final CourseRepo courseRepo;
+
+    public CourseService(CourseRepo courseRepo) {
+        this.courseRepo = courseRepo;
+    }
+
+    public void addNewCourse(String title, String description, String instructor, float prices, LocalDateTime creationTime, LocalDateTime lastUpdatedTime){
+        Course newCourse = new Course(title, description, prices, instructor, creationTime, lastUpdatedTime);
+        courseRepo.save(newCourse);
     }
     
-    public void addLesson(String id, String Chapter, String title, String description, String videoURL){
-        Courses newCourse = new Courses(id, Chapter);
-        newCourse.setTitle(title);
-        newCourse.setDescription(description);
-        newCourse.setVideoURL(videoURL);
-        courseTable.putItem(newCourse);
+    
+    public List<Course> getAllCourses(){
+        return courseRepo.findAll();
     }
     
-    public List<Courses> getAllCourses(){
-        PageIterable<Courses> courseIterable = courseTable.scan();
-        List<Courses> courseList = courseIterable.items().stream().toList();
-        return courseList;
+    public List<Course> getCourseByTitle(String title){
+        return courseRepo.findByTitleContaining(title);
     }
     
-    public List<Courses> getCourseByPk(String pk){
-        QueryConditional query  = QueryConditional.keyEqualTo(Key.builder().addPartitionValue(pk).build());
-        PageIterable<Courses> courseIterable = courseTable.query(query);
-        return courseIterable.items().stream().toList();
-    }
-    
-    public Courses getLesson(String pk, String sk){
-        Key searchKey = Key.builder().addPartitionValue(pk).addSortValue(sk).build();
-        return courseTable.getItem(searchKey);
-    }
-    
-    public void updateCourse(String id, String title, String description, String instructor, float prices, LocalDateTime lastUpdatedTime){
-        Courses updatedCourse = getLesson(id, "Meta");
+    public void updateCourse(UUID id, String title, String description, String instructor, float prices, LocalDateTime lastUpdatedTime){
+        Course updatedCourse = courseRepo.findById(id).orElseThrow();
         updatedCourse.setTitle(title);
         updatedCourse.setDescription(description);
         updatedCourse.setInstructor(instructor);
         updatedCourse.setPrice(prices);
-        updatedCourse.setCreationTime(updatedCourse.getCreationTime());
-        updatedCourse.setLastUpdatedTime(lastUpdatedTime);
-        courseTable.updateItem(updatedCourse);
+        updatedCourse.setLastUpdateTime(lastUpdatedTime);
+        courseRepo.save(updatedCourse);
     }
     
-    public void updateLesson(String id, String Chapter, String title, String description, String videoURL){
-        Courses updatedLesson = getLesson(id, Chapter);
-        updatedLesson.setTitle(title);
-        updatedLesson.setDescription(description);
-        updatedLesson.setVideoURL(videoURL);
-        courseTable.updateItem(updatedLesson);
+  
+    public void deleteCourse(UUID id){
+        Course targetCourse = courseRepo.findById(id).orElseThrow() ;
+        courseRepo.delete(targetCourse);
     }
     
-    public void deleteLesson(String id, String Chapter){
-        Key searchKey = Key.builder().addPartitionValue(id).addSortValue(Chapter).build();
-        courseTable.deleteItem(searchKey);
-    }
-    public void deleteCourse(String id){
-        Key searchKey = Key.builder().addPartitionValue(id).build();
-        QueryConditional query = QueryConditional.keyEqualTo(searchKey);
-        List<Courses> targetList = courseTable.query(query).items().stream().toList();
-        for(Courses course: targetList){
-            courseTable.deleteItem(course);
-        }
-    }
 }

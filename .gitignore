@@ -13,3 +13,4 @@ dist/
 build/
 client/dist/
 server/dist/
+.kiro
