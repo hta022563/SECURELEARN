@@ -8,6 +8,7 @@ import { useToast } from '../context/ToastProvider';
 import Logo from './Logo';
 import LanguageSwitcher from './LanguageSwitcher';
 import ThemeToggle from './ThemeToggle';
+import { logoutBackendSession } from '../services/courseService';
 
 /**
  * =============================================================================
@@ -27,7 +28,12 @@ export default function MainNavbar() {
   const location = useLocation();
   const { showToast } = useToast();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await logoutBackendSession();
+    } catch (e) {
+      // ignore
+    }
     logout();
     showToast(t('navbar.logout_success'), 'info');
     navigate('/login');

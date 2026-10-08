@@ -19,7 +19,7 @@ import {
 import { useVideoUpload, UPLOAD_STATUS } from '../hooks/useVideoUpload';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
-import { createChapter, createLesson } from '../services/courseService';
+import { getCourses, getChapters, createChapter, createLesson } from '../services/courseService';
 import {
   courses as dbCourses,
   chapters as dbChapters,
@@ -121,10 +121,44 @@ export default function UploadVideo() {
     return currentCourseChapters[0]?.ID || '';
   });
 
+  // Nạp danh sách khóa học từ Backend API
+  React.useEffect(() => {
+    let isMounted = true;
+    getCourses()
+      .then((data) => {
+        if (isMounted && Array.isArray(data) && data.length > 0) {
+          setAllCourses(data);
+        }
+      })
+      .catch((err) => console.warn('[UploadVideo] Lỗi nạp khóa học từ BE:', err));
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Nạp danh sách chương của khóa học đang chọn từ Backend API
+  React.useEffect(() => {
+    if (!selectedCourseId) return;
+    let isMounted = true;
+    getChapters(selectedCourseId)
+      .then((data) => {
+        if (isMounted && Array.isArray(data) && data.length > 0) {
+          setAllChapters((prev) => {
+            const others = prev.filter((ch) => ch.CoursesID !== selectedCourseId && ch.course_id !== selectedCourseId);
+            return [...others, ...data];
+          });
+        }
+      })
+      .catch((err) => console.warn('[UploadVideo] Lỗi nạp chương từ BE:', err));
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedCourseId]);
+
   // Cập nhật selectedChapterId khi đổi khóa học
   React.useEffect(() => {
     if (currentCourseChapters.length > 0) {
-      setSelectedChapterId(currentCourseChapters[0].ID);
+      setSelectedChapterId(currentCourseChapters[0].ID || currentCourseChapters[0].id);
     } else {
       setSelectedChapterId('');
     }

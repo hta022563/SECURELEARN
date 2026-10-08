@@ -24,10 +24,13 @@ import {
 } from '../data/mockDatabase';
 import {
   getCourses,
+  deleteCourse,
+  updateCourse,
   updateVideoTitle,
   deleteVideo,
   updateChapterTitle,
   deleteChapter,
+  getCourseWithLessons,
 } from '../services/courseService';
 import CreateCourseModal from '../components/CreateCourseModal';
 import ReuploadVideoModal from '../components/ReuploadVideoModal';
@@ -234,6 +237,41 @@ export default function InstructorVideos() {
 
     showToast(t('instructor.video_title_updated'), 'success', t('instructor.success'));
     setEditingVideo(null);
+  };
+
+  // Mở modal chi tiết khóa học và tải trực tiếp từ Backend API
+  const handleOpenCourseDetail = async (course) => {
+    setSelectedCourseForDetail(course);
+    try {
+      const detailed = await getCourseWithLessons(course.ID || course.id);
+      if (detailed?.chapters) {
+        setSelectedCourseForDetail((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            chaptersCount: detailed.chapters.length,
+            videosCount: detailed.lessons.length,
+            structuredChapters: detailed.chapters,
+          };
+        });
+      }
+    } catch (e) {
+      console.warn('Lỗi đồng bộ chi tiết khóa học từ BE:', e);
+    }
+  };
+
+  // Xóa toàn bộ khóa học (Cascades trên Backend: DELETE /api/v1/course/{id})
+  const handleDeleteCourse = async (courseId, courseTitle, e) => {
+    if (e) e.stopPropagation();
+    if (window.confirm(`Bạn có chắc chắn muốn xóa khóa học "${courseTitle}"? Thao tác này sẽ xóa toàn bộ chương và bài học bên trong.`)) {
+      try {
+        await deleteCourse(courseId);
+        setCoursesList((prev) => prev.filter((c) => (c.ID !== courseId && c.id !== courseId)));
+        showToast(`Đã xóa thành công khóa học: "${courseTitle}".`, 'info', 'Đã Xóa Khóa Học');
+      } catch (err) {
+        showToast(`Lỗi xóa khóa học: ${err.message}`, 'danger', 'Lỗi');
+      }
+    }
   };
 
   // Xóa bài giảng nhỏ
@@ -443,12 +481,12 @@ export default function InstructorVideos() {
                     </div>
                   </div>
 
-                  {/* Thao tác chính: Mở quản lý bài giảng nhỏ & Xem trước */}
+                  {/* Thao tác chính: Mở quản lý bài giảng nhỏ, Xem trước & Xóa khóa học */}
                   <div className="d-flex gap-2 mt-auto">
                     <Button
                       variant="primary"
                       className="btn-primary-pill flex-grow-1 d-flex align-items-center justify-content-center gap-1 small py-2"
-                      onClick={() => setSelectedCourseForDetail(course)}
+                      onClick={() => handleOpenCourseDetail(course)}
                     >
                       <i className="bi bi-pencil-square"></i>
                       <span>{t('instructor.edit_lesson')}</span>
@@ -456,7 +494,7 @@ export default function InstructorVideos() {
                     <Button
                       variant="outline-primary"
                       className="rounded-pill px-3 py-2 small d-flex align-items-center justify-content-center gap-1"
-                      onClick={() => navigate(`/${lang}/instructor/preview/${course.ID}`)}
+                      onClick={() => navigate(`/${lang}/instructor/preview/${course.ID || course.id}`)}
                     >
                       <i className="bi bi-play-circle"></i>
                       <span>{t('instructor.view')}</span>
@@ -464,9 +502,17 @@ export default function InstructorVideos() {
                     <Button
                       variant="outline-secondary"
                       className="rounded-pill px-3 py-2 small d-flex align-items-center justify-content-center"
-                      onClick={() => navigate(`/${lang}/instructor/upload`, { state: { courseId: course.ID } })}
+                      onClick={() => navigate(`/${lang}/instructor/upload`, { state: { courseId: course.ID || course.id } })}
                     >
                       <i className="bi bi-cloud-arrow-up"></i>
+                    </Button>
+                    <Button
+                      variant="outline-danger"
+                      className="rounded-pill px-3 py-2 small d-flex align-items-center justify-content-center"
+                      title="Xóa khóa học (DELETE /api/v1/course/{id})"
+                      onClick={(e) => handleDeleteCourse(course.ID || course.id, course.Title, e)}
+                    >
+                      <i className="bi bi-trash"></i>
                     </Button>
                   </div>
                 </Card.Body>

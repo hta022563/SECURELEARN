@@ -46,44 +46,18 @@ export async function fetchSignedUrl(videoId, studentId, courseId = null) {
     throw new Error('410: Signed URL bài giảng đã hết hạn truy cập.');
   }
 
-  // 1. Thử gọi API Backend lấy Lesson theo partitionKey (courseId) & sortKey (videoId / chapter)
-  if (courseId) {
-    try {
-      const res = await apiClient.request({
-        method: 'GET',
-        url: '/lesson',
-        data: { partitionKey: courseId, sortKey: videoId },
-      });
-      if (res && (res.videoURL || res.videoUrl)) {
-        return {
-          streamUrl: res.videoURL || res.videoUrl,
-          expiresAt: Date.now() + 3600000,
-        };
-      }
-    } catch (e) {
-      console.warn('[cryptoService] Không tìm thấy bài học qua GET /lesson:', e.message);
-    }
-  }
-
-  // 2. Thử gọi API Backend lấy danh sách bản ghi của Course theo partitionKey = videoId hoặc courseId
+  // 1. Thử gọi API Backend lấy Lesson theo ID: GET /api/v1/lesson/{id}
   try {
-    const targetPk = courseId || videoId;
-    const items = await apiClient.request({
-      method: 'GET',
-      url: '/course',
-      data: { partitionKey: targetPk },
-    });
-    if (Array.isArray(items)) {
-      const found = items.find((item) => (item.Chapter === videoId || item.chapter === videoId || item.videoURL));
-      if (found && (found.videoURL || found.videoUrl)) {
-        return {
-          streamUrl: found.videoURL || found.videoUrl,
-          expiresAt: Date.now() + 3600000,
-        };
-      }
+    const res = await apiClient.get(`/lesson/${videoId}`);
+    const stream = res?.url || res?.videoURL || res?.videoUrl;
+    if (stream) {
+      return {
+        streamUrl: stream,
+        expiresAt: Date.now() + 3600000,
+      };
     }
   } catch (e) {
-    console.warn('[cryptoService] Không tìm thấy qua GET /course:', e.message);
+    console.warn(`[cryptoService] Không tìm thấy bài học qua GET /lesson/${videoId}:`, e.message);
   }
 
   // 3. Nếu videoId tự thân là một URL trực tiếp (http://, https://, blob:)

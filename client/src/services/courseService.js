@@ -1,688 +1,838 @@
 import apiClient from '../api/axiosClient';
-import { courses, chapters, videos } from '../data/mockDatabase';
+import {
+  courses as mockCourses,
+  chapters as mockChapters,
+  videos as mockVideos,
+} from '../data/mockDatabase';
 
 /**
  * =============================================================================
  * SERVICE: courseService
  * =============================================================================
- * Tương thích 100% với Controller Backend Spring Boot (CourseController.java):
- * Base Path: /api/v1
+ * Khớp chuẩn 100% với Controller Backend Spring Boot:
+ * Base URL: http://localhost:8080
+ * API Prefix: /api/v1
+ * Credentials: withCredentials: true
  *
- * Các API Endpoints:
- * 1. POST   /course        -> Tạo mới khóa học (CourseCreationRequest)
- * 2. POST   /lesson        -> Tạo mới bài học (LessonCreationRequest)
- * 3. GET    /allcourses    -> Lấy toàn bộ danh sách khóa học (List<Courses>)
- * 4. GET    /course        -> Lấy khóa học theo PartitionKey (PartitionKeyRequest)
- * 5. GET    /lesson        -> Lấy bài học theo PartitionKey & SortKey (KeySchemaRequest)
- * 6. POST   /updateCourse  -> Cập nhật khóa học (CourseCreationRequest)
- * 7. POST   /updatelesson  -> Cập nhật bài học (LessonCreationRequest)
- * 8. DELETE /course        -> Xóa khóa học theo PartitionKey (PartitionKeyRequest)
- * 9. DELETE /lesson        -> Xóa bài học theo PartitionKey & SortKey (KeySchemaRequest)
+ * 1. Course Management:
+ *    - GET    /api/v1/allcourses                    -> Lấy tất cả khóa học
+ *    - GET    /api/v1/course/search?title={keyword} -> Tìm kiếm khóa học theo tiêu đề
+ *    - POST   /api/v1/course                        -> Tạo khóa học mới ({ title, description, instructor, prices })
+ *    - PUT    /api/v1/course/{id}                   -> Cập nhật khóa học ({ title, description, instructor, prices })
+ *    - DELETE /api/v1/course/{id}                   -> Xóa khóa học (cascades chapters & lessons)
+ *
+ * 2. Chapter Management:
+ *    - GET    /api/v1/course/{courseId}/chapters    -> Lấy danh sách chương của khóa học
+ *    - POST   /api/v1/chapter                       -> Tạo chương mới ({ course_id, title, description })
+ *    - PUT    /api/v1/chapter/{id}                  -> Cập nhật chương ({ course_id, title, description })
+ *    - DELETE /api/v1/chapter/{id}                  -> Xóa chương (cascades lessons)
+ *
+ * 3. Lesson Management:
+ *    - GET    /api/v1/chapter/{chapterId}/lessons   -> Lấy danh sách bài học của chương
+ *    - GET    /api/v1/lesson/{id}                   -> Lấy chi tiết một bài học
+ *    - POST   /api/v1/lesson                        -> Tạo bài học mới ({ course_id, chapter_id, title, description, url })
+ *    - PUT    /api/v1/lesson/{id}                   -> Cập nhật bài học ({ course_id, chapter_id, title, description, url })
+ *    - DELETE /api/v1/lesson/{id}                   -> Xóa bài học
+ *
+ * 4. Authentication (Cognito Open Routes):
+ *    - GET    /oauth2/authorization/cognito         -> Redirect tới Cognito Hosted UI login
+ *    - GET    /login/oauth2/code/cognito            -> Callback xử lý
+ *    - POST   /logout                               -> Hủy session -> Cognito logout -> localhost:3000
  * =============================================================================
  */
 
 // Đổi cờ này sang true nếu muốn ép buộc chế độ Mock dữ liệu nội bộ
 export const USE_MOCK = false;
-const simulateDelay = (ms = 300) => new Promise((resolve) => setTimeout(resolve, ms));
+const simulateDelay = (ms = 250) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Đường dẫn OAuth2 Cognito Backend
+export const COGNITO_LOGIN_URL = 'http://localhost:8080/oauth2/authorization/cognito';
+export const COGNITO_LOGOUT_URL = 'http://localhost:8080/logout';
 
 /**
- * Helper chuẩn hóa đối tượng Khóa học từ BE (DynamoDB) sang cấu trúc hiển thị FE
+ * Đăng xuất phiên làm việc phía Backend (Cognito Session)
+ */
+export async function logoutBackendSession() {
+  try {
+    await apiClient.post('/logout', {}, { baseURL: 'http://localhost:8080' });
+  } catch (err) {
+    console.warn('[courseService] Backend logout call notice:', err.message);
+  }
+}
+
+/**
+ * Chuyển hướng tới trang Đăng nhập AWS Cognito Hosted UI
+ */
+export function redirectToCognitoLogin() {
+  window.location.href = COGNITO_LOGIN_URL;
+}
+
+/**
+ * Helper chuẩn hóa đối tượng Khóa học từ BE sang cấu trúc hiển thị FE
+ * Đảm bảo tương thích cả các trường camelCase của BE và PascalCase của mockDatabase
  */
 export function normalizeCourse(item) {
   if (!item) return null;
   const courseId = item.id || item.ID || item.partitionKey || '';
   const courseTitle = item.title || item.Title || 'Khóa học chưa đặt tên';
   const courseDesc = item.description || item.Description || '';
-  const coursePrice = Number(item.prices ?? item.price ?? item.Price ?? item.Prices ?? 0);
-  const courseOwner = item.instructor || item.Instructor || item.owner || item.Owner || 'Giảng viên';
+  const coursePrice = Number(item.price ?? item.prices ?? item.Price ?? item.Prices ?? 0);
+  const courseInstructor = item.instructor || item.Instructor || item.owner || item.Owner || 'Giảng viên';
+  const creationTime = item.creationTime || item['Creation Time'] || new Date().toISOString();
+  const lastUpdateTime = item.lastUpdateTime || item.creationTime || creationTime;
 
   return {
-    ID: courseId,
     id: courseId,
-    Title: courseTitle,
+    ID: courseId,
     title: courseTitle,
-    Description: courseDesc,
+    Title: courseTitle,
     description: courseDesc,
-    Price: coursePrice,
+    Description: courseDesc,
     price: coursePrice,
     prices: coursePrice,
-    Owner: courseOwner,
-    owner: courseOwner,
-    instructor: courseOwner,
-    "Creation Time": item.creationTime || item["Creation Time"] || new Date().toISOString(),
+    Price: coursePrice,
+    Prices: coursePrice,
+    instructor: courseInstructor,
+    Instructor: courseInstructor,
+    owner: courseInstructor,
+    Owner: courseInstructor,
+    creationTime,
+    'Creation Time': creationTime,
+    lastUpdateTime,
+    accessLogID: item.accessLogID || item.AccessLogID || `al-${String(courseId).slice(-3)}`,
     AccessLogID: item.accessLogID || item.AccessLogID || `al-${String(courseId).slice(-3)}`,
+    anomalyAlertID: item.anomalyAlertID || item.AnomalyAlertID || null,
     AnomalyAlertID: item.anomalyAlertID || item.AnomalyAlertID || null,
   };
 }
 
 /**
- * 1. Lấy danh sách tất cả khóa học
+ * Helper chuẩn hóa đối tượng Chương (Chapter)
+ */
+export function normalizeChapter(item, courseId = null) {
+  if (!item) return null;
+  const chapterId = item.id || item.ID || '';
+  const chapterTitle = item.title || item.Title || 'Chương học';
+  const chapterDesc = item.description || item.Description || '';
+  const relCourseId = item.course_id || item.courseId || item.CoursesID || courseId || '';
+
+  return {
+    id: chapterId,
+    ID: chapterId,
+    title: chapterTitle,
+    Title: chapterTitle,
+    description: chapterDesc,
+    Description: chapterDesc,
+    course_id: relCourseId,
+    courseId: relCourseId,
+    CoursesID: relCourseId,
+    ChapterNumber: Number(item.ChapterNumber || item.chapterNumber || 1),
+    AccessLogID: item.AccessLogID || item.accessLogID || `al-${String(chapterId).slice(-3)}`,
+  };
+}
+
+/**
+ * Helper chuẩn hóa đối tượng Bài học (Lesson)
+ */
+export function normalizeLesson(item, chapterId = null, courseId = null) {
+  if (!item) return null;
+  const lessonId = item.id || item.ID || '';
+  const lessonTitle = item.title || item.Title || 'Bài học';
+  const lessonDesc = item.description || item.Description || '';
+  const lessonUrl = item.url || item.videoURL || item.videoUrl || '';
+  const relChapterId = item.chapter_id || item.chapterId || item.Chapter || chapterId || '';
+  const relCourseId = item.course_id || item.courseId || courseId || '';
+
+  return {
+    id: lessonId,
+    ID: lessonId,
+    title: lessonTitle,
+    Title: lessonTitle,
+    description: lessonDesc,
+    Description: lessonDesc,
+    url: lessonUrl,
+    videoURL: lessonUrl,
+    videoUrl: lessonUrl,
+    streamUrl: lessonUrl,
+    chapter_id: relChapterId,
+    chapterId: relChapterId,
+    course_id: relCourseId,
+    courseId: relCourseId,
+    Length: Number(item.Length || item.length || 1200),
+    Size: Number(item.Size || item.size || 350000000),
+    UploadTime: item.UploadTime || item.uploadTime || new Date().toISOString(),
+    UploadedBy: item.UploadedBy || item.uploadedBy || 'u-002',
+    AccessLogID: item.AccessLogID || item.accessLogID || 'al-001',
+  };
+}
+
+// =============================================================================
+// 1. COURSE MANAGEMENT
+// =============================================================================
+
+/**
+ * Lấy tất cả danh sách khóa học
  * Backend: GET /api/v1/allcourses
  */
 export async function getCourses() {
   if (USE_MOCK) {
     await simulateDelay();
-    return courses;
+    return mockCourses.map(normalizeCourse);
   }
 
   try {
     const data = await apiClient.get('/allcourses');
     if (Array.isArray(data)) {
-      return data
-        .filter((item) => !item.Chapter || item.Chapter === 'Meta' || item.chapter === 'Meta' || !item.sortKey || item.sortKey === 'Meta')
-        .map(normalizeCourse);
+      return data.map(normalizeCourse);
     }
     return [];
   } catch (err) {
-    console.warn('[courseService] Lỗi gọi GET /allcourses, fallback sang mockDatabase:', err.message);
-    return courses;
+    console.warn('[courseService] GET /allcourses fallback sang mockCourses:', err.message);
+    return mockCourses.map(normalizeCourse);
   }
 }
 
 /**
- * 2. Lấy danh sách items theo Partition Key (Khóa học và các bản ghi liên quan)
- * Backend: GET /api/v1/course
- * Payload: { partitionKey }
+ * Tìm kiếm khóa học theo tiêu đề (partial match, case-insensitive)
+ * Backend: GET /api/v1/course/search?title={keyword}
  */
-export async function getCourseByPk(partitionKey) {
+export async function searchCourses(keyword) {
+  const term = (keyword || '').trim();
+  if (!term) return getCourses();
+
   if (USE_MOCK) {
-    await simulateDelay(200);
-    return courses.filter((c) => (c.ID === partitionKey || c.id === partitionKey));
+    await simulateDelay();
+    return mockCourses
+      .filter((c) => (c.Title || c.title || '').toLowerCase().includes(term.toLowerCase()))
+      .map(normalizeCourse);
   }
 
   try {
-    const res = await apiClient.request({
-      method: 'GET',
-      url: '/course',
-      data: { partitionKey },
+    const data = await apiClient.get('/course/search', {
+      params: { title: term },
     });
-    return Array.isArray(res) ? res : [res];
+    if (Array.isArray(data)) {
+      return data.map(normalizeCourse);
+    }
+    return [];
   } catch (err) {
-    console.warn('[courseService] Lỗi gọi GET /course:', err.message);
-    throw err;
+    console.warn('[courseService] GET /course/search lỗi, fallback lọc local:', err.message);
+    const all = await getCourses();
+    return all.filter((c) =>
+      (c.title || c.Title || '').toLowerCase().includes(term.toLowerCase())
+    );
   }
 }
 
 /**
- * Lấy chi tiết khóa học theo ID
+ * Lấy thông tin một khóa học theo ID
  */
 export async function getCourseById(courseId) {
-  if (USE_MOCK) {
-    await simulateDelay(200);
-    return courses.find((c) => (c.ID === courseId || c.id === courseId)) || null;
-  }
-
-  try {
-    const items = await getCourseByPk(courseId);
-    if (Array.isArray(items) && items.length > 0) {
-      const meta = items.find((item) => !item.chapter && !item.Chapter || item.chapter === 'Meta' || item.Chapter === 'Meta') || items[0];
-      return normalizeCourse(meta);
-    }
-  } catch (err) {
-    console.warn('[courseService] getCourseById fallback sang getCourses():', err.message);
-  }
-
   const all = await getCourses();
-  return all.find((c) => c.ID === courseId || c.id === courseId) || null;
+  return all.find((c) => c.id === courseId || c.ID === courseId) || null;
 }
 
 /**
- * Lấy khóa học cùng danh sách bài giảng (Lessons) từ Backend API
- * Backend: GET /api/v1/course { partitionKey: courseId }
- */
-export async function getCourseWithLessons(courseId) {
-  if (USE_MOCK) {
-    const course = courses.find((c) => c.ID === courseId || c.id === courseId) || courses[0];
-    const chaps = chapters.filter((ch) => ch.CoursesID === course?.ID);
-    return {
-      course,
-      chapters: chaps,
-      lessons: videos,
-    };
-  }
-
-  try {
-    const items = await getCourseByPk(courseId);
-    if (Array.isArray(items) && items.length > 0) {
-      const meta = items.find((item) => !item.chapter && !item.Chapter || item.chapter === 'Meta' || item.Chapter === 'Meta') || items[0];
-      const normalizedCourse = normalizeCourse(meta);
-
-      const rawLessons = items.filter((item) => item.Chapter && item.Chapter !== 'Meta' && item.chapter !== 'Meta');
-      
-      const normalizedLessons = rawLessons.map((l, idx) => ({
-        ID: l.Chapter || l.chapter || `lesson-${idx}`,
-        id: l.Chapter || l.chapter || `lesson-${idx}`,
-        Title: l.title || 'Bài học',
-        title: l.title || 'Bài học',
-        Description: l.description || '',
-        description: l.description || '',
-        videoURL: l.videoURL || l.videoUrl || '',
-        videoUrl: l.videoURL || l.videoUrl || '',
-        streamUrl: l.videoURL || l.videoUrl || '',
-        Length: 1200,
-        Size: 350000000,
-        UploadTime: l.creationTime || new Date().toISOString(),
-        chapterId: l.Chapter || l.chapter,
-        courseId: l.id || courseId,
-      }));
-
-      return {
-        course: normalizedCourse,
-        lessons: normalizedLessons,
-      };
-    }
-  } catch (err) {
-    console.warn('[courseService] getCourseWithLessons lỗi:', err.message);
-  }
-
-  const course = await getCourseById(courseId);
-  return {
-    course,
-    lessons: [],
-  };
-}
-
-/**
- * 3. Lấy thông tin bài học cụ thể
- * Backend: GET /api/v1/lesson
- * Payload: { partitionKey, sortKey }
- */
-export async function getLesson(partitionKey, sortKey) {
-  if (USE_MOCK) {
-    await simulateDelay(200);
-    return videos.find((v) => v.ID === sortKey || v.id === sortKey) || null;
-  }
-
-  try {
-    const res = await apiClient.request({
-      method: 'GET',
-      url: '/lesson',
-      data: { partitionKey, sortKey },
-    });
-    return res;
-  } catch (err) {
-    console.warn('[courseService] Lỗi gọi GET /lesson:', err.message);
-    throw err;
-  }
-}
-
-/**
- * 4. Thêm một khóa học mới vào CSDL
+ * Tạo mới một khóa học
  * Backend: POST /api/v1/course
- * Payload: { id, title, description, instructor, prices }
+ * Request Body: { title, description, instructor, prices }
+ * Response: { success: "Course added successfully" }
  */
-export async function createCourse({ id, title, description, price, prices, owner, instructor }) {
-  const generatedId = id || `c-${Date.now().toString().slice(-4)}`;
-  const instructorName = instructor || owner || 'Instructor';
-  const priceNum = Number(prices ?? price) >= 0 ? Number(prices ?? price) : 0;
+export async function createCourse({ title, description, instructor, owner, price, prices }) {
+  const courseTitle = (title || '').trim();
+  const courseDesc = (description || '').trim();
+  const courseInstructor = (instructor || owner || 'Instructor').trim();
+  const priceNum = Number(prices ?? price ?? 0) >= 0 ? Number(prices ?? price ?? 0) : 0;
 
-  const newCourse = {
-    ID: generatedId,
-    id: generatedId,
-    Title: (title || '').trim(),
-    title: (title || '').trim(),
-    Description: (description || '').trim(),
-    description: (description || '').trim(),
-    Price: priceNum,
+  const payload = {
+    title: courseTitle,
+    description: courseDesc,
+    instructor: courseInstructor,
+    prices: priceNum,
+  };
+
+  const tempCourse = {
+    id: `c-${Date.now().toString().slice(-6)}`,
+    ...payload,
     price: priceNum,
-    prices: priceNum,
-    "Creation Time": new Date().toISOString(),
-    Owner: instructorName,
-    instructor: instructorName,
-    AccessLogID: `al-${Date.now().toString().slice(-3)}`,
-    AnomalyAlertID: null,
+    creationTime: new Date().toISOString(),
+    lastUpdateTime: new Date().toISOString(),
   };
 
   if (USE_MOCK) {
-    await simulateDelay(500);
-    courses.unshift(newCourse);
-    return newCourse;
+    await simulateDelay();
+    mockCourses.unshift(tempCourse);
+    return normalizeCourse(tempCourse);
   }
 
   try {
-    await apiClient.post('/course', {
-      id: generatedId,
-      title: (title || '').trim(),
-      description: (description || '').trim(),
-      instructor: instructorName,
-      prices: priceNum,
-    });
-  } catch (error) {
-    console.error('[courseService] Lỗi gọi API POST /course:', error);
-    throw error;
+    const res = await apiClient.post('/course', payload);
+    // Cập nhật bộ nhớ mock đệm để UI hiển thị mượt mà
+    mockCourses.unshift(tempCourse);
+    return {
+      ...normalizeCourse(tempCourse),
+      backendResponse: res,
+    };
+  } catch (err) {
+    console.error('[courseService] POST /course lỗi:', err.message);
+    throw err;
   }
-
-  // Cập nhật bộ nhớ đệm UI để phản hồi tức thì
-  if (!courses.some((c) => (c.ID || c.id) === generatedId)) {
-    courses.unshift(newCourse);
-  }
-
-  return newCourse;
 }
 
 /**
- * 5. Cập nhật thông tin khóa học
- * Backend: POST /api/v1/updateCourse
- * Payload: { id, title, description, instructor, prices }
+ * Cập nhật một khóa học
+ * Backend: PUT /api/v1/course/{id}
+ * Request Body: { title, description, instructor, prices }
+ * Response: { success: "Course updated successfully" }
  */
-export async function updateCourse({ id, title, description, prices, price, instructor, owner }) {
-  const priceNum = Number(prices ?? price) >= 0 ? Number(prices ?? price) : 0;
-  const instructorName = instructor || owner || 'Instructor';
+export async function updateCourse(id, { title, description, instructor, owner, price, prices }) {
+  const courseTitle = (title || '').trim();
+  const courseDesc = (description || '').trim();
+  const courseInstructor = (instructor || owner || 'Instructor').trim();
+  const priceNum = Number(prices ?? price ?? 0) >= 0 ? Number(prices ?? price ?? 0) : 0;
+
   const payload = {
-    id,
-    title: (title || '').trim(),
-    description: (description || '').trim(),
-    instructor: instructorName,
+    title: courseTitle,
+    description: courseDesc,
+    instructor: courseInstructor,
     prices: priceNum,
   };
 
   if (USE_MOCK) {
-    await simulateDelay(400);
-    const c = courses.find((item) => item.id === id || item.ID === id);
-    if (c) {
-      c.Title = payload.title;
-      c.title = payload.title;
-      c.Description = payload.description;
-      c.description = payload.description;
-      c.Price = priceNum;
-      c.price = priceNum;
-      c.prices = priceNum;
-      c.Owner = instructorName;
-      c.instructor = instructorName;
+    await simulateDelay();
+    const item = mockCourses.find((c) => c.id === id || c.ID === id);
+    if (item) {
+      item.title = courseTitle;
+      item.Title = courseTitle;
+      item.description = courseDesc;
+      item.Description = courseDesc;
+      item.instructor = courseInstructor;
+      item.Instructor = courseInstructor;
+      item.price = priceNum;
+      item.Price = priceNum;
     }
-    return { success: 'Courses updated successfully' };
+    return { success: 'Course updated successfully' };
   }
 
   try {
-    const res = await apiClient.post('/updateCourse', payload);
-    const c = courses.find((item) => item.id === id || item.ID === id);
-    if (c) {
-      c.Title = payload.title;
-      c.title = payload.title;
-      c.Description = payload.description;
-      c.description = payload.description;
-      c.Price = priceNum;
-      c.price = priceNum;
-      c.prices = priceNum;
-      c.Owner = instructorName;
-      c.instructor = instructorName;
+    const res = await apiClient.put(`/course/${id}`, payload);
+    const item = mockCourses.find((c) => c.id === id || c.ID === id);
+    if (item) {
+      item.title = courseTitle;
+      item.Title = courseTitle;
+      item.description = courseDesc;
+      item.Description = courseDesc;
+      item.instructor = courseInstructor;
+      item.Instructor = courseInstructor;
+      item.price = priceNum;
+      item.Price = priceNum;
     }
     return res;
   } catch (err) {
-    console.error('[courseService] Lỗi gọi POST /updateCourse:', err);
+    console.error('[courseService] PUT /course/{id} lỗi:', err.message);
     throw err;
   }
 }
 
 /**
- * 6. Xóa khóa học
- * Backend: DELETE /api/v1/course
- * Payload: { partitionKey }
+ * Xóa một khóa học (Cascades tới tất cả chapters và lessons)
+ * Backend: DELETE /api/v1/course/{id}
+ * Response: { success: "Course deleted successfully" }
  */
-export async function deleteCourse(courseId) {
+export async function deleteCourse(id) {
   if (USE_MOCK) {
-    await simulateDelay(400);
-    const idx = courses.findIndex((c) => c.ID === courseId || c.id === courseId);
-    if (idx !== -1) courses.splice(idx, 1);
-    return { success: 'Courses deleted successfully' };
+    await simulateDelay();
+    const idx = mockCourses.findIndex((c) => c.id === id || c.ID === id);
+    if (idx !== -1) mockCourses.splice(idx, 1);
+    return { success: 'Course deleted successfully' };
   }
 
   try {
-    const res = await apiClient.delete('/course', {
-      data: { partitionKey: courseId },
-    });
-    const idx = courses.findIndex((c) => c.ID === courseId || c.id === courseId);
-    if (idx !== -1) courses.splice(idx, 1);
+    const res = await apiClient.delete(`/course/${id}`);
+    const idx = mockCourses.findIndex((c) => c.id === id || c.ID === id);
+    if (idx !== -1) mockCourses.splice(idx, 1);
     return res;
   } catch (err) {
-    console.error('[courseService] Lỗi gọi DELETE /course:', err);
+    console.error('[courseService] DELETE /course/{id} lỗi:', err.message);
+    throw err;
+  }
+}
+
+// =============================================================================
+// 2. CHAPTER MANAGEMENT
+// =============================================================================
+
+/**
+ * Lấy danh sách tất cả các chương trong một khóa học
+ * Backend: GET /api/v1/course/{courseId}/chapters
+ * Response: [ { id, title, description } ]
+ */
+export async function getChapters(courseId) {
+  if (USE_MOCK) {
+    await simulateDelay();
+    return mockChapters
+      .filter((ch) => ch.CoursesID === courseId || ch.course_id === courseId)
+      .map((ch) => normalizeChapter(ch, courseId));
+  }
+
+  try {
+    const data = await apiClient.get(`/course/${courseId}/chapters`);
+    if (Array.isArray(data)) {
+      return data.map((ch, idx) => ({
+        ...normalizeChapter(ch, courseId),
+        ChapterNumber: idx + 1,
+      }));
+    }
+    return [];
+  } catch (err) {
+    console.warn(`[courseService] GET /course/${courseId}/chapters fallback mock:`, err.message);
+    return mockChapters
+      .filter((ch) => ch.CoursesID === courseId || ch.course_id === courseId)
+      .map((ch) => normalizeChapter(ch, courseId));
+  }
+}
+
+/**
+ * Tạo mới một chương trong khóa học
+ * Backend: POST /api/v1/chapter
+ * Request Body: { course_id, title, description }
+ * Response: { success: "Chapter added successfully" }
+ */
+export async function createChapter({ course_id, courseId, title, description, chapterNumber }) {
+  const targetCourseId = course_id || courseId;
+  const chapterTitle = (title || '').trim();
+  const chapterDesc = (description || '').trim();
+
+  const payload = {
+    course_id: targetCourseId,
+    title: chapterTitle,
+    description: chapterDesc,
+  };
+
+  const tempChapter = {
+    id: `ch-${Date.now().toString().slice(-6)}`,
+    ...payload,
+    ChapterNumber: Number(chapterNumber) || 1,
+  };
+
+  if (USE_MOCK) {
+    await simulateDelay();
+    mockChapters.push(tempChapter);
+    return normalizeChapter(tempChapter, targetCourseId);
+  }
+
+  try {
+    const res = await apiClient.post('/chapter', payload);
+    mockChapters.push(tempChapter);
+    return {
+      ...normalizeChapter(tempChapter, targetCourseId),
+      backendResponse: res,
+    };
+  } catch (err) {
+    console.error('[courseService] POST /chapter lỗi:', err.message);
     throw err;
   }
 }
 
 /**
- * 7. Thêm một bài học mới vào khóa học
+ * Cập nhật một chương
+ * Backend: PUT /api/v1/chapter/{id}
+ * Request Body: { course_id, title, description }
+ * Response: { success: "Chapter updated successfully" }
+ */
+export async function updateChapter(id, { course_id, courseId, title, description }) {
+  const targetCourseId = course_id || courseId;
+  const chapterTitle = (title || '').trim();
+  const chapterDesc = (description || '').trim();
+
+  const payload = {
+    course_id: targetCourseId,
+    title: chapterTitle,
+    description: chapterDesc,
+  };
+
+  if (USE_MOCK) {
+    await simulateDelay();
+    const ch = mockChapters.find((item) => item.id === id || item.ID === id);
+    if (ch) {
+      ch.title = chapterTitle;
+      ch.Title = chapterTitle;
+      ch.description = chapterDesc;
+      ch.Description = chapterDesc;
+    }
+    return { success: 'Chapter updated successfully' };
+  }
+
+  try {
+    const res = await apiClient.put(`/chapter/${id}`, payload);
+    const ch = mockChapters.find((item) => item.id === id || item.ID === id);
+    if (ch) {
+      ch.title = chapterTitle;
+      ch.Title = chapterTitle;
+      ch.description = chapterDesc;
+      ch.Description = chapterDesc;
+    }
+    return res;
+  } catch (err) {
+    console.error('[courseService] PUT /chapter/{id} lỗi:', err.message);
+    throw err;
+  }
+}
+
+/**
+ * Xóa một chương (Cascades tới tất cả bài học trong chương)
+ * Backend: DELETE /api/v1/chapter/{id}
+ * Response: { success: "Chapter deleted successfully" }
+ */
+export async function deleteChapter(id) {
+  if (USE_MOCK) {
+    await simulateDelay();
+    const idx = mockChapters.findIndex((c) => c.id === id || c.ID === id);
+    if (idx !== -1) mockChapters.splice(idx, 1);
+    return { success: 'Chapter deleted successfully' };
+  }
+
+  try {
+    const res = await apiClient.delete(`/chapter/${id}`);
+    const idx = mockChapters.findIndex((c) => c.id === id || c.ID === id);
+    if (idx !== -1) mockChapters.splice(idx, 1);
+    return res;
+  } catch (err) {
+    console.error('[courseService] DELETE /chapter/{id} lỗi:', err.message);
+    throw err;
+  }
+}
+
+// =============================================================================
+// 3. LESSON MANAGEMENT
+// =============================================================================
+
+/**
+ * Lấy danh sách tất cả các bài học trong một chương
+ * Backend: GET /api/v1/chapter/{chapterId}/lessons
+ * Response: [ { id, title, description, url } ]
+ */
+export async function getLessons(chapterId) {
+  if (USE_MOCK) {
+    await simulateDelay();
+    return mockVideos
+      .filter((v) => v.chapterId === chapterId || v.chapter === chapterId)
+      .map((v) => normalizeLesson(v, chapterId));
+  }
+
+  try {
+    const data = await apiClient.get(`/chapter/${chapterId}/lessons`);
+    if (Array.isArray(data)) {
+      return data.map((l) => normalizeLesson(l, chapterId));
+    }
+    return [];
+  } catch (err) {
+    console.warn(`[courseService] GET /chapter/${chapterId}/lessons fallback mock:`, err.message);
+    return mockVideos
+      .filter((v) => v.chapterId === chapterId || v.chapter === chapterId)
+      .map((v) => normalizeLesson(v, chapterId));
+  }
+}
+
+/**
+ * Lấy chi tiết một bài học theo ID
+ * Backend: GET /api/v1/lesson/{id}
+ * Response: { id, title, description, url }
+ */
+export async function getLessonById(id) {
+  if (USE_MOCK) {
+    await simulateDelay();
+    const found = mockVideos.find((v) => v.id === id || v.ID === id);
+    return found ? normalizeLesson(found) : null;
+  }
+
+  try {
+    const data = await apiClient.get(`/lesson/${id}`);
+    return normalizeLesson(data);
+  } catch (err) {
+    console.warn(`[courseService] GET /lesson/${id} fallback mock:`, err.message);
+    const found = mockVideos.find((v) => v.id === id || v.ID === id);
+    return found ? normalizeLesson(found) : null;
+  }
+}
+
+/**
+ * Tạo mới một bài học trong chương
  * Backend: POST /api/v1/lesson
- * Payload: { id, chapter, title, description, videoURL }
+ * Request Body: { course_id, chapter_id, title, description, url }
+ * Response: { success: "Lesson added successfully" }
  */
-export async function createLesson({ id, courseId, chapter, title, description, videoURL }) {
+export async function createLesson({
+  course_id,
+  courseId,
+  chapter_id,
+  chapterId,
+  chapter,
+  title,
+  description,
+  url,
+  videoURL,
+  videoUrl,
+}) {
+  const targetCourseId = course_id || courseId || '';
+  const targetChapterId = chapter_id || chapterId || chapter || '';
+  const lessonTitle = (title || '').trim();
+  const lessonDesc = (description || '').trim();
+  const lessonUrl = (url || videoURL || videoUrl || '').trim();
+
   const payload = {
-    id: id || courseId,
-    chapter: chapter || `ch-${Date.now().toString().slice(-4)}`,
-    title: (title || '').trim(),
-    description: (description || '').trim(),
-    videoURL: videoURL || '',
+    course_id: targetCourseId,
+    chapter_id: targetChapterId,
+    title: lessonTitle,
+    description: lessonDesc,
+    url: lessonUrl || null,
+  };
+
+  const tempLesson = {
+    id: `v-${Date.now().toString().slice(-6)}`,
+    ...payload,
+    videoURL: lessonUrl,
   };
 
   if (USE_MOCK) {
-    await simulateDelay(400);
-    return { success: 'Lesson added successfully (Mock)', data: payload };
+    await simulateDelay();
+    mockVideos.push(tempLesson);
+    return normalizeLesson(tempLesson, targetChapterId, targetCourseId);
   }
 
   try {
     const res = await apiClient.post('/lesson', payload);
-    return res;
-  } catch (error) {
-    console.error('[courseService] Lỗi gọi API POST /lesson:', error);
-    throw error;
-  }
-}
-
-/**
- * 8. Cập nhật bài học
- * Backend: POST /api/v1/updatelesson
- * Payload: { id, chapter, title, description, videoURL }
- */
-export async function updateLesson({ id, courseId, chapter, title, description, videoURL }) {
-  const payload = {
-    id: id || courseId,
-    chapter: chapter,
-    title: (title || '').trim(),
-    description: (description || '').trim(),
-    videoURL: videoURL || '',
-  };
-
-  if (USE_MOCK) {
-    await simulateDelay(400);
-    return { success: 'Lesson update successfully' };
-  }
-
-  try {
-    const res = await apiClient.post('/updatelesson', payload);
-    return res;
+    mockVideos.push(tempLesson);
+    return {
+      ...normalizeLesson(tempLesson, targetChapterId, targetCourseId),
+      backendResponse: res,
+    };
   } catch (err) {
-    console.error('[courseService] Lỗi gọi POST /updatelesson:', err);
+    console.error('[courseService] POST /lesson lỗi:', err.message);
     throw err;
   }
 }
 
 /**
- * 9. Xóa bài học / chương
- * Backend: DELETE /api/v1/lesson
- * Payload: { partitionKey, sortKey }
+ * Cập nhật một bài học
+ * Backend: PUT /api/v1/lesson/{id}
+ * Request Body: { course_id, chapter_id, title, description, url }
+ * Response: { success: "Lesson updated successfully" }
  */
-export async function deleteLesson(courseId, chapter) {
+export async function updateLesson(id, {
+  course_id,
+  courseId,
+  chapter_id,
+  chapterId,
+  chapter,
+  title,
+  description,
+  url,
+  videoURL,
+  videoUrl,
+}) {
+  const targetCourseId = course_id || courseId || '';
+  const targetChapterId = chapter_id || chapterId || chapter || '';
+  const lessonTitle = (title || '').trim();
+  const lessonDesc = (description || '').trim();
+  const lessonUrl = (url || videoURL || videoUrl || '').trim();
+
+  const payload = {
+    course_id: targetCourseId,
+    chapter_id: targetChapterId,
+    title: lessonTitle,
+    description: lessonDesc,
+    url: lessonUrl || null,
+  };
+
   if (USE_MOCK) {
-    await simulateDelay(400);
+    await simulateDelay();
+    const vid = mockVideos.find((v) => v.id === id || v.ID === id);
+    if (vid) {
+      vid.title = lessonTitle;
+      vid.Title = lessonTitle;
+      vid.description = lessonDesc;
+      vid.Description = lessonDesc;
+      vid.url = lessonUrl;
+      vid.videoURL = lessonUrl;
+    }
+    return { success: 'Lesson updated successfully' };
+  }
+
+  try {
+    const res = await apiClient.put(`/lesson/${id}`, payload);
+    const vid = mockVideos.find((v) => v.id === id || v.ID === id);
+    if (vid) {
+      vid.title = lessonTitle;
+      vid.Title = lessonTitle;
+      vid.description = lessonDesc;
+      vid.Description = lessonDesc;
+      vid.url = lessonUrl;
+      vid.videoURL = lessonUrl;
+    }
+    return res;
+  } catch (err) {
+    console.error('[courseService] PUT /lesson/{id} lỗi:', err.message);
+    throw err;
+  }
+}
+
+/**
+ * Xóa một bài học
+ * Backend: DELETE /api/v1/lesson/{id}
+ * Response: { success: "Lesson deleted successfully" }
+ */
+export async function deleteLesson(id) {
+  if (USE_MOCK) {
+    await simulateDelay();
+    const idx = mockVideos.findIndex((v) => v.id === id || v.ID === id);
+    if (idx !== -1) mockVideos.splice(idx, 1);
     return { success: 'Lesson deleted successfully' };
   }
 
   try {
-    const res = await apiClient.delete('/lesson', {
-      data: { partitionKey: courseId, sortKey: chapter },
-    });
+    const res = await apiClient.delete(`/lesson/${id}`);
+    const idx = mockVideos.findIndex((v) => v.id === id || v.ID === id);
+    if (idx !== -1) mockVideos.splice(idx, 1);
     return res;
   } catch (err) {
-    console.error('[courseService] Lỗi gọi DELETE /lesson:', err);
+    console.error('[courseService] DELETE /lesson/{id} lỗi:', err.message);
     throw err;
   }
 }
 
+// =============================================================================
+// 4. COMPOSITE AGGREGATOR FUNCTIONS (Dành cho Player & Instructor Views)
+// =============================================================================
+
 /**
- * Thêm một chương mới cho khóa học (Tạo bản ghi Lesson trên BE)
+ * Lấy toàn bộ cây nội dung khóa học: Khóa học -> Các chương -> Các bài học
+ * Tự động gọi lần lượt:
+ * 1. GET /api/v1/allcourses (hoặc tìm theo ID)
+ * 2. GET /api/v1/course/{courseId}/chapters
+ * 3. GET /api/v1/chapter/{chapterId}/lessons cho từng chương
  */
-export async function createChapter({ courseId, chapterNumber, title, description }) {
-  const chapterId = `ch-${Date.now().toString().slice(-4)}`;
-  const newChapter = {
-    ID: chapterId,
-    ChapterNumber: Number(chapterNumber) || 1,
-    Title: (title || '').trim(),
-    Description: (description || '').trim(),
-    CoursesID: courseId,
-    AccessLogID: `al-${Date.now().toString().slice(-3)}`,
-  };
-
-  if (USE_MOCK) {
-    await simulateDelay(400);
-    chapters.push(newChapter);
-    return newChapter;
-  }
-
+export async function getCourseWithLessons(courseId) {
   try {
-    await createLesson({
-      courseId,
-      chapter: chapterId,
-      title: (title || '').trim(),
-      description: (description || '').trim(),
-      videoURL: '',
-    });
-  } catch (error) {
-    console.warn('[courseService] Lỗi khi tạo chapter trên BE:', error.message);
-  }
+    const course = await getCourseById(courseId);
+    if (!course) {
+      return { course: null, chapters: [], lessons: [] };
+    }
 
-  chapters.push(newChapter);
-  return newChapter;
+    const fetchedChapters = await getChapters(courseId);
+
+    // Nạp song song danh sách bài học của tất cả các chương
+    const chaptersWithLessons = await Promise.all(
+      fetchedChapters.map(async (chap, idx) => {
+        const lessons = await getLessons(chap.id);
+        const mappedLessons = lessons.map((l) => ({
+          ...l,
+          chapterId: chap.id,
+          courseId: course.id,
+          chapterTitle: chap.title,
+          chapterNumber: idx + 1,
+        }));
+
+        return {
+          ...chap,
+          ChapterNumber: idx + 1,
+          lessons: mappedLessons,
+          videos: mappedLessons, // alias tương thích component cũ
+        };
+      })
+    );
+
+    // Danh sách phẳng tất cả bài học
+    const allFlattenedLessons = chaptersWithLessons.flatMap((ch) => ch.lessons);
+
+    return {
+      course,
+      chapters: chaptersWithLessons,
+      lessons: allFlattenedLessons,
+    };
+  } catch (err) {
+    console.warn('[courseService] getCourseWithLessons fallback mock:', err.message);
+    const course = mockCourses.find((c) => c.ID === courseId || c.id === courseId) || mockCourses[0];
+    const chaps = mockChapters.filter((ch) => ch.CoursesID === course?.ID || ch.CoursesID === course?.id);
+    return {
+      course: normalizeCourse(course),
+      chapters: chaps.map((ch) => ({
+        ...normalizeChapter(ch, course?.id),
+        videos: mockVideos.filter((v) => v.chapterId === ch.ID || v.AccessLogID === ch.AccessLogID),
+        lessons: mockVideos.filter((v) => v.chapterId === ch.ID || v.AccessLogID === ch.AccessLogID),
+      })),
+      lessons: mockVideos.map(normalizeLesson),
+    };
+  }
 }
 
-/**
- * Thêm một video bài giảng mới
- */
-export async function createVideo({ courseId, chapterId, title, length, size, uploadedBy, accessLogId, videoURL }) {
-  const videoId = `v-${Date.now().toString().slice(-4)}`;
-  const newVideo = {
-    ID: videoId,
-    Title: (title || '').trim(),
-    Length: Number(length) || 1200,
-    Size: Number(size) || 350000000,
-    UploadTime: new Date().toISOString(),
-    UploadedBy: uploadedBy || 'u-002',
-    AccessLogID: accessLogId || 'al-001',
-    AnomalyAlertID: null,
-  };
+// =============================================================================
+// 5. BACKWARD-COMPATIBLE ALIASES (Đảm bảo các component cũ chạy ổn định)
+// =============================================================================
 
-  if (USE_MOCK) {
-    await simulateDelay(400);
-    videos.push(newVideo);
-    return newVideo;
-  }
-
-  if (courseId) {
-    try {
-      await createLesson({
-        courseId,
-        chapter: chapterId || videoId,
-        title: (title || '').trim(),
-        description: `Video bài giảng: ${(title || '').trim()}`,
-        videoURL: videoURL || `https://stream.securelearn.internal/${videoId}`,
-      });
-    } catch (e) {
-      console.warn('[courseService] Lỗi khi tạo video lesson trên BE:', e.message);
-    }
-  }
-
-  videos.push(newVideo);
-  return newVideo;
+export async function createVideo({
+  courseId,
+  chapterId,
+  title,
+  length,
+  size,
+  uploadedBy,
+  accessLogId,
+  videoURL,
+  url,
+}) {
+  return createLesson({
+    course_id: courseId,
+    chapter_id: chapterId,
+    title,
+    description: `Video: ${title}`,
+    url: url || videoURL,
+  });
 }
 
-/**
- * Cập nhật tiêu đề video bài học nhỏ
- * Backend: POST /api/v1/updatelesson
- */
-export async function updateVideoTitle(videoId, newTitle, courseId = null, chapter = null) {
-  let cId = courseId;
-  let chId = chapter;
+export async function updateVideoTitle(videoId, newTitle, courseId = null, chapterId = null) {
+  return updateLesson(videoId, {
+    course_id: courseId,
+    chapter_id: chapterId,
+    title: newTitle,
+    description: '',
+  });
+}
 
-  if (!cId || !chId) {
-    const foundVid = videos.find((v) => v.ID === videoId || v.id === videoId);
-    if (foundVid) {
-      cId = cId || foundVid.courseId || foundVid.CoursesID;
-      chId = chId || foundVid.chapterId || foundVid.chapter;
-    }
-  }
+export async function deleteVideo(videoId) {
+  return deleteLesson(videoId);
+}
 
+export async function updateChapterTitle(chapterId, newTitle, newDesc = '', courseId = null) {
+  return updateChapter(chapterId, {
+    course_id: courseId,
+    title: newTitle,
+    description: newDesc,
+  });
+}
+
+export async function reuploadVideo(videoId, { title, length, size, url, videoURL }) {
   if (USE_MOCK) {
     await simulateDelay();
-    const vid = videos.find((v) => v.ID === videoId);
+    const vid = mockVideos.find((v) => v.ID === videoId || v.id === videoId);
     if (vid) {
-      vid.Title = newTitle.trim();
+      if (title) vid.Title = title;
+      if (url || videoURL) vid.videoURL = url || videoURL;
       return vid;
     }
-    return null;
   }
 
-  if (cId && chId) {
-    try {
-      await updateLesson({
-        courseId: cId,
-        chapter: chId,
-        title: newTitle.trim(),
-        description: '',
-        videoURL: '',
-      });
-    } catch (e) {
-      console.warn('[courseService] Lỗi update lesson trên BE:', e.message);
-    }
-  }
-
-  const vid = videos.find((v) => v.ID === videoId);
-  if (vid) vid.Title = newTitle.trim();
-  return vid;
+  return updateLesson(videoId, {
+    title: title || '',
+    url: url || videoURL || '',
+  });
 }
 
-/**
- * Xóa một video bài học nhỏ
- * Backend: DELETE /api/v1/lesson
- */
-export async function deleteVideo(videoId, courseId = null, chapter = null) {
-  let cId = courseId;
-  let chId = chapter;
-
-  if (!cId || !chId) {
-    const foundVid = videos.find((v) => v.ID === videoId || v.id === videoId);
-    if (foundVid) {
-      cId = cId || foundVid.courseId || foundVid.CoursesID;
-      chId = chId || foundVid.chapterId || foundVid.chapter;
-    }
-  }
-
-  if (USE_MOCK) {
-    await simulateDelay();
-    const idx = videos.findIndex((v) => v.ID === videoId);
-    if (idx !== -1) {
-      return videos.splice(idx, 1)[0];
-    }
-    return null;
-  }
-
-  if (cId && chId) {
-    try {
-      await deleteLesson(cId, chId);
-    } catch (e) {
-      console.warn('[courseService] Lỗi xóa lesson trên BE:', e.message);
-    }
-  }
-
-  const idx = videos.findIndex((v) => v.ID === videoId);
-  if (idx !== -1) {
-    return videos.splice(idx, 1)[0];
-  }
-  return null;
+// Alias cho các hàm cũ
+export async function getCourseByPk(partitionKey) {
+  return getCourseById(partitionKey);
 }
 
-/**
- * Cập nhật tiêu đề hoặc thông tin chương
- */
-export async function updateChapterTitle(chapterId, newTitle, newDesc, courseId = null) {
-  if (USE_MOCK) {
-    await simulateDelay();
-    const chap = chapters.find((c) => c.ID === chapterId);
-    if (chap) {
-      if (newTitle) chap.Title = newTitle.trim();
-      if (newDesc !== undefined) chap.Description = newDesc.trim();
-      return chap;
-    }
-    return null;
-  }
-
-  let cId = courseId;
-  if (!cId) {
-    const chap = chapters.find((c) => c.ID === chapterId);
-    if (chap) cId = chap.CoursesID || chap.courseId;
-  }
-
-  if (cId) {
-    try {
-      await updateLesson({
-        courseId: cId,
-        chapter: chapterId,
-        title: (newTitle || '').trim(),
-        description: (newDesc || '').trim(),
-        videoURL: '',
-      });
-    } catch (e) {
-      console.warn('[courseService] Lỗi update chapter trên BE:', e.message);
-    }
-  }
-
-  const chap = chapters.find((c) => c.ID === chapterId);
-  if (chap) {
-    if (newTitle) chap.Title = newTitle.trim();
-    if (newDesc !== undefined) chap.Description = newDesc.trim();
-  }
-  return chap;
-}
-
-/**
- * Xóa một chương
- * Backend: DELETE /api/v1/lesson
- */
-export async function deleteChapter(chapterId, courseId = null) {
-  let cId = courseId;
-  if (!cId) {
-    const foundChap = chapters.find((c) => c.ID === chapterId || c.id === chapterId);
-    if (foundChap) {
-      cId = foundChap.CoursesID || foundChap.courseId;
-    }
-  }
-
-  if (USE_MOCK) {
-    await simulateDelay();
-    const idx = chapters.findIndex((c) => c.ID === chapterId);
-    if (idx !== -1) {
-      return chapters.splice(idx, 1)[0];
-    }
-    return null;
-  }
-
-  if (cId) {
-    try {
-      await deleteLesson(cId, chapterId);
-    } catch (e) {
-      console.warn('[courseService] Lỗi xóa chapter trên BE:', e.message);
-    }
-  }
-
-  const idx = chapters.findIndex((c) => c.ID === chapterId);
-  if (idx !== -1) {
-    return chapters.splice(idx, 1)[0];
-  }
-  return null;
-}
-
-/**
- * Thay thế / Up lại video khác
- */
-export async function reuploadVideo(videoId, { title, length, size }) {
-  if (USE_MOCK) {
-    await simulateDelay();
-    const vid = videos.find((v) => v.ID === videoId);
-    if (vid) {
-      if (title && title.trim()) vid.Title = title.trim();
-      if (length) vid.Length = Number(length);
-      if (size) vid.Size = Number(size);
-      vid.UploadTime = new Date().toISOString();
-      return vid;
-    }
-    return null;
-  }
-
-  const vid = videos.find((v) => v.ID === videoId);
-  if (vid) {
-    if (title && title.trim()) vid.Title = title.trim();
-    if (length) vid.Length = Number(length);
-    if (size) vid.Size = Number(size);
-    vid.UploadTime = new Date().toISOString();
-    return vid;
-  }
-  return null;
+export async function getLesson(partitionKey, sortKey) {
+  return getLessonById(sortKey || partitionKey);
 }

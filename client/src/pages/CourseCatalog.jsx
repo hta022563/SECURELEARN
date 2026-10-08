@@ -15,14 +15,14 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { courses, users } from '../data/mockDatabase';
 import { checkCourseAccess, getEntitledCourseIds } from '../services/entitlementService';
-import { getCourses } from '../services/courseService';
+import { getCourses, searchCourses } from '../services/courseService';
 import CreateCourseModal from '../components/CreateCourseModal';
 
 /**
  * =============================================================================
  * PAGE: CourseCatalog (Danh Mục Khóa Học Toàn Diện - 100% Dữ Liệu Mềm)
  * =============================================================================
- * - Đọc trực tiếp từ bảng courses và users trong CSDL
+ * - Đọc trực tiếp từ Backend API (GET /allcourses, GET /course/search?title=)
  * - Kiểm tra quyền Entitlement: khóa học chưa được cấp quyền KHÔNG THỂ xem video bài giảng
  * - Chỉ khóa học trong "Khóa học của tôi" (đã ghi danh active/completed) mới được phép vào học
  * =============================================================================
@@ -38,17 +38,25 @@ export default function CourseCatalog() {
 
   useEffect(() => {
     let isMounted = true;
-    getCourses()
-      .then((data) => {
-        if (isMounted && Array.isArray(data) && data.length > 0) {
-          setCourseList(data);
-        }
-      })
-      .catch((err) => console.warn('[CourseCatalog] Lỗi nạp khóa học:', err));
+    const timer = setTimeout(() => {
+      const fetchPromise = searchTerm.trim()
+        ? searchCourses(searchTerm.trim())
+        : getCourses();
+
+      fetchPromise
+        .then((data) => {
+          if (isMounted && Array.isArray(data)) {
+            setCourseList(data);
+          }
+        })
+        .catch((err) => console.warn('[CourseCatalog] Lỗi nạp khóa học:', err));
+    }, 300);
+
     return () => {
       isMounted = false;
+      clearTimeout(timer);
     };
-  }, []);
+  }, [searchTerm]);
 
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();

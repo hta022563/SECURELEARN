@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastProvider';
 import Logo from './Logo';
+import { logoutBackendSession } from '../services/courseService';
 
 export default function LayoutWithLanguage() {
   const { lang } = useParams();
@@ -51,7 +52,12 @@ export default function LayoutWithLanguage() {
     navigate(newPath);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await logoutBackendSession();
+    } catch (e) {
+      // ignore
+    }
     logout();
     showToast(t('navbar.logout_success'), 'info');
     navigate(`/${lang}/login`);

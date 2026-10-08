@@ -104,23 +104,37 @@ export default function StudentCoursePlayer() {
 
   // 3. Dữ liệu: Ghép các video bài giảng từ Backend API hoặc mockDatabase vào các chương
   const curriculum = useMemo(() => {
-    // Nếu Backend API trả về danh sách bài học (lessons)
+    // Ưu tiên: Nếu Backend API trả về danh sách chapters có kèm lessons
+    if (backendData?.chapters && backendData.chapters.length > 0) {
+      return backendData.chapters.map((chap, idx) => ({
+        ID: chap.id || chap.ID,
+        ChapterNumber: chap.ChapterNumber || (idx + 1),
+        Title: chap.title || chap.Title || `Chương ${idx + 1}`,
+        Description: chap.description || chap.Description || '',
+        videos: (chap.lessons || chap.videos || []).map((l) => ({
+          ...l,
+          videoUrl: l.url || l.videoURL || l.videoUrl,
+        })),
+      }));
+    }
+
+    // Nếu Backend API chỉ trả về danh sách bài học phẳng (lessons)
     if (backendData?.lessons && backendData.lessons.length > 0) {
       const grouped = {};
       backendData.lessons.forEach((l) => {
-        const chapKey = l.chapterId || 'ch-main';
+        const chapKey = l.chapterId || l.chapter_id || 'ch-main';
         if (!grouped[chapKey]) {
           grouped[chapKey] = {
             ID: chapKey,
             ChapterNumber: Object.keys(grouped).length + 1,
-            Title: `Phần: ${l.chapterId || 'Bài học'}`,
+            Title: l.chapterTitle || `Phần: ${chapKey}`,
             Description: l.description || '',
             videos: [],
           };
         }
         grouped[chapKey].videos.push({
           ...l,
-          videoUrl: l.videoURL || l.videoUrl,
+          videoUrl: l.url || l.videoURL || l.videoUrl,
         });
       });
       return Object.values(grouped);

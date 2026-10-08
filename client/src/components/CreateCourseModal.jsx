@@ -34,8 +34,9 @@ export default function CreateCourseModal({ show, onHide, onCourseCreated }) {
       const newCourse = await createCourse({
         title: title.trim(),
         description: description.trim(),
+        prices: Number(price) || 0,
         price: Number(price) || 0,
-        owner: user?.userId,
+        instructor: user?.name || user?.email || user?.userId || 'Instructor',
       });
 
       showToast(`Đã tạo thành công khóa học: "${newCourse.Title}"!`, 'success', 'Tạo Khóa Học Thành Công');

@@ -14,6 +14,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { users } from '../data/mockDatabase';
 import Logo from '../components/Logo';
+import { COGNITO_LOGIN_URL } from '../services/courseService';
 
 // Map Role trong mockDb → Role trong RBAC routing
 const ROLE_MAP = {
@@ -143,6 +144,24 @@ export default function Login() {
                     {errorMessage}
                   </Alert>
                 )}
+
+                {/* Đăng nhập nhanh bằng AWS Cognito (Hosted UI - OAuth2) */}
+                <div className="d-grid mb-3">
+                  <a
+                    href={COGNITO_LOGIN_URL}
+                    className="btn btn-outline-dark rounded-pill py-2 fw-semibold d-flex align-items-center justify-content-center gap-2 shadow-sm text-decoration-none"
+                  >
+                    <i className="bi bi-shield-lock-fill text-warning fs-5"></i>
+                    <span>Đăng nhập với AWS Cognito (Hosted UI)</span>
+                  </a>
+                </div>
+
+                <div className="position-relative my-4 text-center">
+                  <hr className="text-muted opacity-25" />
+                  <span className="position-absolute top-50 start-50 translate-middle bg-white px-3 small text-muted">
+                    hoặc đăng nhập tài khoản
+                  </span>
+                </div>
 
                 {/* Form Đăng Nhập */}
                 <Form onSubmit={handleSubmit}>
