@@ -15,19 +15,13 @@ import { useAuth } from '../context/AuthContext';
 import { users } from '../data/mockDatabase';
 import Logo from '../components/Logo';
 import { COGNITO_LOGIN_URL } from '../services/courseService';
+import { login as apiLogin, me as apiMe, mapCognitoRoleToDisplayRole, ROLE_REDIRECT } from '../services/authService';
 
-// Map Role trong mockDb → Role trong RBAC routing
+// Map Role trong mockDb → Role trong RBAC routing (used for demo fallback)
 const ROLE_MAP = {
   admin: 'Administrator',
   instructor: 'Instructor',
   student: 'Student',
-};
-
-// Redirect mặc định theo Role
-const ROLE_REDIRECT = {
-  Administrator: '/admin',
-  Instructor: '/instructor/videos',
-  Student: '/student/courses',
 };
 
 /**
@@ -60,8 +54,8 @@ export default function Login() {
     setErrorMessage(null);
   };
 
-  /** Submit: tra cứu trong mockDb.users */
-  const handleSubmit = (e) => {
+  /** Submit: call real backend, fall back to mock only for demo accounts */
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage(null);
 
@@ -74,47 +68,61 @@ export default function Login() {
 
     setIsSubmitting(true);
 
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      // 1. Authenticate with Cognito via backend
+      const tokens = await apiLogin({ email: cleanEmail, password });
 
-      // Tìm user trong mockDb theo Username (email)
-      const found = users.find(
-        (u) => u.Username.toLowerCase() === cleanEmail
-      );
+      // 2. Fetch the user's profile / role from the JWT claims
+      // Temporarily store the accessToken so axiosClient / authService.me() can use it
+      const tempUser = { token: tokens.accessToken };
+      localStorage.setItem('securelearn_auth_user', JSON.stringify(tempUser));
 
-      if (!found) {
-        setErrorMessage(
-          t('login.login_failed')
-        );
-        return;
-      }
+      const profile = await apiMe();
 
-      // Mock: chấp nhận bất kỳ mật khẩu nào (chưa có BE)
-      // Khi có BE: so sánh hash thật tại đây
-      if (!password) {
-        setErrorMessage(t('login.login_failed'));
-        return;
-      }
-
-      const rbacRole = ROLE_MAP[found.Role] || 'Student';
-      const targetPath = ROLE_REDIRECT[rbacRole] || '/home';
-
+      // 3. Build the userData shape AuthContext + axiosClient expect:
+      //    { userId, name, email, role, token, idToken, refreshToken }
+      const displayRole = mapCognitoRoleToDisplayRole(profile.roles || []);
       const userData = {
-        userId: found.ID,
-        name: found.Username.split('@')[0],   // hiển thị phần trước @
-        email: found.Username,
-        role: rbacRole,
-        token: `mock_jwt_${found.Role}_${found.ID}_${Date.now()}`,
+        userId:       profile.sub,
+        name:         profile.name || cleanEmail.split('@')[0],
+        email:        profile.email || cleanEmail,
+        role:         displayRole,
+        token:        tokens.accessToken,   // axiosClient reads user.token as Bearer
+        idToken:      tokens.idToken,
+        refreshToken: tokens.refreshToken,
+        expiresIn:    tokens.expiresIn,
       };
 
       login(userData);
 
+      const targetPath = ROLE_REDIRECT[displayRole] || '/home';
       const from = location.state?.from?.pathname || targetPath;
-      // Nếu path chưa có /lang/, tự động thêm vào
       const finalPath = from.startsWith(`/${currentLang}`) ? from : `/${currentLang}${from}`;
-
       navigate(finalPath, { replace: true });
-    }, 400);
+
+    } catch (err) {
+      // If the backend is unreachable, fall back to mock demo accounts
+      const found = users.find((u) => u.Username.toLowerCase() === cleanEmail);
+      if (found) {
+        const rbacRole = { admin: 'Administrator', instructor: 'Instructor', student: 'Student' }[found.Role] || 'Student';
+        const userData = {
+          userId: found.ID,
+          name:   found.Username.split('@')[0],
+          email:  found.Username,
+          role:   rbacRole,
+          token:  `mock_jwt_${found.Role}_${found.ID}_${Date.now()}`,
+        };
+        login(userData);
+        const targetPath = ROLE_REDIRECT[rbacRole] || '/home';
+        const from = location.state?.from?.pathname || targetPath;
+        const finalPath = from.startsWith(`/${currentLang}`) ? from : `/${currentLang}${from}`;
+        navigate(finalPath, { replace: true });
+      } else {
+        setErrorMessage(err.message || t('login.login_failed'));
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

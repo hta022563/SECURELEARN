@@ -48,6 +48,10 @@
                 </dependency>
                 <dependency>
                     <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+                </dependency>
+                <dependency>
+                    <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-starter-security</artifactId>
                 </dependency>
                 <dependency>
@@ -75,6 +79,12 @@
                     <groupId>io.awspring.cloud</groupId>
                     <artifactId>spring-cloud-aws-starter-dynamodb</artifactId>
                     <version>4.1.1</version>
+                </dependency>
+                <!-- AWS SDK v2 Cognito IDP — same version as the SDK already in classpath -->
+                <dependency>
+                    <groupId>software.amazon.awssdk</groupId>
+                    <artifactId>cognitoidentityprovider</artifactId>
+                    <version>2.54.3</version>
                 </dependency>
                 <dependency>
                     <groupId>org.springframework.boot</groupId>
