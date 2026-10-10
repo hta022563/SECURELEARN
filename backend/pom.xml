@@ -78,7 +78,10 @@
                 <dependency>
                     <groupId>io.awspring.cloud</groupId>
                     <artifactId>spring-cloud-aws-starter-dynamodb</artifactId>
-                    <version>4.1.1</version>
+                </dependency>
+                <dependency>
+                    <groupId>io.awspring.cloud</groupId>
+                    <artifactId>spring-cloud-aws-starter-s3</artifactId>
                 </dependency>
                 <!-- AWS SDK v2 Cognito IDP — same version as the SDK already in classpath -->
                 <dependency>

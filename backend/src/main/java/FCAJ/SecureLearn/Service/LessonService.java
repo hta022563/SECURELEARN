@@ -4,16 +4,18 @@
  */
 package FCAJ.SecureLearn.Service;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.stereotype.Service;
+
 import FCAJ.SecureLearn.Model.Chapter;
 import FCAJ.SecureLearn.Model.Course;
 import FCAJ.SecureLearn.Model.Lesson;
 import FCAJ.SecureLearn.repositories.ChapterRepo;
 import FCAJ.SecureLearn.repositories.CourseRepo;
 import FCAJ.SecureLearn.repositories.LessonRepo;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.UUID;
-import org.springframework.stereotype.Service;
 
 /**
  *
@@ -29,6 +31,20 @@ public class LessonService {
         this.courseRepo = courseRepo;
         this.chapterRepo = chapterRepo;
         this.lessonRepo = lessonRepo;
+    }
+
+    /**
+     * Creates a lesson and returns its generated UUID.
+     * Used by the upload pipeline so the frontend gets the lesson ID
+     * immediately after the video is processed.
+     */
+    public UUID addLessonReturningId(UUID chapter_id, String title, String description, String url, UUID course_id){
+        Chapter chapter = chapterRepo.findById(chapter_id).orElseThrow();
+        Course course = courseRepo.findById(course_id).orElseThrow();
+        course.setLastUpdateTime(LocalDateTime.now());
+        courseRepo.save(course);
+        Lesson newLesson = new Lesson(chapter, title, description, url);
+        return lessonRepo.save(newLesson).getId();
     }
 
     public void addLesson(UUID chapter_id, String title, String description, String url, UUID course_id){

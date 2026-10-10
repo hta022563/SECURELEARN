@@ -82,6 +82,10 @@ public class SecurityConfiguration {
                 .requestMatchers("/api/v1/auth/refresh").permitAll()
                 // /api/v1/auth/logout and /api/v1/auth/me require a valid token (authenticated)
 
+                // Upload pipeline — INSTRUCTOR or ADMIN only
+                .requestMatchers(HttpMethod.POST, "/api/v1/upload/presign").hasAnyRole("INSTRUCTOR", "ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/v1/upload/process").hasAnyRole("INSTRUCTOR", "ADMIN")
+
                 // Rules 4–5: public read endpoints
                 .requestMatchers(HttpMethod.GET,  "/api/v1/allcourses").permitAll()
                 .requestMatchers(HttpMethod.GET,  "/api/v1/course/search").permitAll()

@@ -76,6 +76,10 @@ services:
       COGNITO_CLIENT_SECRET: ${COGNITO_CLIENT_SECRET:?Set COGNITO_CLIENT_SECRET in the .env file}
       COGNITO_POOL_ID: ${COGNITO_POOL_ID:?Set COGNITO_POOL_ID in the .env file}
 
+      # Cloudflare R2
+      R2_BUCKET_NAME: ${R2_BUCKET_NAME:?Set R2_BUCKET_NAME in the .env file}
+      R2_PUBLIC_URL: ${R2_PUBLIC_URL:?Set R2_PUBLIC_URL in the .env file}
+
       # Spring Cloud AWS / DynamoDB — must match spring.cloud.aws.* property keys
       AWS_DYNAMODB_ENDPOINT: http://dynamodb-local:8000
       AWS_DYNAMODB_REGION: ${AWS_REGION:-ap-southeast-1}
