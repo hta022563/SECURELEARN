@@ -83,14 +83,14 @@ export default function Login() {
       //    { userId, name, email, role, token, idToken, refreshToken }
       const displayRole = mapCognitoRoleToDisplayRole(profile.roles || []);
       const userData = {
-        userId:       profile.sub,
-        name:         profile.name || cleanEmail.split('@')[0],
-        email:        profile.email || cleanEmail,
-        role:         displayRole,
-        token:        tokens.accessToken,   // axiosClient reads user.token as Bearer
-        idToken:      tokens.idToken,
+        userId: profile.sub,
+        name: profile.name || cleanEmail.split('@')[0],
+        email: profile.email || cleanEmail,
+        role: displayRole,
+        token: tokens.accessToken,   // axiosClient reads user.token as Bearer
+        idToken: tokens.idToken,
         refreshToken: tokens.refreshToken,
-        expiresIn:    tokens.expiresIn,
+        expiresIn: tokens.expiresIn,
       };
 
       login(userData);
@@ -107,10 +107,10 @@ export default function Login() {
         const rbacRole = { admin: 'Administrator', instructor: 'Instructor', student: 'Student' }[found.Role] || 'Student';
         const userData = {
           userId: found.ID,
-          name:   found.Username.split('@')[0],
-          email:  found.Username,
-          role:   rbacRole,
-          token:  `mock_jwt_${found.Role}_${found.ID}_${Date.now()}`,
+          name: found.Username.split('@')[0],
+          email: found.Username,
+          role: rbacRole,
+          token: `mock_jwt_${found.Role}_${found.ID}_${Date.now()}`,
         };
         login(userData);
         const targetPath = ROLE_REDIRECT[rbacRole] || '/home';
