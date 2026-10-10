@@ -11,6 +11,7 @@ import {
 } from 'react-bootstrap';
 import { useToast } from '../context/ToastContext';
 import Logo from '../components/Logo';
+import { register as apiRegister } from '../services/authService';
 
 export default function Register() {
   // Form State
@@ -67,7 +68,7 @@ export default function Register() {
   /**
    * Xử lý Submit Form Đăng Ký
    */
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!validateForm()) {
@@ -76,20 +77,31 @@ export default function Register() {
 
     setIsSubmitting(true);
 
-    // Giả lập gọi API đăng ký tài khoản (Network latency 500ms)
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      // Call real backend — POST /api/v1/auth/register
+      await apiRegister({
+        fullName,
+        email: email.trim().toLowerCase(),
+        password,
+        role: role.toLowerCase(), // backend expects 'student' | 'instructor'
+      });
 
-      // Bắn Toast thông báo thành công
       showToast(
         `Chúc mừng ${fullName}! Tài khoản ${role} đã được tạo thành công. Vui lòng đăng nhập.`,
         'success',
         'Đăng Ký Thành Công'
       );
 
-      // Chuyển hướng người dùng về trang Đăng Nhập
       navigate('/login');
-    }, 500);
+    } catch (err) {
+      showToast(
+        err.message || 'Đăng ký thất bại. Vui lòng thử lại.',
+        'danger',
+        'Đăng Ký Thất Bại'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
