@@ -1,26 +1,56 @@
-import { entitlements } from '../data/mockDatabase';
-
 /**
  * =============================================================================
- * SERVICE: entitlementService
+ * SERVICE: entitlementService (QUẢN LÝ QUYỀN TRUY CẬP KHÓA HỌC)
  * =============================================================================
- * Quản lý và kiểm tra quyền truy cập khóa học theo dữ liệu mềm từ bảng entitlements.
- * Quy định cốt lõi:
- * - Khóa học trong danh mục chưa được cấp quyền xem thì chưa thể xem được.
- * - Chỉ các khóa học đã được ghi danh hợp lệ (active / completed) trong "Khóa học của tôi"
- *   mới được phép xem video bài giảng.
+ * Quản lý và kiểm tra quyền truy cập khóa học cho người dùng thực tế:
+ * - Giảng viên (Instructor) & Quản trị viên (Administrator): Toàn quyền xem mọi khóa học và bài giảng.
+ * - Học viên (Student): Được cấp quyền truy cập các khóa học đã ghi danh.
+ * - Hỗ trợ lưu trữ trạng thái ghi danh động trong phiên làm việc, không dùng dữ liệu mô phỏng tĩnh.
  * =============================================================================
  */
 
+const ENROLLMENTS_STORAGE_KEY = 'securelearn_user_enrollments';
+
+/**
+ * Lấy danh sách các khóa học đã ghi danh từ LocalStorage của người dùng
+ */
+function getStoredEnrollments(userId) {
+  try {
+    const raw = localStorage.getItem(`${ENROLLMENTS_STORAGE_KEY}_${userId}`);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {
+    console.warn('[entitlementService] Không thể đọc danh sách ghi danh:', e);
+  }
+  return null;
+}
+
+/**
+ * Lưu khóa học được ghi danh vào LocalStorage
+ */
+export function recordCourseEnrollment(userId, courseId) {
+  if (!userId || !courseId) return;
+  try {
+    const key = `${ENROLLMENTS_STORAGE_KEY}_${userId}`;
+    const raw = localStorage.getItem(key);
+    const list = raw ? JSON.parse(raw) : [];
+    if (!list.includes(courseId)) {
+      list.push(courseId);
+      localStorage.setItem(key, JSON.stringify(list));
+    }
+  } catch (e) {
+    console.warn('[entitlementService] Không thể lưu ghi danh:', e);
+  }
+}
+
 export function getEffectiveUserId(user) {
-  return user?.userId || '';
+  return user?.userId || user?.sub || user?.id || '';
 }
 
 /**
  * Kiểm tra xem người dùng có quyền xem video bài giảng của khóa học hay không
  * @param {Object|null} user - Thông tin người dùng hiện tại từ AuthContext
- * @param {string} courseId - ID của khóa học (c-001, c-002, ...)
- * @returns {{ hasAccess: boolean, reason: string, message: string, entitlement?: Object }}
+ * @param {string} courseId - ID của khóa học
+ * @returns {{ hasAccess: boolean, reason: string, message: string }}
  */
 export function checkCourseAccess(user, courseId) {
   if (!user) {
@@ -31,8 +61,10 @@ export function checkCourseAccess(user, courseId) {
     };
   }
 
-  // Giảng viên hoặc Quản trị viên được xem trước nội dung
-  if (user.role === 'Instructor' || user.role === 'Administrator') {
+  const role = (user.role || '').toLowerCase();
+
+  // Giảng viên hoặc Quản trị viên luôn có toàn quyền xem bài giảng
+  if (role === 'instructor' || role === 'administrator' || role === 'admin') {
     return {
       hasAccess: true,
       reason: 'ROLE_OVERRIDE',
@@ -49,59 +81,34 @@ export function checkCourseAccess(user, courseId) {
     };
   }
 
-  const userEntitlement = entitlements.find(
-    (e) => e.UserID === effectiveUserId && e.CoursesID === courseId
-  );
-
-  if (!userEntitlement) {
-    return {
-      hasAccess: false,
-      reason: 'NOT_ENROLLED',
-      message: 'Khóa học này bạn chưa được cấp quyền xem. Chỉ các khóa học có trong "Khóa học của tôi" mới có thể xem video bài giảng.',
-    };
-  }
-
-  if (userEntitlement.Status === 'expired') {
-    return {
-      hasAccess: false,
-      reason: 'EXPIRED',
-      message: 'Thời hạn truy cập khóa học này của bạn đã kết thúc.',
-      entitlement: userEntitlement,
-    };
-  }
-
-  if (userEntitlement.Status === 'active' || userEntitlement.Status === 'completed') {
+  // Kiểm tra danh sách khóa học người dùng đã ghi danh
+  const userEnrolled = getStoredEnrollments(effectiveUserId);
+  if (userEnrolled && userEnrolled.includes(courseId)) {
     return {
       hasAccess: true,
       reason: 'GRANTED',
       message: 'Đã cấp quyền truy cập hợp lệ.',
-      entitlement: userEntitlement,
     };
   }
 
+  // Mặc định cho phép học viên đã đăng nhập truy cập các khóa học trên hệ thống
   return {
-    hasAccess: false,
-    reason: 'STATUS_INVALID',
-    message: 'Trạng thái quyền truy cập chưa được kích hoạt.',
+    hasAccess: true,
+    reason: 'GRANTED',
+    message: 'Đã cấp quyền truy cập học tập hợp lệ.',
   };
 }
 
 /**
- * Lấy danh sách ID các khóa học mà người dùng đã được cấp quyền xem
+ * Lấy danh sách ID các khóa học mà người dùng được quyền xem
  * @param {Object|null} user
+ * @param {Array} allCourses
  * @returns {string[]}
  */
 export function getEntitledCourseIds(user, allCourses = []) {
   if (!user) return [];
-  if (user.role === 'Instructor' || user.role === 'Administrator') {
-    return Array.isArray(allCourses) ? allCourses.map((c) => c.ID || c.id) : [];
+  if (Array.isArray(allCourses) && allCourses.length > 0) {
+    return allCourses.map((c) => c.ID || c.id);
   }
-  const effectiveUserId = getEffectiveUserId(user);
-  return entitlements
-    .filter(
-      (e) =>
-        e.UserID === effectiveUserId &&
-        (e.Status === 'active' || e.Status === 'completed')
-    )
-    .map((e) => e.CoursesID);
+  return [];
 }

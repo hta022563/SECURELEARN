@@ -16,10 +16,6 @@ import { motion } from 'framer-motion';
 import axiosClient from '../api/axiosClient';
 
 import { useAuth } from '../context/AuthContext';
-import {
-  entitlements,
-  users,
-} from '../data/mockDatabase';
 import { getCourses } from '../services/courseService';
 
 /**

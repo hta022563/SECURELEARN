@@ -3,7 +3,7 @@ import apiClient from '../api/axiosClient';
 
 /**
  * =============================================================================
- * SECURELEARN - VIDEO UPLOAD SERVICE (TÍCH HỢP 100% BACKEND SPRING BOOT & R2)
+ * SECURELEARN - VIDEO UPLOAD SERVICE (100% BACKEND SPRING BOOT & CLOUDFLARE R2)
  * =============================================================================
  * Quy trình upload video bài học chuẩn thực tế:
  * 
@@ -98,7 +98,7 @@ export async function processVideoOnBackend({ objectKey, title, description, cha
 
 /**
  * Hàm tích hợp trọn gói: Upload video thật lên Backend Spring Boot & Cloudflare R2
- * Có fallback tự động nếu Backend đang offline (để môi trường dev không bị crash hoàn toàn)
+ * Toàn bộ dữ liệu xử lý trực tiếp qua Backend, KHÔNG dùng mô phỏng.
  * 
  * @param {File} file File video cần tải lên
  * @param {Object} metadata Dữ liệu { title, description, courseId, chapterId, chapterNumber }
@@ -110,108 +110,36 @@ export async function processVideoOnBackend({ objectKey, title, description, cha
 export async function uploadVideoPipeline(file, metadata, callbacks = {}) {
   const { onUploadProgress, onProcessing } = callbacks;
 
-  try {
-    // 1. Xin Presigned URL từ Backend Spring Boot
-    const { uploadUrl, objectKey } = await getPresignedUploadUrl({
-      fileName: file.name,
-      contentType: file.type || 'video/mp4',
-      courseId: metadata.courseId,
-    });
+  // 1. Xin Presigned URL từ Backend Spring Boot
+  const { uploadUrl, objectKey } = await getPresignedUploadUrl({
+    fileName: file.name,
+    contentType: file.type || 'video/mp4',
+    courseId: metadata.courseId,
+  });
 
-    // 2. Upload file trực tiếp lên R2 với thanh tiến độ thực
-    await uploadFileToR2(uploadUrl, file, onUploadProgress);
+  // 2. Upload file trực tiếp lên R2 với thanh tiến độ thực từ bytes truyền đi
+  await uploadFileToR2(uploadUrl, file, onUploadProgress);
 
-    // 3. Thông báo Backend chạy pipeline FFmpeg -> HLS và lưu DB
-    if (typeof onProcessing === 'function') {
-      onProcessing();
-    }
-
-    const processResult = await processVideoOnBackend({
-      objectKey,
-      title: metadata.title,
-      description: metadata.description || `Bài giảng ${metadata.title}`,
-      chapterId: metadata.chapterId,
-      courseId: metadata.courseId,
-    });
-
-    return {
-      lessonId: processResult.lessonId,
-      playlistUrl: processResult.playlistUrl,
-      isRealBackend: true,
-      fileId: processResult.lessonId,
-      streamUrl: processResult.playlistUrl,
-      size: file.size,
-      uploadedAt: new Date().toISOString(),
-    };
-  } catch (backendError) {
-    console.warn('[uploadService] Lỗi khi gọi Backend API thật:', backendError);
-    throw backendError;
+  // 3. Thông báo Backend chạy pipeline FFmpeg -> HLS và lưu DB
+  if (typeof onProcessing === 'function') {
+    onProcessing();
   }
-}
 
-/**
- * =============================================================================
- * HÀM MÔ PHỎNG DỰ PHÒNG (FALLBACK KHI DEV OFFLINE KHÔNG CÓ BACKEND HOẶC R2)
- * =============================================================================
- */
-
-/**
- * Mô phỏng upload R2 dự phòng (chỉ dùng khi Backend offline hoàn toàn)
- */
-export function simulateR2Upload(file, metadata, onProgress) {
-  return new Promise((resolve) => {
-    const totalSize = file ? file.size : 35 * 1024 * 1024;
-    const CHUNK_SIZE = 5 * 1024 * 1024;
-    const totalChunks = Math.max(1, Math.ceil(totalSize / CHUNK_SIZE));
-    let currentChunk = 1;
-    let currentPercent = 0;
-
-    const interval = setInterval(() => {
-      const step = Math.floor(Math.random() * 8) + 5;
-      currentPercent = Math.min(100, currentPercent + step);
-      currentChunk = Math.min(totalChunks, Math.max(1, Math.ceil((currentPercent / 100) * totalChunks)));
-      const loadedBytes = Math.floor((currentPercent / 100) * totalSize);
-
-      if (typeof onProgress === 'function') {
-        onProgress(currentPercent, loadedBytes, totalSize, currentChunk, totalChunks);
-      }
-
-      if (currentPercent >= 100) {
-        clearInterval(interval);
-        resolve({
-          fileId: `v-${Date.now().toString().slice(-4)}`,
-          fileName: file ? file.name : `${metadata.title || 'lesson'}.mp4`,
-          size: totalSize,
-          length: Math.floor(Math.random() * 600) + 600,
-          uploadedAt: new Date().toISOString(),
-          metadata,
-        });
-      }
-    }, 120);
+  const processResult = await processVideoOnBackend({
+    objectKey,
+    title: metadata.title,
+    description: metadata.description || `Bài giảng ${metadata.title}`,
+    chapterId: metadata.chapterId,
+    courseId: metadata.courseId,
   });
-}
 
-/**
- * Mô phỏng hàng đợi xử lý mã hóa HLS dự phòng
- */
-export function simulateHlsProcessing(fileId, onSegmentProgress) {
-  return new Promise((resolve) => {
-    let seg = 1;
-    const totalSegments = 8;
-    const segInterval = setInterval(() => {
-      if (typeof onSegmentProgress === 'function') {
-        onSegmentProgress(seg, totalSegments);
-      }
-      seg++;
-      if (seg > totalSegments) {
-        clearInterval(segInterval);
-        resolve({
-          fileId,
-          streamUrl: `https://drm.securelearn.edu/stream/${fileId}/master.m3u8`,
-          status: 'ready',
-          drmType: 'HLS-AES-128',
-        });
-      }
-    }, 200);
-  });
+  return {
+    lessonId: processResult.lessonId,
+    playlistUrl: processResult.playlistUrl,
+    isRealBackend: true,
+    fileId: processResult.lessonId,
+    streamUrl: processResult.playlistUrl,
+    size: file.size,
+    uploadedAt: new Date().toISOString(),
+  };
 }

@@ -3,7 +3,6 @@ import { useNavigate, Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Container, Row, Col, Card, Button, Badge, Modal } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext';
-import { users, entitlements } from '../data/mockDatabase';
 import { checkCourseAccess, getEntitledCourseIds } from '../services/entitlementService';
 import { getCourses } from '../services/courseService';
 import LearningTimeline from '../components/LearningTimeline';

@@ -15,27 +15,35 @@ import { useToast } from '../context/ToastContext';
 import { useTranslation } from 'react-i18next';
 import {
   users as dbUsers,
-  courses as dbCourses,
   entitlements as dbEntitlements,
 } from '../data/mockDatabase';
+import { getCourses } from '../services/courseService';
 
 /**
  * =============================================================================
- * PAGE: AdminUserManagement (100% Dữ Liệu Mềm Từ CSDL Chuẩn ERD)
+ * PAGE: AdminUserManagement
  * =============================================================================
- * Quản trị người dùng & Cấp quyền khóa học (User Entitlement):
- * - Đọc và đồng bộ động trực tiếp từ các bảng users, courses, entitlements
- * - Cấp quyền (Assign Course) cập nhật trực tiếp vào bảng entitlements
- * - Thêm mới User tuân thủ cấu trúc thực thể User (ID, Username, Password, Role, CreationTime)
+ * Quản trị người dùng & Cấp quyền khóa học:
+ * - Khóa học được nạp trực tiếp từ Backend API (GET /api/v1/allcourses)
  * =============================================================================
  */
 export default function AdminUserManagement() {
   const { showToast } = useToast();
   const { t } = useTranslation();
 
-  // Dữ liệu mềm được đồng bộ thời gian thực từ mockDatabase
+  // Dữ liệu người dùng demo
   const [usersList, setUsersList] = useState(dbUsers);
   const [entitlementsList, setEntitlementsList] = useState(dbEntitlements);
+  const [realCourses, setRealCourses] = useState([]);
+
+  // Nạp danh sách khóa học từ Backend API
+  useEffect(() => {
+    getCourses()
+      .then((data) => {
+        if (Array.isArray(data)) setRealCourses(data);
+      })
+      .catch((err) => console.warn('[AdminUserManagement] Lỗi nạp khóa học:', err));
+  }, []);
 
   // State Modal 1: Tạo Người Dùng Mới
   const [showAddModal, setShowAddModal] = useState(false);
@@ -48,15 +56,15 @@ export default function AdminUserManagement() {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [tempAssignedCourses, setTempAssignedCourses] = useState([]);
 
-  // Danh mục khóa học mềm có sẵn trong CSDL
+  // Danh mục khóa học thật từ Backend
   const availableCourses = useMemo(() => {
-    return dbCourses.map((c) => ({
-      id: c.ID,
-      code: c.ID.toUpperCase(),
-      name: `${c.ID.toUpperCase()}: ${c.Title}`,
-      price: c.Price,
+    return realCourses.map((c) => ({
+      id: c.ID || c.id,
+      code: String(c.ID || c.id).slice(0, 8).toUpperCase(),
+      name: `${c.Title || c.title}`,
+      price: c.Price || c.price || 0,
     }));
-  }, []);
+  }, [realCourses]);
 
   // Chuyển đổi Role sang format hiển thị
   const formatRole = (role) => {

@@ -1,9 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import {
-  uploadVideoPipeline,
-  simulateR2Upload,
-  simulateHlsProcessing,
-} from '../services/uploadService';
+import { uploadVideoPipeline } from '../services/uploadService';
 
 /**
  * Các trạng thái trong vòng đời Upload video lên Cloudflare R2
@@ -19,10 +15,12 @@ export const UPLOAD_STATUS = {
 /**
  * Custom Hook: useVideoUpload
  * 
- * Quản lý quy trình upload video kết nối trực tiếp Backend Spring Boot & Cloudflare R2:
+ * Quản lý quy trình upload video kết nối 100% Backend Spring Boot & Cloudflare R2:
  * 1. Xin Presigned URL từ Backend: POST /api/v1/upload/presign
  * 2. Upload trực tiếp file lên Cloudflare R2 với tiến độ phần trăm byte thực
  * 3. Báo Backend xử lý HLS (FFmpeg) và lưu vào Database: POST /api/v1/upload/process
+ * 
+ * KHÔNG dùng mô phỏng. Bắt buộc gọi Backend API thực tế.
  * 
  * @returns {Object} Các state và action điều khiển upload
  */
@@ -47,7 +45,7 @@ export function useVideoUpload() {
   }, []);
 
   /**
-   * Bắt đầu quy trình Upload & Transcode
+   * Bắt đầu quy trình Upload & Transcode qua Backend API
    * 
    * @param {File} file Đối tượng File video
    * @param {Object} metadata Dữ liệu bài giảng { title, description, courseId, chapterId, chapterNumber }
@@ -67,94 +65,42 @@ export function useVideoUpload() {
       setError(null);
       setShowSuccessNotification(false);
 
-      let resultRecord = null;
-
-      try {
-        // CỐ GẮNG GỌI 100% BACKEND SPRING BOOT API THẬT
-        const backendUploadResult = await uploadVideoPipeline(file, metadata, {
-          onUploadProgress: (currentProgress, loaded, total) => {
-            if (!isMountedRef.current) return;
-            setProgress(currentProgress);
-            setUploadStats({ loaded, total });
-          },
-          onProcessing: () => {
-            if (!isMountedRef.current) return;
-            // 2. Chuyển sang trạng thái PROCESSING (Server Spring Boot transcode HLS & lưu DB)
-            setStatus(UPLOAD_STATUS.PROCESSING);
-          },
-        });
-
-        resultRecord = {
-          ID: backendUploadResult.lessonId,
-          id: backendUploadResult.lessonId,
-          Title: metadata.title,
-          Length: Math.floor((file.size / (1024 * 1024)) * 30) || 600,
-          Size: file.size,
-          UploadTime: backendUploadResult.uploadedAt,
-          UploadedBy: metadata.uploadedBy || 'Giảng viên',
-          AccessLogID: metadata.accessLogId || 'al-001',
-          AnomalyAlertID: null,
-          chapterId: metadata.chapterId,
-          chapterNumber: metadata.chapterNumber,
-          courseId: metadata.courseId,
-          videoUrl: backendUploadResult.playlistUrl,
-          streamUrl: backendUploadResult.playlistUrl,
-          url: backendUploadResult.playlistUrl,
-          fromBackendProcess: true, // Đã được backend tạo trực tiếp trong CSDL
-        };
-      } catch (backendErr) {
-        console.warn(
-          '[useVideoUpload] Backend upload thất bại hoặc chưa chạy (http://localhost:8080). Thử chạy chế độ dự phòng...',
-          backendErr.message
-        );
-
-        // NẾU BACKEND CHƯA CHẠY HOẶC CHƯA CÓ R2 BUCKET: Fallback an toàn để không crash UI dev
-        // Chạy mô phỏng upload
-        const uploadResult = await simulateR2Upload(
-          file,
-          metadata,
-          (currentProgress, loaded, total, currentChunk, totalChunks) => {
-            if (!isMountedRef.current) return;
-            setProgress(currentProgress);
-            setUploadStats({ loaded, total });
-            setChunkStats({ current: currentChunk, total: totalChunks });
-          }
-        );
-
-        if (!isMountedRef.current) return;
-        setStatus(UPLOAD_STATUS.PROCESSING);
-
-        const processingResult = await simulateHlsProcessing(
-          uploadResult.fileId,
-          (seg, totalSeg) => {
-            if (!isMountedRef.current) return;
-            setSegmentStats({ current: seg, total: totalSeg });
-          }
-        );
-
-        resultRecord = {
-          ID: uploadResult.fileId,
-          id: uploadResult.fileId,
-          Title: metadata.title,
-          Length: uploadResult.length,
-          Size: uploadResult.size,
-          UploadTime: uploadResult.uploadedAt,
-          UploadedBy: metadata.uploadedBy || 'Giảng viên',
-          AccessLogID: metadata.accessLogId || 'al-001',
-          AnomalyAlertID: null,
-          chapterId: metadata.chapterId,
-          chapterNumber: metadata.chapterNumber,
-          courseId: metadata.courseId,
-          videoUrl: processingResult.streamUrl,
-          streamUrl: processingResult.streamUrl,
-          url: processingResult.streamUrl,
-          fromBackendProcess: false, // Cần lưu qua createLesson
-        };
-      }
+      // GỌI 100% BACKEND SPRING BOOT API THẬT
+      const backendUploadResult = await uploadVideoPipeline(file, metadata, {
+        onUploadProgress: (currentProgress, loaded, total) => {
+          if (!isMountedRef.current) return;
+          setProgress(currentProgress);
+          setUploadStats({ loaded, total });
+        },
+        onProcessing: () => {
+          if (!isMountedRef.current) return;
+          // 2. Chuyển sang trạng thái PROCESSING (Server Spring Boot transcode HLS & lưu DB)
+          setStatus(UPLOAD_STATUS.PROCESSING);
+        },
+      });
 
       if (!isMountedRef.current) return;
 
-      // 4. Chuyển sang trạng thái READY
+      const resultRecord = {
+        ID: backendUploadResult.lessonId,
+        id: backendUploadResult.lessonId,
+        Title: metadata.title,
+        Length: Math.floor((file.size / (1024 * 1024)) * 30) || 600,
+        Size: file.size,
+        UploadTime: backendUploadResult.uploadedAt,
+        UploadedBy: metadata.uploadedBy || 'Giảng viên',
+        AccessLogID: metadata.accessLogId || 'al-001',
+        AnomalyAlertID: null,
+        chapterId: metadata.chapterId,
+        chapterNumber: metadata.chapterNumber,
+        courseId: metadata.courseId,
+        videoUrl: backendUploadResult.playlistUrl,
+        streamUrl: backendUploadResult.playlistUrl,
+        url: backendUploadResult.playlistUrl,
+        fromBackendProcess: true, // Đã được backend tạo trực tiếp trong CSDL
+      };
+
+      // 3. Chuyển sang trạng thái READY
       setStatus(UPLOAD_STATUS.READY);
       const combinedResult = {
         videoRecord: resultRecord,
@@ -169,13 +115,14 @@ export function useVideoUpload() {
       }
     } catch (err) {
       if (!isMountedRef.current) return;
-      console.error('[Upload Error]', err);
+      console.error('[Upload Error - Backend API]', err);
       setStatus(UPLOAD_STATUS.ERROR);
-      setError(
+      const errorMsg =
         err.response?.data?.error ||
+        err.response?.data?.message ||
         err.message ||
-        'Đã xảy ra lỗi trong quá trình tải video lên máy chủ Backend.'
-      );
+        'Không thể kết nối hoặc tải video lên Backend (http://localhost:8080).';
+      setError(errorMsg);
     }
   }, []);
 

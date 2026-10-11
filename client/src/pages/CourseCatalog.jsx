@@ -13,7 +13,6 @@ import {
   Modal,
 } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext';
-import { users } from '../data/mockDatabase';
 import { checkCourseAccess, getEntitledCourseIds } from '../services/entitlementService';
 import { getCourses, searchCourses } from '../services/courseService';
 import CreateCourseModal from '../components/CreateCourseModal';

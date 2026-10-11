@@ -9,7 +9,7 @@ import {
   Badge,
   Spinner,
 } from 'react-bootstrap';
-import { simulateR2Upload, simulateHlsProcessing } from '../services/uploadService';
+import { getPresignedUploadUrl, uploadFileToR2 } from '../services/uploadService';
 import { reuploadVideo } from '../services/courseService';
 import { useToast } from '../context/ToastContext';
 
@@ -102,34 +102,30 @@ export default function ReuploadVideoModal({ show, onHide, video, onSuccess }) {
     setUploadStage('uploading');
 
     try {
-      // 1. Mô phỏng upload file mới lên Cloudflare R2
-      const uploadResult = await simulateR2Upload(
-        selectedFile,
-        {
-          title: newTitle.trim(),
-          fileId: video.ID,
-        },
-        (progress) => {
-          setUploadProgress(progress);
-        }
-      );
-
-      // 2. Chuyển sang giai đoạn mã hóa HLS AES-128
-      setUploadStage('processing');
-      await simulateHlsProcessing(uploadResult.fileId, (seg, totalSeg) => {
-        setSegmentInfo({ current: seg, total: totalSeg });
+      // 1. Lấy presigned URL từ Backend Spring Boot
+      const { uploadUrl, objectKey } = await getPresignedUploadUrl({
+        fileName: selectedFile.name,
+        contentType: selectedFile.type || 'video/mp4',
+        courseId: video.courseId || video.CoursesID || null,
       });
 
-      // 3. Hoàn tất cập nhật vào cơ sở dữ liệu mềm
-      setUploadStage('done');
+      // 2. Upload trực tiếp lên Cloudflare R2
+      await uploadFileToR2(uploadUrl, selectedFile, (progress) => {
+        setUploadProgress(progress);
+      });
+
+      // 3. Cập nhật bài học trên Backend
+      setUploadStage('processing');
+      const updatedUrl = `https://stream.securelearn.edu/${objectKey}`;
       const updatedRecord = await reuploadVideo(video.ID, {
         title: newTitle.trim(),
-        length: uploadResult.length || 1500,
-        size: selectedFile.size,
+        url: updatedUrl,
+        videoURL: updatedUrl,
       });
 
+      setUploadStage('done');
       showToast(
-        `Đã tải lên và thay thế video "${newTitle.trim()}" thành công!`,
+        `Đã tải lên và thay thế video "${newTitle.trim()}" trên Backend thành công!`,
         'success',
         'Thay Thế Video Thành Công'
       );

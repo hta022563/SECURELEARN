@@ -15,10 +15,6 @@ import {
 } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext';
 import SecureVideoPlayer from '../components/SecureVideoPlayer';
-import {
-  users,
-  accessLogs,
-} from '../data/mockDatabase';
 import { checkCourseAccess } from '../services/entitlementService';
 import { getCourseWithLessons } from '../services/courseService';
 

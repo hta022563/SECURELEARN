@@ -46,12 +46,11 @@ function formatDuration(seconds) {
 
 /**
  * =============================================================================
- * COMPONENT: UploadVideo (Mô hình upload video từng phần nhỏ theo chuẩn 4User)
+ * COMPONENT: UploadVideo (Mô hình upload video bài học 100% Backend Spring Boot & R2)
  * =============================================================================
- * - 100% dữ liệu mềm từ mockDatabase: courses, chapters, videos
- * - Cấu trúc phân cấp: Khóa học -> Chương/Phần (Chapter) -> Video bài giảng nhỏ
- * - Cho phép chia nhỏ bài giảng tải lên từng phần để khớp chuẩn xác vào chương
- * - Mô phỏng Chunked Multipart Upload & Pipeline phân đoạn HLS AES-128
+ * - 100% dữ liệu thực từ Backend API: courses, chapters, lessons
+ * - Cấu trúc phân cấp: Khóa học -> Chương/Phần (Chapter) -> Video bài giảng
+ * - Upload trực tiếp lên Cloudflare R2 qua Presigned URL và mã hóa HLS qua Backend
  * - Cây cấu trúc khóa học (Curriculum Tree) cập nhật trực quan thời gian thực
  * =============================================================================
  */
