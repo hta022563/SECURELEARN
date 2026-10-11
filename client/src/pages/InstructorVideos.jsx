@@ -18,11 +18,6 @@ import { useTranslation } from 'react-i18next';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import {
-  courses as dbCourses,
-  chapters as dbChapters,
-  videos as dbVideos,
-} from '../data/mockDatabase';
-import {
   getCourses,
   deleteCourse,
   updateCourse,
@@ -73,19 +68,48 @@ export default function InstructorVideos() {
   const navigate = useNavigate();
   const { showToast } = useToast();
 
-  const [coursesList, setCoursesList] = useState(dbCourses);
-  const [chaptersList, setChaptersList] = useState(dbChapters);
-  const [videosList, setVideosList] = useState(dbVideos);
+  const [coursesList, setCoursesList] = useState([]);
+  const [chaptersList, setChaptersList] = useState([]);
+  const [videosList, setVideosList] = useState([]);
 
   useEffect(() => {
     let isMounted = true;
     getCourses()
-      .then((data) => {
-        if (isMounted && Array.isArray(data) && data.length > 0) {
+      .then(async (data) => {
+        if (!isMounted) return;
+        if (Array.isArray(data)) {
           setCoursesList(data);
+
+          if (data.length > 0) {
+            // Nạp động cấu trúc chương và bài học từ Backend API
+            try {
+              const courseDetails = await Promise.all(
+                data.map((c) => getCourseWithLessons(c.ID || c.id))
+              );
+              if (isMounted) {
+                const allFetchedChapters = courseDetails.flatMap((cd) => cd.chapters || []);
+                const allFetchedLessons = courseDetails.flatMap((cd) => cd.lessons || []);
+
+                setChaptersList(allFetchedChapters);
+                setVideosList(allFetchedLessons);
+              }
+            } catch (e) {
+              console.warn('[InstructorVideos] Lỗi nạp chi tiết bài học từ BE:', e);
+            }
+          } else {
+            setChaptersList([]);
+            setVideosList([]);
+          }
         }
       })
-      .catch((err) => console.warn('[InstructorVideos] Lỗi nạp khóa học:', err));
+      .catch((err) => {
+        console.warn('[InstructorVideos] Lỗi nạp khóa học:', err);
+        if (isMounted) {
+          setCoursesList([]);
+          setChaptersList([]);
+          setVideosList([]);
+        }
+      });
     return () => {
       isMounted = false;
     };
@@ -137,52 +161,61 @@ export default function InstructorVideos() {
   // Tính toán dữ liệu tổng hợp từng Khóa học (Parent Overview)
   const courseSummaries = useMemo(() => {
     // Lọc các khóa học của giảng viên (hoặc tất cả nếu demo)
-    const myCourses = coursesList.filter((c) => c.Owner === user?.userId);
+    const myCourses = coursesList.filter((c) => (c.Owner === user?.userId || c.owner === user?.userId || c.instructor === user?.username));
     const targetCourses = myCourses.length > 0 ? myCourses : coursesList;
 
     return targetCourses.map((course) => {
+      const courseId = course.ID || course.id;
       // Các chương thuộc khóa học này
       const courseChaps = chaptersList
-        .filter((ch) => ch.CoursesID === course.ID)
-        .sort((a, b) => a.ChapterNumber - b.ChapterNumber);
+        .filter((ch) => ch.CoursesID === courseId || ch.course_id === courseId || ch.courseId === courseId)
+        .sort((a, b) => (a.ChapterNumber || 1) - (b.ChapterNumber || 1));
 
       // Các video thuộc khóa học này
       const courseVideos = videosList.filter((v) => {
-        if (v.courseId) return v.courseId === course.ID;
-        return courseChaps.some((ch) => ch.AccessLogID === v.AccessLogID);
+        const vCourseId = v.courseId || v.course_id;
+        if (vCourseId) return String(vCourseId) === String(courseId);
+        return courseChaps.some((ch) => {
+          const chId = ch.ID || ch.id;
+          return (v.chapterId && String(v.chapterId) === String(chId)) || (v.chapter_id && String(v.chapter_id) === String(chId));
+        });
       });
 
-      const totalSeconds = courseVideos.reduce((acc, v) => acc + (v.Length || 0), 0);
-      const totalBytes = courseVideos.reduce((acc, v) => acc + (v.Size || 0), 0);
+      const totalSeconds = courseVideos.reduce((acc, v) => acc + (v.Length || v.duration || 0), 0);
+      const totalBytes = courseVideos.reduce((acc, v) => acc + (v.Size || v.file_size || 0), 0);
 
       // Cấu trúc phân cấp từng chương chứa các bài nhỏ
       const structuredChapters = courseChaps.map((chap) => {
+        const chapId = chap.ID || chap.id;
         const chapVideos = courseVideos.filter((v) => {
-          if (v.chapterId) return v.chapterId === chap.ID;
-          return v.AccessLogID === chap.AccessLogID;
+          const vChapId = v.chapterId || v.chapter_id || v.chapter;
+          return vChapId && String(vChapId) === String(chapId);
         });
 
         // Loại bỏ trùng lặp ID (ngăn lỗi double bài học)
         const uniqueChapVideos = [];
         const seenIds = new Set();
         for (const v of chapVideos) {
-          if (v && v.ID && !seenIds.has(v.ID)) {
-            seenIds.add(v.ID);
+          const vId = v?.ID || v?.id;
+          if (v && vId && !seenIds.has(vId)) {
+            seenIds.add(vId);
             uniqueChapVideos.push(v);
           }
         }
 
         // Sắp xếp bài học theo thứ tự thời gian tạo (bài cũ ở trên, bài mới ở DƯỚI CÙNG)
-        uniqueChapVideos.sort((a, b) => new Date(a.UploadTime || 0) - new Date(b.UploadTime || 0));
+        uniqueChapVideos.sort((a, b) => new Date(a.UploadTime || a.uploadTime || 0) - new Date(b.UploadTime || b.uploadTime || 0));
 
         return {
           ...chap,
+          ID: chapId,
           videos: uniqueChapVideos,
         };
       });
 
       return {
         ...course,
+        ID: courseId,
         chaptersCount: courseChaps.length,
         videosCount: courseVideos.length,
         totalSeconds,
@@ -195,7 +228,9 @@ export default function InstructorVideos() {
   // Lọc theo từ khóa tìm kiếm
   const filteredCourses = courseSummaries.filter((c) => {
     const term = searchTerm.toLowerCase();
-    return c.Title.toLowerCase().includes(term) || c.Description.toLowerCase().includes(term);
+    const title = (c.Title || c.title || '').toLowerCase();
+    const desc = (c.Description || c.description || '').toLowerCase();
+    return title.includes(term) || desc.includes(term);
   });
 
   // Mở modal sửa tên bài nhỏ

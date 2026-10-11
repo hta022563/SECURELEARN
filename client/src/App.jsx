@@ -12,6 +12,7 @@ import LayoutWithLanguage from './components/LayoutWithLanguage';
 import SecureVideoPlayer from './components/SecureVideoPlayer';
 import MeshGradientBackground from './components/MeshGradientBackground';
 import Logo from './components/Logo';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // 3. Guest / Public Pages
 import Home from './pages/Home';
@@ -66,7 +67,8 @@ export default function App() {
           <div className="min-vh-100 bg-light-blue text-dark d-flex flex-column position-relative">
             {/* Khung chuyển đổi màn hình (Routes Tree) */}
             <main className="flex-grow-1">
-              <Routes>
+              <ErrorBoundary>
+                <Routes>
                 {/* Redirect / về mặc định /vi/home */}
                 <Route path="/" element={<Navigate to="/vi/home" replace />} />
 
@@ -226,6 +228,7 @@ export default function App() {
                   <Route path="*" element={<NotFound />} />
                 </Route>
               </Routes>
+              </ErrorBoundary>
             </main>
 
 

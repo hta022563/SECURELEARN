@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Container, Row, Col, Card, Button, Badge, Modal } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext';
-import { courses, users, entitlements } from '../data/mockDatabase';
+import { users, entitlements } from '../data/mockDatabase';
 import { checkCourseAccess, getEntitledCourseIds } from '../services/entitlementService';
+import { getCourses } from '../services/courseService';
 import LearningTimeline from '../components/LearningTimeline';
 
 // Danh sách câu hỏi thường gặp về SecureLearn (Bản quyền số, DRM, Mã hóa HLS & Hệ thống AI)
@@ -39,6 +40,37 @@ const FAQ_ITEMS = [
   },
 ];
 
+const FAQ_ITEMS_EN = [
+  {
+    question: 'How are courses at SecureLearn protected against piracy?',
+    answer: 'All video lectures at SecureLearn are encrypted segment by segment according to the HLS AES-128 standard. Each segment requires a secret decryption key issued on a valid session, combined with a Signed URL preventing downloading via DevTools and browser extensions.',
+  },
+  {
+    question: 'What is the purpose of the dynamic watermark on the video screen?',
+    answer: 'During video playback, the system automatically displays a faint personal identifier (StudentID / Timestamp) moving randomly on the screen. If screen recording occurs, the system accurately traces the source account to address copyright violations.',
+  },
+  {
+    question: 'Can I download videos to watch offline?',
+    answer: 'To protect intellectual property and instructor copyrights, video lectures can only be streamed securely on the SecureLearn platform through our dedicated DRM player. Cloudflare R2 CDN optimization ensures low-latency playback even with unstable networks.',
+  },
+  {
+    question: 'How does the AI Anomaly Detection (Isolation Forest) system work?',
+    answer: 'The Isolation Forest Machine Learning algorithm continuously analyzes access logs in real time to detect anomalies such as account sharing, simultaneous logins from multiple IPs, or suspicious skipping. When a risk is detected, the system immediately alerts and activates account protection.',
+  },
+  {
+    question: 'How do I get access to a course after enrolling?',
+    answer: 'Once enrolled successfully, administrators activate the corresponding Entitlement for your account. You can then navigate to "My Courses" to access all copyrighted chapters and video lectures.',
+  },
+  {
+    question: 'How can instructors publish and manage secure courses on SecureLearn?',
+    answer: 'Instructors have a dedicated Studio to upload lectures. The system automatically encrypts and stores files safely on Cloudflare R2, providing content preview tools and real-time student enrollment tracking.',
+  },
+  {
+    question: 'Will I receive a verified certificate upon course completion?',
+    answer: 'Yes. Upon completing 100% of the lectures and practical projects, students are issued a digital Certificate with a unique identifier that employers can verify directly on SecureLearn.',
+  },
+];
+
 /**
  * =============================================================================
  * PAGE: Home (Trang Chủ - 100% Dữ Liệu Mềm)
@@ -49,39 +81,59 @@ export default function Home() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { user, isAuthenticated } = useAuth();
+  const [coursesList, setCoursesList] = useState([]);
   const [blockedModalCourse, setBlockedModalCourse] = useState(null);
   const [openFaqIndex, setOpenFaqIndex] = useState(null);
   const [showAllFaq, setShowAllFaq] = useState(false);
 
-  // Thống kê động (100% dữ liệu mềm từ CSDL mockDatabase)
-  const totalCourses = courses?.length || 0;
+  useEffect(() => {
+    let isMounted = true;
+    getCourses()
+      .then((data) => {
+        if (isMounted && Array.isArray(data)) {
+          setCoursesList(data);
+        }
+      })
+      .catch((err) => console.warn('[Home] Lỗi nạp khóa học:', err));
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Thống kê động (100% dữ liệu thực từ Backend)
+  const totalCourses = coursesList?.length || 0;
   const totalEnrollments = entitlements?.length || 0;
 
-  // Lọc số câu hỏi hiển thị
-  const visibleFaqs = showAllFaq ? FAQ_ITEMS : FAQ_ITEMS.slice(0, 5);
+  // Lọc số câu hỏi hiển thị (hỗ trợ đa ngôn ngữ vi/en)
+  const faqList = lang === 'en' ? FAQ_ITEMS_EN : FAQ_ITEMS;
+  const visibleFaqs = showAllFaq ? faqList : faqList.slice(0, 5);
 
   // Danh sách ID các khóa học đã được cấp quyền cho người dùng hiện tại
   const entitledIds = useMemo(() => {
-    return getEntitledCourseIds(user);
-  }, [user]);
+    return getEntitledCourseIds(user, coursesList);
+  }, [user, coursesList]);
 
   // Chỉ hiển thị 3 khóa học mới nhất — sắp xếp mềm theo "Creation Time" giảm dần
-  const latestCourses = [...courses]
-    .sort((a, b) => new Date(b["Creation Time"]) - new Date(a["Creation Time"]))
-    .slice(0, 3);
+  const latestCourses = useMemo(() => {
+    return [...coursesList]
+      .sort((a, b) => new Date(b["Creation Time"] || b.createdAt || 0) - new Date(a["Creation Time"] || a.createdAt || 0))
+      .slice(0, 3);
+  }, [coursesList]);
 
   const handleCourseAction = (course) => {
-    const access = checkCourseAccess(user, course.ID);
+    const cId = course.ID || course.id;
+    const access = checkCourseAccess(user, cId);
 
     if (access.hasAccess) {
       if (user?.role === 'Instructor') {
-        navigate(`/instructor/preview/${course.ID}`);
+        navigate(`/${lang}/instructor/preview/${cId}`);
       } else {
-        navigate(`/student/player/${course.ID}`);
+        navigate(`/${lang}/student/player/${cId}`);
       }
     } else {
       setBlockedModalCourse({
         ...course,
+        ID: cId,
         reasonMessage: access.message,
       });
     }
@@ -232,111 +284,138 @@ export default function Home() {
               to={`/${lang}/catalog`}
               className="btn-secondary-pill text-decoration-none d-inline-flex align-items-center gap-2 small px-3 py-2"
             >
-              <span>{t('home.view_all')} ({courses.length})</span>
+              <span>{t('home.view_all')} ({coursesList.length})</span>
               <i className="bi bi-arrow-right"></i>
             </Link>
           </div>
 
           <Row className="g-4">
-            {latestCourses.map((course) => {
-              const instructorUser = users.find((u) => u.ID === course.Owner);
-              const isEntitled = entitledIds.includes(course.ID);
-
-              return (
-                <Col key={course.ID} xs={12} md={6} lg={4}>
-                  <Card
-                    className={`h-100 card-clean card-clean-hover overflow-hidden d-flex flex-column border-0 shadow-sm ${!isEntitled ? 'border-light' : ''
-                      }`}
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => handleCourseAction(course)}
-                  >
-                    {/* Header Khóa học */}
-                    <div
-                      className={`p-4 border-bottom d-flex flex-column justify-content-between ${isEntitled ? 'bg-primary bg-opacity-10' : 'bg-light'
-                        }`}
-                      style={{ minHeight: '130px' }}
+            {latestCourses.length === 0 ? (
+              <Col xs={12}>
+                <div className="card-clean border-0 shadow-sm p-5 text-center bg-white rounded-4">
+                  <div className="text-muted mb-3" style={{ fontSize: '2.5rem' }}>
+                    <i className="bi bi-mortarboard"></i>
+                  </div>
+                  <h5 className="fw-bold text-dark mb-2">{t('home.no_courses_title')}</h5>
+                  <p className="text-secondary small mb-3">
+                    {t('home.no_courses_desc')}
+                  </p>
+                  {isAuthenticated && user?.role === 'Instructor' && (
+                    <Button
+                      variant="primary"
+                      onClick={() => navigate(`/${lang}/instructor/upload`)}
+                      className="btn-primary-pill"
                     >
-                      <div className="d-flex justify-content-between align-items-center">
-                        {isEntitled ? (
-                          <Badge bg="success" className="px-3 py-2 rounded-pill fw-semibold shadow-sm">
-                            {t('home.entitled')}
-                          </Badge>
-                        ) : (
-                          <Badge bg="secondary" className="px-3 py-2 rounded-pill fw-semibold bg-opacity-75">
-                            {t('home.not_entitled')}
-                          </Badge>
-                        )}
-                        <span className="small text-muted font-monospace">
-                          <code>{course.ID}</code>
-                        </span>
-                      </div>
+                      <i className="bi bi-cloud-arrow-up me-1"></i> {t('home.upload_course_now')}
+                    </Button>
+                  )}
+                </div>
+              </Col>
+            ) : (
+              latestCourses.map((course) => {
+                const cId = course.ID || course.id;
+                const title = course.Title || course.title || 'Khóa học';
+                const desc = course.Description || course.description || '';
+                const price = course.Price ?? course.price;
+                const instructorUser = users.find((u) => u.ID === (course.Owner || course.owner));
+                const isEntitled = entitledIds.includes(cId);
 
-                      {course["Creation Time"] && (
-                        <small className="text-secondary mt-3">
-                          <i className="bi bi-calendar-event me-1"></i>
-                          {t('home.created_at')} {course["Creation Time"].split('T')[0]}
-                        </small>
-                      )}
-                    </div>
-
-                    <Card.Body className="d-flex flex-column p-4">
-                      <Card.Title className="fw-bold fs-5 text-dark mb-2 text-truncate" title={course.Title}>
-                        {course.Title}
-                      </Card.Title>
-
-                      <Card.Text className="text-secondary small mb-3 flex-grow-1" style={{ minHeight: '55px' }}>
-                        {course.Description}
-                      </Card.Text>
-
-                      {/* Giảng viên */}
-                      {instructorUser && (
-                        <div className="d-flex justify-content-between text-muted small mb-3 border-top pt-2">
-                          <span>
-                            <i className="bi bi-person-fill text-primary me-1"></i>
-                            {instructorUser.Username}
-                          </span>
-                        </div>
-                      )}
-
-                      <div className="d-flex justify-content-between align-items-center mt-auto pt-2 border-top">
-                        <div>
-                          <small className="text-muted d-block">{lang === 'vi' ? 'Học phí:' : 'Tuition:'}</small>
-                          <span className="fw-bold fs-5 text-primary">
-                            {course.Price === 0 ? t('home.free') : `${course.Price?.toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US') ?? '?'} ${lang === 'vi' ? 'đ' : 'VND'}`}
+                return (
+                  <Col key={cId} xs={12} md={6} lg={4}>
+                    <Card
+                      className={`h-100 card-clean card-clean-hover overflow-hidden d-flex flex-column border-0 shadow-sm ${!isEntitled ? 'border-light' : ''
+                        }`}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => handleCourseAction(course)}
+                    >
+                      {/* Header Khóa học */}
+                      <div
+                        className={`p-4 border-bottom d-flex flex-column justify-content-between ${isEntitled ? 'bg-primary bg-opacity-10' : 'bg-light'
+                          }`}
+                        style={{ minHeight: '130px' }}
+                      >
+                        <div className="d-flex justify-content-between align-items-center">
+                          {isEntitled ? (
+                            <Badge bg="success" className="px-3 py-2 rounded-pill fw-semibold shadow-sm">
+                              {t('home.entitled')}
+                            </Badge>
+                          ) : (
+                            <Badge bg="secondary" className="px-3 py-2 rounded-pill fw-semibold bg-opacity-75">
+                              {t('home.not_entitled')}
+                            </Badge>
+                          )}
+                          <span className="small text-muted font-monospace">
+                            <code>{cId}</code>
                           </span>
                         </div>
 
-                        {isEntitled ? (
-                          <Button
-                            variant="primary"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCourseAction(course);
-                            }}
-                            className="btn-primary-pill d-flex align-items-center gap-2 small px-3 py-2"
-                          >
-                            <i className="bi bi-play-circle-fill"></i>
-                            <span>{t('home.start_learning')}</span>
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="light"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCourseAction(course);
-                            }}
-                            className="btn-unentitled-pill d-flex align-items-center gap-2 small px-3 py-2"
-                          >
-                            <i className="bi bi-lock-fill"></i>
-                            <span>{t('home.not_entitled')}</span>
-                          </Button>
+                        {(course["Creation Time"] || course.createdAt) && (
+                          <small className="text-secondary mt-3">
+                            <i className="bi bi-calendar-event me-1"></i>
+                            {t('home.created_at')} {(course["Creation Time"] || course.createdAt).split('T')[0]}
+                          </small>
                         )}
                       </div>
-                    </Card.Body>
-                  </Card>
-                </Col>
-              );
-            })}
+
+                      <Card.Body className="d-flex flex-column p-4">
+                        <Card.Title className="fw-bold fs-5 text-dark mb-2 text-truncate" title={title}>
+                          {title}
+                        </Card.Title>
+
+                        <Card.Text className="text-secondary small mb-3 flex-grow-1" style={{ minHeight: '55px' }}>
+                          {desc}
+                        </Card.Text>
+
+                        {/* Giảng viên */}
+                        {instructorUser && (
+                          <div className="d-flex justify-content-between text-muted small mb-3 border-top pt-2">
+                            <span>
+                              <i className="bi bi-person-fill text-primary me-1"></i>
+                              {instructorUser.Username}
+                            </span>
+                          </div>
+                        )}
+
+                        <div className="d-flex justify-content-between align-items-center mt-auto pt-2 border-top">
+                          <div>
+                            <small className="text-muted d-block">{lang === 'vi' ? 'Học phí:' : 'Tuition:'}</small>
+                            <span className="fw-bold fs-5 text-primary">
+                              {price === 0 ? t('home.free') : `${price?.toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US') ?? '?'} ${lang === 'vi' ? 'đ' : 'VND'}`}
+                            </span>
+                          </div>
+
+                          {isEntitled ? (
+                            <Button
+                              variant="primary"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCourseAction(course);
+                              }}
+                              className="btn-primary-pill d-flex align-items-center gap-2 small px-3 py-2"
+                            >
+                              <i className="bi bi-play-circle-fill"></i>
+                              <span>{t('home.start_learning')}</span>
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="light"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCourseAction(course);
+                              }}
+                              className="btn-unentitled-pill d-flex align-items-center gap-2 small px-3 py-2"
+                            >
+                              <i className="bi bi-lock-fill"></i>
+                              <span>{t('home.not_entitled')}</span>
+                            </Button>
+                          )}
+                        </div>
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                );
+              })
+            )}
           </Row>
         </section>
 

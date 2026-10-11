@@ -76,96 +76,16 @@ export const sessions = [
 ];
 
 // 5. TABLE: Course — Fields: ID, Title, Description, Price, "Creation Time", Owner, AccessLogID, AnomalyAlertID
-export const courses = [
-  {
-    ID: "c-001",
-    Title: "Network Security Fundamentals",
-    Description: "Học các nguyên tắc bảo mật mạng cơ bản: tường lửa thế hệ mới, VPN bảo mật, mã hóa dữ liệu và phát hiện xâm nhập IDS/IPS.",
-    Price: 499000,
-    "Creation Time": "2024-07-10T10:00:00Z",
-    Owner: "u-002",
-    AccessLogID: "al-001",
-    AnomalyAlertID: "aa-001",
-  },
-  {
-    ID: "c-002",
-    Title: "Ethical Hacking & Penetration Testing",
-    Description: "Khóa học toàn diện về Pentest: từ thu thập thông tin trinh sát OSINT, khai thác lỗ hổng với Metasploit đến viết báo cáo chuyên nghiệp.",
-    Price: 799000,
-    "Creation Time": "2024-08-01T09:30:00Z",
-    Owner: "u-002",
-    AccessLogID: "al-003",
-    AnomalyAlertID: "aa-002",
-  },
-  {
-    ID: "c-003",
-    Title: "Web Application Security (OWASP Top 10)",
-    Description: "Phân tích chuyên sâu Top 10 lỗ hổng bảo mật OWASP phổ biến (SQLi, XSS, CSRF, SSRF) và kỹ thuật vá lỗi an toàn.",
-    Price: 650000,
-    "Creation Time": "2024-09-15T14:00:00Z",
-    Owner: "u-003",
-    AccessLogID: "al-005",
-    AnomalyAlertID: "aa-003",
-  },
-  {
-    ID: "c-004",
-    Title: "Cloud Security & Zero-Trust Architecture",
-    Description: "Bảo mật hạ tầng đám mây đa nền tảng (AWS/Azure/GCP), quản lý IAM chặt chẽ và triển khai mô hình Zero-Trust.",
-    Price: 899000,
-    "Creation Time": "2024-10-05T08:00:00Z",
-    Owner: "u-003",
-    AccessLogID: "al-006",
-    AnomalyAlertID: "aa-004",
-  },
-  {
-    ID: "c-005",
-    Title: "Malware Analysis & Reverse Engineering",
-    Description: "Kỹ thuật dịch ngược mã nhị phân PE, phân tích tĩnh và phân tích động mã độc trong môi trường sandbox an toàn.",
-    Price: 720000,
-    "Creation Time": "2024-11-20T11:00:00Z",
-    Owner: "u-002",
-    AccessLogID: "al-007",
-    AnomalyAlertID: "aa-005",
-  },
-];
+export const courses = [];
 
 // 6. TABLE: Entitlement — Fields: UserID, CoursesID, Status, "Join Date", "Completion Date"
-export const entitlements = [
-  { UserID: "u-004", CoursesID: "c-001", Status: "completed", "Join Date": "2024-08-15T00:00:00Z", "Completion Date": "2024-11-01T00:00:00Z" },
-  { UserID: "u-004", CoursesID: "c-002", Status: "active", "Join Date": "2024-11-05T00:00:00Z", "Completion Date": null },
-  { UserID: "u-005", CoursesID: "c-001", Status: "active", "Join Date": "2024-09-10T00:00:00Z", "Completion Date": null },
-  { UserID: "u-005", CoursesID: "c-003", Status: "active", "Join Date": "2024-10-01T00:00:00Z", "Completion Date": null },
-  { UserID: "u-006", CoursesID: "c-002", Status: "expired", "Join Date": "2024-07-01T00:00:00Z", "Completion Date": null },
-  { UserID: "u-006", CoursesID: "c-004", Status: "active", "Join Date": "2024-11-10T00:00:00Z", "Completion Date": null },
-];
+export const entitlements = [];
 
 // 7. TABLE: Chapter — Fields: ID, ChapterNumber, Title, Description, CoursesID, AccessLogID
-export const chapters = [
-  { ID: "ch-001", ChapterNumber: 1, Title: "Giới thiệu về Bảo mật Mạng", Description: "Tổng quan về bảo mật mạng, các mối đe dọa phổ biến và mô hình CIA Triad.", CoursesID: "c-001", AccessLogID: "al-001" },
-  { ID: "ch-002", ChapterNumber: 2, Title: "Tường lửa & Kiến trúc DMZ", Description: "Cấu hình tường lửa stateful, phân vùng DMZ và lọc gói tin nâng cao.", CoursesID: "c-001", AccessLogID: "al-002" },
-  { ID: "ch-003", ChapterNumber: 3, Title: "VPN và Mã hóa Dữ liệu", Description: "Triển khai VPN IPSec/SSL, giao thức mã hóa AES, RSA và quản lý chứng chỉ.", CoursesID: "c-001", AccessLogID: "al-003" },
-  { ID: "ch-004", ChapterNumber: 1, Title: "Giai đoạn Thu thập Thông tin (Recon)", Description: "Kỹ thuật passive/active reconnaissance: OSINT, Shodan, Nmap scanning.", CoursesID: "c-002", AccessLogID: "al-004" },
-  { ID: "ch-005", ChapterNumber: 2, Title: "Khai thác Lỗ hổng với Metasploit", Description: "Sử dụng Metasploit Framework để khai thác lỗ hổng, leo thang đặc quyền.", CoursesID: "c-002", AccessLogID: "al-005" },
-  { ID: "ch-006", ChapterNumber: 1, Title: "SQL Injection & NoSQL Injection", Description: "Phân tích, khai thác và vá các lỗ hổng injection trong ứng dụng web hiện đại.", CoursesID: "c-003", AccessLogID: "al-006" },
-  { ID: "ch-007", ChapterNumber: 2, Title: "XSS, CSRF và Broken Auth", Description: "Tấn công Cross-Site Scripting, CSRF token bypass và khai thác lỗ hổng xác thực.", CoursesID: "c-003", AccessLogID: "al-007" },
-  { ID: "ch-008", ChapterNumber: 1, Title: "Bảo mật AWS IAM & S3", Description: "Cấu hình IAM Policy, S3 Bucket Policy và phát hiện cấu hình sai trên AWS.", CoursesID: "c-004", AccessLogID: "al-001" },
-  { ID: "ch-009", ChapterNumber: 1, Title: "Phân tích Tĩnh (Static Analysis)", Description: "Đọc PE headers, tìm IOC, dùng Ghidra/IDA để disassemble mã độc.", CoursesID: "c-005", AccessLogID: "al-002" },
-  { ID: "ch-010", ChapterNumber: 2, Title: "Phân tích Động (Dynamic Analysis)", Description: "Chạy malware trong sandbox, theo dõi API calls, network traffic và registry.", CoursesID: "c-005", AccessLogID: "al-003" },
-];
+export const chapters = [];
 
 // 8. TABLE: Video — Fields: ID, Title, Length, Size, UploadTime, UploadedBy, AccessLogID, AnomalyAlertID
-export const videos = [
-  { ID: "v-001", Title: "CIA Triad - Confidentiality, Integrity, Availability", Length: 1320, Size: 524288000, UploadTime: "2024-07-11T10:00:00Z", UploadedBy: "u-002", AccessLogID: "al-001", AnomalyAlertID: "aa-001" },
-  { ID: "v-002", Title: "Các loại tấn công mạng phổ biến năm 2024", Length: 1800, Size: 720896000, UploadTime: "2024-07-12T11:00:00Z", UploadedBy: "u-002", AccessLogID: "al-002", AnomalyAlertID: null },
-  { ID: "v-003", Title: "Cấu hình Firewall với iptables trên Linux", Length: 2400, Size: 960000000, UploadTime: "2024-07-15T09:30:00Z", UploadedBy: "u-002", AccessLogID: "al-003", AnomalyAlertID: "aa-002" },
-  { ID: "v-004", Title: "OSINT với Shodan và Maltego", Length: 2700, Size: 1080000000, UploadTime: "2024-08-05T10:00:00Z", UploadedBy: "u-002", AccessLogID: "al-004", AnomalyAlertID: null },
-  { ID: "v-005", Title: "Metasploit: Từ cơ bản đến nâng cao", Length: 3600, Size: 1440000000, UploadTime: "2024-08-10T14:00:00Z", UploadedBy: "u-002", AccessLogID: "al-005", AnomalyAlertID: "aa-003" },
-  { ID: "v-006", Title: "SQLMap - Tự động hóa tấn công SQL Injection", Length: 1980, Size: 792000000, UploadTime: "2024-09-18T10:00:00Z", UploadedBy: "u-003", AccessLogID: "al-006", AnomalyAlertID: null },
-  { ID: "v-007", Title: "XSS Stored vs Reflected - Demo thực tế", Length: 2160, Size: 864000000, UploadTime: "2024-09-20T11:30:00Z", UploadedBy: "u-003", AccessLogID: "al-007", AnomalyAlertID: "aa-004" },
-  { ID: "v-008", Title: "AWS IAM: Principle of Least Privilege", Length: 2520, Size: 1008000000, UploadTime: "2024-10-08T09:00:00Z", UploadedBy: "u-003", AccessLogID: "al-001", AnomalyAlertID: null },
-  { ID: "v-009", Title: "Phân tích PE Header bằng PEStudio", Length: 3000, Size: 1200000000, UploadTime: "2024-11-22T08:00:00Z", UploadedBy: "u-002", AccessLogID: "al-002", AnomalyAlertID: "aa-005" },
-  { ID: "v-010", Title: "Cuckoo Sandbox - Phân tích động mã độc", Length: 2880, Size: 1152000000, UploadTime: "2024-11-25T10:00:00Z", UploadedBy: "u-002", AccessLogID: "al-003", AnomalyAlertID: null },
-];
+export const videos = [];
 
 // Single Database Object Export
 const mockDatabase = {

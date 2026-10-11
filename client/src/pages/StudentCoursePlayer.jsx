@@ -16,9 +16,6 @@ import {
 import { useAuth } from '../context/AuthContext';
 import SecureVideoPlayer from '../components/SecureVideoPlayer';
 import {
-  courses,
-  chapters,
-  videos,
   users,
   accessLogs,
 } from '../data/mockDatabase';
@@ -29,7 +26,7 @@ import { getCourseWithLessons } from '../services/courseService';
  * =============================================================================
  * PAGE: StudentCoursePlayer (Giao diện học tập kết nối Backend API)
  * =============================================================================
- * - Tự động nạp dữ liệu khóa học và bài giảng (Lessons) từ Backend API qua DynamoDB
+ * - Tự động nạp dữ liệu khóa học và bài giảng (Lessons) từ Backend API
  * - Phát luồng videoURL được lưu trên Backend cho từng bài học
  * =============================================================================
  */
@@ -63,24 +60,10 @@ export default function StudentCoursePlayer() {
     };
   }, [paramCourseOrVideoId]);
 
-  // 1. Dữ liệu: Xác định Khóa học hiện tại (ưu tiên Backend API, fallback mockDatabase)
+  // 1. Dữ liệu: Xác định Khóa học hiện tại (chỉ lấy từ Backend API)
   const currentCourse = useMemo(() => {
-    if (backendData?.course) return backendData.course;
-    if (!courses || courses.length === 0) return null;
-    const foundByCourseId = courses.find((c) => c.ID === paramCourseOrVideoId);
-    if (foundByCourseId) return foundByCourseId;
-
-    const foundVideo = videos.find((v) => v.ID === paramCourseOrVideoId);
-    if (foundVideo) {
-      const relChapter = chapters.find((ch) => ch.AccessLogID === foundVideo.AccessLogID);
-      if (relChapter) {
-        const c = courses.find((c) => c.ID === relChapter.CoursesID);
-        if (c) return c;
-      }
-    }
-
-    return courses.find((c) => c.ID === paramCourseOrVideoId) || courses[0];
-  }, [paramCourseOrVideoId, backendData]);
+    return backendData?.course || null;
+  }, [backendData]);
 
   // Kiểm tra quyền xem khóa học từ bảng Entitlements
   const accessResult = useMemo(() => {
@@ -88,23 +71,14 @@ export default function StudentCoursePlayer() {
       return {
         hasAccess: false,
         reason: 'NOT_FOUND',
-        message: 'Không tìm thấy thông tin khóa học.',
+        message: 'Không tìm thấy thông tin khóa học trên hệ thống.',
       };
     }
-    return checkCourseAccess(user, currentCourse.ID);
+    return checkCourseAccess(user, currentCourse.ID || currentCourse.id);
   }, [currentCourse, user]);
 
-  // 2. Dữ liệu: Lấy danh sách các Chương (Chapters) thuộc Khóa học này
-  const courseChapters = useMemo(() => {
-    if (!currentCourse) return [];
-    return chapters
-      .filter((ch) => ch.CoursesID === currentCourse.ID)
-      .sort((a, b) => a.ChapterNumber - b.ChapterNumber);
-  }, [currentCourse]);
-
-  // 3. Dữ liệu: Ghép các video bài giảng từ Backend API hoặc mockDatabase vào các chương
+  // 2. Dữ liệu: Ghép các video bài giảng từ Backend API vào các chương
   const curriculum = useMemo(() => {
-    // Ưu tiên: Nếu Backend API trả về danh sách chapters có kèm lessons
     if (backendData?.chapters && backendData.chapters.length > 0) {
       return backendData.chapters.map((chap, idx) => ({
         ID: chap.id || chap.ID,
@@ -113,12 +87,14 @@ export default function StudentCoursePlayer() {
         Description: chap.description || chap.Description || '',
         videos: (chap.lessons || chap.videos || []).map((l) => ({
           ...l,
+          ID: l.id || l.ID,
+          Title: l.title || l.Title,
+          Description: l.description || l.Description,
           videoUrl: l.url || l.videoURL || l.videoUrl,
         })),
       }));
     }
 
-    // Nếu Backend API chỉ trả về danh sách bài học phẳng (lessons)
     if (backendData?.lessons && backendData.lessons.length > 0) {
       const grouped = {};
       backendData.lessons.forEach((l) => {
@@ -134,40 +110,17 @@ export default function StudentCoursePlayer() {
         }
         grouped[chapKey].videos.push({
           ...l,
+          ID: l.id || l.ID,
+          Title: l.title || l.Title,
+          Description: l.description || l.Description,
           videoUrl: l.url || l.videoURL || l.videoUrl,
         });
       });
       return Object.values(grouped);
     }
 
-    if (courseChapters.length === 0) {
-      return [
-        {
-          ID: `ch-default-${currentCourse?.ID || '0'}`,
-          ChapterNumber: 1,
-          Title: currentCourse?.Title || '',
-          Description: currentCourse?.Description || '',
-          videos: videos || [],
-        },
-      ];
-    }
-
-    return courseChapters.map((chap, cIdx) => {
-      const directVideos = videos.filter((v) => v.chapterId === chap.ID);
-      const relatedVideos = directVideos.length > 0
-        ? directVideos
-        : videos.filter((v) => ['c-001', 'c-002', 'c-003', 'c-004', 'c-005'].includes(currentCourse?.ID) && v.AccessLogID === chap.AccessLogID);
-
-      const countPerChap = Math.ceil(videos.length / Math.max(courseChapters.length, 1));
-      const start = cIdx * countPerChap;
-      const chapVideos = relatedVideos.length > 0 ? relatedVideos : videos.slice(start, start + countPerChap);
-
-      return {
-        ...chap,
-        videos: chapVideos.length > 0 ? chapVideos : (videos[0] ? [videos[0]] : []),
-      };
-    });
-  }, [courseChapters, currentCourse, backendData]);
+    return [];
+  }, [backendData]);
 
   // Danh sách phẳng tất cả bài giảng trong khóa học
   const allLectures = useMemo(() => {
@@ -185,10 +138,20 @@ export default function StudentCoursePlayer() {
     return list;
   }, [curriculum]);
 
-  // 4. Bài giảng đang phát (Dữ liệu mềm)
-  const [activeLectureId, setActiveLectureId] = useState(() => {
-    return allLectures[0]?.ID || '';
-  });
+  // 3. Bài giảng đang phát
+  const [activeLectureId, setActiveLectureId] = useState('');
+
+  // Tự động đồng bộ bài giảng đầu tiên khi curriculum nạp xong
+  React.useEffect(() => {
+    if (allLectures && allLectures.length > 0) {
+      setActiveLectureId((prev) => {
+        if (prev && allLectures.some((l) => l.ID === prev)) return prev;
+        return allLectures[0].ID;
+      });
+    } else {
+      setActiveLectureId('');
+    }
+  }, [allLectures]);
 
   // State tương tác người dùng (động)
   const [completedLectures, setCompletedLectures] = useState([]);

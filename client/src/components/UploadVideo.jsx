@@ -19,13 +19,7 @@ import {
 import { useVideoUpload, UPLOAD_STATUS } from '../hooks/useVideoUpload';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
-import { getCourses, getChapters, createChapter, createLesson } from '../services/courseService';
-import {
-  courses as dbCourses,
-  chapters as dbChapters,
-  videos as dbVideos,
-  users as dbUsers,
-} from '../data/mockDatabase';
+import { getCourses, getChapters, createChapter, createLesson, getLessons } from '../services/courseService';
 import CreateCourseModal from './CreateCourseModal';
 
 /**
@@ -68,13 +62,13 @@ export default function UploadVideo() {
   const navigate = useNavigate();
   const { showToast } = useToast();
 
-  // State danh sách khóa học (hỗ trợ tạo thêm khóa học mới tại chỗ)
-  const [allCourses, setAllCourses] = useState(dbCourses);
+  // State danh sách khóa học (lấy từ Backend)
+  const [allCourses, setAllCourses] = useState([]);
 
-  // Dữ liệu mềm: Lấy danh sách khóa học do giảng viên này phụ trách (hoặc tất cả nếu demo)
+  // Dữ liệu: Lấy danh sách khóa học do giảng viên này phụ trách (hoặc tất cả nếu chưa lọc)
   const instructorCourses = useMemo(() => {
     if (!allCourses || allCourses.length === 0) return [];
-    const owned = allCourses.filter((c) => c.Owner === user?.userId);
+    const owned = allCourses.filter((c) => c.Owner === user?.userId || c.owner === user?.userId || c.instructor === user?.username);
     return owned.length > 0 ? owned : allCourses;
   }, [allCourses, user]);
 
@@ -82,43 +76,34 @@ export default function UploadVideo() {
 
   // State khóa học đang được chọn
   const [selectedCourseId, setSelectedCourseId] = useState(() => {
-    return location.state?.courseId || instructorCourses[0]?.ID || 'c-001';
+    return location.state?.courseId || '';
   });
 
-  // State các chương (cho phép thêm chương mới mềm tại chỗ)
-  const [allChapters, setAllChapters] = useState(dbChapters);
+  // State các chương (nạp từ Backend)
+  const [allChapters, setAllChapters] = useState([]);
 
-  // State các video bài giảng (đảm bảo không bị trùng lặp ID)
-  const [allVideos, setAllVideos] = useState(() => {
-    const unique = [];
-    const seen = new Set();
-    dbVideos.forEach((v) => {
-      if (v && v.ID && !seen.has(v.ID)) {
-        seen.add(v.ID);
-        unique.push(v);
-      }
-    });
-    return unique;
-  });
+  // State các video bài giảng lấy động theo Backend API
+  const [allVideos, setAllVideos] = useState([]);
+  const [isLoadingLessons, setIsLoadingLessons] = useState(false);
 
   // State modal thêm khóa học mới
   const [showCreateCourseModal, setShowCreateCourseModal] = useState(false);
 
   const handleCourseCreated = (newCourse) => {
     setAllCourses((prev) => [newCourse, ...prev]);
-    setSelectedCourseId(newCourse.ID);
+    setSelectedCourseId(newCourse.ID || newCourse.id);
   };
 
   // Các chương thuộc khóa học đang chọn
   const currentCourseChapters = useMemo(() => {
     return allChapters
-      .filter((ch) => ch.CoursesID === selectedCourseId)
-      .sort((a, b) => a.ChapterNumber - b.ChapterNumber);
+      .filter((ch) => ch.CoursesID === selectedCourseId || ch.course_id === selectedCourseId || ch.courseId === selectedCourseId)
+      .sort((a, b) => (a.ChapterNumber || 1) - (b.ChapterNumber || 1));
   }, [allChapters, selectedCourseId]);
 
   // State chương đang chọn để ghép video vào
   const [selectedChapterId, setSelectedChapterId] = useState(() => {
-    return currentCourseChapters[0]?.ID || '';
+    return currentCourseChapters[0]?.ID || currentCourseChapters[0]?.id || '';
   });
 
   // Nạp danh sách khóa học từ Backend API
@@ -126,8 +111,16 @@ export default function UploadVideo() {
     let isMounted = true;
     getCourses()
       .then((data) => {
-        if (isMounted && Array.isArray(data) && data.length > 0) {
+        if (isMounted && Array.isArray(data)) {
           setAllCourses(data);
+          if (data.length > 0) {
+            setSelectedCourseId((prev) => {
+              if (prev && data.some((c) => (c.ID === prev || c.id === prev))) {
+                return prev;
+              }
+              return data[0].ID || data[0].id;
+            });
+          }
         }
       })
       .catch((err) => console.warn('[UploadVideo] Lỗi nạp khóa học từ BE:', err));
@@ -138,15 +131,15 @@ export default function UploadVideo() {
 
   // Nạp danh sách chương của khóa học đang chọn từ Backend API
   React.useEffect(() => {
-    if (!selectedCourseId) return;
+    if (!selectedCourseId) {
+      setAllChapters([]);
+      return;
+    }
     let isMounted = true;
     getChapters(selectedCourseId)
       .then((data) => {
-        if (isMounted && Array.isArray(data) && data.length > 0) {
-          setAllChapters((prev) => {
-            const others = prev.filter((ch) => ch.CoursesID !== selectedCourseId && ch.course_id !== selectedCourseId);
-            return [...others, ...data];
-          });
+        if (isMounted && Array.isArray(data)) {
+          setAllChapters(data);
         }
       })
       .catch((err) => console.warn('[UploadVideo] Lỗi nạp chương từ BE:', err));
@@ -158,16 +151,64 @@ export default function UploadVideo() {
   // Cập nhật selectedChapterId khi đổi khóa học
   React.useEffect(() => {
     if (currentCourseChapters.length > 0) {
-      setSelectedChapterId(currentCourseChapters[0].ID || currentCourseChapters[0].id);
+      setSelectedChapterId((prev) => {
+        const exists = currentCourseChapters.some((ch) => (ch.ID === prev || ch.id === prev));
+        return exists ? prev : (currentCourseChapters[0].ID || currentCourseChapters[0].id);
+      });
     } else {
       setSelectedChapterId('');
     }
   }, [selectedCourseId, currentCourseChapters]);
 
+  // Nạp động danh sách bài học của các chương từ Backend API (GET /api/v1/chapter/{chapterId}/lessons)
+  const refreshLessonsFromBackend = React.useCallback(async (chapters) => {
+    if (!chapters || chapters.length === 0) {
+      setAllVideos([]);
+      return;
+    }
+    setIsLoadingLessons(true);
+    try {
+      const lessonPromises = chapters.map(async (chap) => {
+        const chapId = chap.ID || chap.id;
+        try {
+          const lessons = await getLessons(chapId);
+          if (Array.isArray(lessons) && lessons.length > 0) {
+            return lessons.map((l) => ({
+              ...l,
+              chapterId: chapId,
+              courseId: selectedCourseId,
+            }));
+          }
+          return [];
+        } catch (e) {
+          return [];
+        }
+      });
+
+      const results = await Promise.all(lessonPromises);
+      const flattened = results.flat();
+      setAllVideos(flattened);
+    } catch (err) {
+      console.warn('[UploadVideo] Lỗi nạp bài học từ BE:', err);
+    } finally {
+      setIsLoadingLessons(false);
+    }
+  }, [selectedCourseId]);
+
+  // Tự động kích hoạt nạp bài học khi danh sách chương thay đổi
+  React.useEffect(() => {
+    if (currentCourseChapters.length > 0) {
+      refreshLessonsFromBackend(currentCourseChapters);
+    } else {
+      setAllVideos([]);
+    }
+  }, [currentCourseChapters, refreshLessonsFromBackend]);
+
   // State Form nhập liệu bài giảng nhỏ
   const [lessonTitle, setLessonTitle] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [customVideoUrl, setCustomVideoUrl] = useState('');
+  const [uploadMode, setUploadMode] = useState('file'); // 'file' | 'url'
   const [validationError, setValidationError] = useState(null);
   const [recentUploadedVideoId, setRecentUploadedVideoId] = useState(null);
 
@@ -193,50 +234,48 @@ export default function UploadVideo() {
 
   // Khóa học hiện tại
   const currentCourse = useMemo(() => {
-    return dbCourses.find((c) => c.ID === selectedCourseId) || instructorCourses[0];
-  }, [selectedCourseId, instructorCourses]);
+    return allCourses.find((c) => (c.ID === selectedCourseId || c.id === selectedCourseId)) || instructorCourses[0] || null;
+  }, [selectedCourseId, allCourses, instructorCourses]);
 
   // Chương hiện tại đang chọn
   const currentChapter = useMemo(() => {
-    return allChapters.find((ch) => ch.ID === selectedChapterId) || currentCourseChapters[0];
-  }, [selectedChapterId, currentCourseChapters, allChapters]);
+    return currentCourseChapters.find((ch) => (ch.ID === selectedChapterId || ch.id === selectedChapterId)) || currentCourseChapters[0] || null;
+  }, [selectedChapterId, currentCourseChapters]);
 
-  // Ghép các video vào từng chương của khóa học hiện tại (Curriculum View)
+  // Ghép các video từ BE vào từng chương của khóa học hiện tại (Curriculum View)
   const courseCurriculum = useMemo(() => {
     if (currentCourseChapters.length === 0) return [];
 
     return currentCourseChapters.map((chap) => {
-      // Chỉ lấy video thực sự thuộc về chương này:
-      // 1. Video vừa được tải lên gán thẳng vào chương này: v.chapterId === chap.ID
-      // 2. Hoặc video gốc từ CSDL có AccessLogID khớp và thuộc đúng khóa học gốc:
+      const chapId = chap.ID || chap.id;
+
+      // Lấy video thuộc về chương này dựa trên ID chương từ CSDL
       const chapVideos = allVideos.filter((v) => {
-        if (v.chapterId) {
-          return v.chapterId === chap.ID;
-        }
-        // Với video gốc trong mockDatabase: chỉ khớp nếu thuộc đúng khóa học gốc và AccessLogID
-        const isSeedCourse = ['c-001', 'c-002', 'c-003', 'c-004', 'c-005'].includes(selectedCourseId);
-        return isSeedCourse && v.AccessLogID === chap.AccessLogID && chap.CoursesID === selectedCourseId;
+        const vChapId = v.chapterId || v.chapter_id || v.chapter;
+        return vChapId && String(vChapId) === String(chapId);
       });
 
       // Loại bỏ hoàn toàn trùng lặp ID (ngăn lỗi double bài học)
       const uniqueChapVideos = [];
       const seenIds = new Set();
       for (const v of chapVideos) {
-        if (v && v.ID && !seenIds.has(v.ID)) {
-          seenIds.add(v.ID);
+        const vId = v?.ID || v?.id;
+        if (v && vId && !seenIds.has(vId)) {
+          seenIds.add(vId);
           uniqueChapVideos.push(v);
         }
       }
 
-      // Sắp xếp bài học theo thứ tự thời gian tạo tăng dần (bài cũ ở trên, bài mới tải lên nằm ở DƯỚI CÙNG)
-      uniqueChapVideos.sort((a, b) => new Date(a.UploadTime || 0) - new Date(b.UploadTime || 0));
+      // Sắp xếp bài học theo thứ tự thời gian tạo tăng dần
+      uniqueChapVideos.sort((a, b) => new Date(a.UploadTime || a.uploadTime || 0) - new Date(b.UploadTime || b.uploadTime || 0));
 
       return {
         ...chap,
+        ID: chapId,
         videos: uniqueChapVideos,
       };
     });
-  }, [currentCourseChapters, allVideos, selectedCourseId]);
+  }, [currentCourseChapters, allVideos]);
 
   // Kiểm tra tính hợp lệ của file video
   const handleFileChange = (e) => {
@@ -265,122 +304,180 @@ export default function UploadVideo() {
     showToast(`${t('upload.selected_lesson')} ${file.name} (${formatBytes(file.size)})`, 'info', t('upload.valid_file'));
   };
 
-  // Tạo thêm Chương / Phần mới trong Khóa học (Lưu bền vững vào LocalStorage)
+  // Tạo thêm Chương / Phần mới trong Khóa học trên Backend (POST /api/v1/chapter)
   const handleCreateNewChapter = async (e) => {
     e.preventDefault();
     if (!newChapterTitle.trim()) return;
 
     const nextChapNum = currentCourseChapters.length + 1;
-    const createdChapter = await createChapter({
-      courseId: selectedCourseId,
-      chapterNumber: nextChapNum,
-      title: newChapterTitle.trim(),
-      description: newChapterDesc.trim() || `${t('upload.chapter_content')} ${nextChapNum}`,
-    });
+    try {
+      await createChapter({
+        courseId: selectedCourseId,
+        course_id: selectedCourseId,
+        chapterNumber: nextChapNum,
+        title: newChapterTitle.trim(),
+        description: newChapterDesc.trim() || `${t('upload.chapter_content')} ${nextChapNum}`,
+      });
 
-    setAllChapters((prev) => [...prev, createdChapter]);
-    setSelectedChapterId(createdChapter.ID);
-    setShowAddChapterModal(false);
-    setNewChapterTitle('');
-    setNewChapterDesc('');
-    showToast(`${t('upload.created_chapter')} ${nextChapNum} - ${createdChapter.Title}`, 'success', t('upload.success'));
+      // Nạp lại danh sách chương từ BE để nhận đúng UUID tạo từ CSDL
+      const updatedChapters = await getChapters(selectedCourseId);
+      if (Array.isArray(updatedChapters) && updatedChapters.length > 0) {
+        setAllChapters((prev) => {
+          const others = prev.filter(
+            (ch) => ch.CoursesID !== selectedCourseId && ch.course_id !== selectedCourseId && ch.courseId !== selectedCourseId
+          );
+          return [...others, ...updatedChapters];
+        });
+        const createdOne = updatedChapters[updatedChapters.length - 1];
+        if (createdOne) {
+          setSelectedChapterId(createdOne.ID || createdOne.id);
+        }
+      }
+
+      setShowAddChapterModal(false);
+      setNewChapterTitle('');
+      setNewChapterDesc('');
+      showToast(`${t('upload.created_chapter')} ${nextChapNum} - ${newChapterTitle.trim()}`, 'success', t('upload.success'));
+    } catch (err) {
+      showToast(`Lỗi tạo chương: ${err.message}`, 'danger', 'Lỗi');
+    }
   };
 
-  // Xử lý gửi Form tải lên bài giảng nhỏ (Lưu bền vững vào LocalStorage & Backend API DynamoDB)
-  const handleSubmitUpload = (e) => {
+  // Xử lý gửi Form tải lên bài giảng nhỏ (Đồng bộ trực tiếp lên Backend Spring Boot: POST /api/v1/lesson)
+  const handleSubmitUpload = async (e) => {
     e.preventDefault();
-    if (!lessonTitle.trim() || (!selectedFile && !customVideoUrl.trim()) || !selectedChapterId) {
-      return;
-    }
+    if (!lessonTitle.trim() || !selectedChapterId) return;
 
-    // Trường hợp 1: Nhập trực tiếp Video URL từ Backend / CDN (không cần tải file)
-    if (customVideoUrl.trim() && !selectedFile) {
-      const generatedVidId = `v-${Date.now().toString().slice(-4)}`;
+    if (uploadMode === 'file' && !selectedFile) return;
+    if (uploadMode === 'url' && !customVideoUrl.trim()) return;
+
+    const targetChapterId = selectedChapterId;
+    const targetCourseId = selectedCourseId;
+
+    // Chế độ 1: Nhập trực tiếp Video URL từ Backend / CDN / S3
+    if (uploadMode === 'url') {
       const targetVideoUrl = customVideoUrl.trim();
 
-      const newVideoRecord = {
-        ID: generatedVidId,
-        Title: lessonTitle.trim(),
-        Length: 1200,
-        Size: 100000000,
-        UploadTime: new Date().toISOString(),
-        UploadedBy: user?.userId || 'u-002',
-        AccessLogID: currentChapter?.AccessLogID || 'al-001',
-        AnomalyAlertID: null,
-        chapterId: selectedChapterId,
-        chapterNumber: currentChapter?.ChapterNumber || 1,
-        courseId: selectedCourseId,
-        videoURL: targetVideoUrl,
-        videoUrl: targetVideoUrl,
-      };
+      try {
+        // Gửi lên Backend Spring Boot: POST /api/v1/lesson
+        await createLesson({
+          courseId: targetCourseId,
+          course_id: targetCourseId,
+          chapter: targetChapterId,
+          chapter_id: targetChapterId,
+          title: lessonTitle.trim(),
+          description: currentChapter?.Title ? `Bài học thuộc chương ${currentChapter.Title}` : '',
+          url: targetVideoUrl,
+          videoURL: targetVideoUrl,
+        });
 
-      // Gửi lên Backend Spring Boot: POST /api/v1/lesson
-      createLesson({
-        courseId: selectedCourseId,
-        chapter: selectedChapterId,
-        title: lessonTitle.trim(),
-        description: currentChapter?.Title ? `Bài học thuộc chương ${currentChapter.Title}` : '',
-        videoURL: targetVideoUrl,
-      }).then(() => {
+        // Nạp lại bài học từ Backend để lấy bản ghi thật
+        const updatedLessons = await getLessons(targetChapterId);
+        if (Array.isArray(updatedLessons) && updatedLessons.length > 0) {
+          setAllVideos((prev) => {
+            const others = prev.filter((v) => {
+              const vChap = v.chapterId || v.chapter_id || v.chapter;
+              return vChap !== targetChapterId;
+            });
+            return [...others, ...updatedLessons];
+          });
+          const lastLesson = updatedLessons[updatedLessons.length - 1];
+          if (lastLesson) setRecentUploadedVideoId(lastLesson.ID || lastLesson.id);
+        }
+
         showToast(
-          `Đã lưu bài học "${lessonTitle.trim()}" vào CSDL Backend thành công!`,
+          `Đã lưu bài học "${lessonTitle.trim()}" vào Backend thành công!`,
           'success',
           'Lưu Bài Học Thành Công'
         );
-      }).catch((err) => {
+        handleContinueNextLesson();
+      } catch (err) {
         console.warn('Lỗi đồng bộ bài học lên Backend:', err.message);
-      });
-
-      if (!dbVideos.some((v) => v.ID === generatedVidId)) {
-        dbVideos.push(newVideoRecord);
+        const updatedLessons = await getLessons(targetChapterId);
+        setAllVideos((prev) => {
+          const others = prev.filter((v) => {
+            const vChap = v.chapterId || v.chapter_id || v.chapter;
+            return vChap !== targetChapterId;
+          });
+          return [...others, ...updatedLessons];
+        });
+        showToast(
+          `Không thể kết nối Backend (http://localhost:8080). Bài học "${lessonTitle.trim()}" đã được lưu tạm an toàn trên máy của bạn và KHÔNG bị mất khi tải lại trang!`,
+          'warning',
+          'Lưu ý: Backend Chưa Kết Nối'
+        );
+        handleContinueNextLesson();
       }
-      setAllVideos((prev) => [...prev, newVideoRecord]);
-      setRecentUploadedVideoId(generatedVidId);
       return;
     }
 
-    // Trường hợp 2: Tải lên file video từ máy tính
+    // Chế độ 2: Tải lên file video từ máy tính
     const metadata = {
       title: lessonTitle.trim(),
-      courseId: selectedCourseId,
-      chapterId: selectedChapterId,
+      courseId: targetCourseId,
+      chapterId: targetChapterId,
       chapterNumber: currentChapter?.ChapterNumber || 1,
       uploadedBy: user?.userId || 'u-002',
       accessLogId: currentChapter?.AccessLogID || 'al-001',
     };
 
-    startUpload(selectedFile, metadata, (newVideoRecord) => {
-      // 1. Thêm vào CUỐI mảng dbVideos nếu chưa có
-      if (!dbVideos.some((v) => v.ID === newVideoRecord.ID)) {
-        dbVideos.push(newVideoRecord);
-      }
+    startUpload(selectedFile, metadata, async (newVideoRecord) => {
+      const effectiveVideoUrl = newVideoRecord.videoUrl || `https://stream.securelearn.edu/videos/${targetCourseId}/${newVideoRecord.ID}.m3u8`;
 
-      // 2. Cập nhật state Cây bài học thời gian thực
-      setAllVideos((prev) => {
-        if (prev.some((v) => v.ID === newVideoRecord.ID)) {
-          return prev;
+      try {
+        // Gửi lên Backend Spring Boot: POST /api/v1/lesson
+        await createLesson({
+          courseId: targetCourseId,
+          course_id: targetCourseId,
+          chapter: targetChapterId,
+          chapter_id: targetChapterId,
+          title: lessonTitle.trim(),
+          description: currentChapter?.Title ? `Bài học thuộc chương ${currentChapter.Title}` : '',
+          url: effectiveVideoUrl,
+          videoURL: effectiveVideoUrl,
+        });
+
+        // Đồng bộ lại danh sách bài học từ Backend API
+        const updatedLessons = await getLessons(targetChapterId);
+        if (Array.isArray(updatedLessons) && updatedLessons.length > 0) {
+          setAllVideos((prev) => {
+            const others = prev.filter((v) => {
+              const vChap = v.chapterId || v.chapter_id || v.chapter;
+              return vChap !== targetChapterId;
+            });
+            return [...others, ...updatedLessons];
+          });
+          const lastLesson = updatedLessons[updatedLessons.length - 1];
+          setRecentUploadedVideoId(lastLesson?.ID || lastLesson?.id || newVideoRecord.ID);
+        } else {
+          setAllVideos((prev) => [...prev, newVideoRecord]);
+          setRecentUploadedVideoId(newVideoRecord.ID);
         }
-        return [...prev, newVideoRecord];
-      });
 
-      // 3. Gọi API Backend Spring Boot để lưu bài học vào DynamoDB (/lesson)
-      const effectiveVideoUrl = customVideoUrl.trim() || newVideoRecord.videoUrl || `https://stream.securelearn.edu/videos/${selectedCourseId}/${newVideoRecord.ID}.m3u8`;
-      createLesson({
-        courseId: selectedCourseId,
-        chapter: selectedChapterId,
-        title: lessonTitle.trim(),
-        description: currentChapter?.Title ? `Bài học thuộc chương ${currentChapter.Title}` : '',
-        videoURL: effectiveVideoUrl,
-      }).catch((err) => {
+        showToast(
+          `Đã tải lên và lưu bài học "${lessonTitle.trim()}" vào Backend thành công!`,
+          'success',
+          'Lưu Bài Học Thành Công'
+        );
+      } catch (err) {
         console.warn('Lỗi đồng bộ bài học lên Backend:', err.message);
-      });
+        // Đồng bộ danh sách bài học từ bộ nhớ đệm bền vững
+        const updatedLessons = await getLessons(targetChapterId);
+        setAllVideos((prev) => {
+          const others = prev.filter((v) => {
+            const vChap = v.chapterId || v.chapter_id || v.chapter;
+            return vChap !== targetChapterId;
+          });
+          return [...others, ...updatedLessons];
+        });
+        setRecentUploadedVideoId(newVideoRecord.ID);
 
-      setRecentUploadedVideoId(newVideoRecord.ID);
-      showToast(
-        `${t('upload.uploaded_and_matched')} "${newVideoRecord.Title}" ${t('upload.into_chapter')} ${currentChapter?.ChapterNumber}!`,
-        'success',
-        t('upload.match_lesson_success')
-      );
+        showToast(
+          `Không thể kết nối Backend (http://localhost:8080). Video "${lessonTitle.trim()}" đã được lưu tạm an toàn trên máy và KHÔNG bị mất khi tải lại trang!`,
+          'warning',
+          'Lưu ý: Backend Chưa Kết Nối'
+        );
+      }
     });
   };
 
@@ -395,7 +492,11 @@ export default function UploadVideo() {
   };
 
   const isUploadDisabled =
-    !lessonTitle.trim() || (!selectedFile && !customVideoUrl.trim()) || !selectedChapterId || Boolean(validationError) || isBusy;
+    !lessonTitle.trim() ||
+    (uploadMode === 'file' ? !selectedFile : !customVideoUrl.trim()) ||
+    !selectedChapterId ||
+    Boolean(validationError) ||
+    isBusy;
 
   return (
     <div className="py-4 bg-light min-vh-100">
@@ -477,11 +578,20 @@ export default function UploadVideo() {
                   disabled={isBusy}
                   className="form-control-clean fw-medium"
                 >
-                  {instructorCourses.map((c) => (
-                    <option key={c.ID} value={c.ID}>
-                      {c.Title} ({c.Price === 0 ? t('upload.free') : `${c.Price?.toLocaleString('vi-VN')} đ`})
-                    </option>
-                  ))}
+                  {instructorCourses.length === 0 ? (
+                    <option value="">-- Chưa có khóa học nào (Bấm Thêm khóa học mới) --</option>
+                  ) : (
+                    instructorCourses.map((c) => {
+                      const cId = c.ID || c.id;
+                      const title = c.Title || c.title || c.name || 'Khóa học';
+                      const price = c.Price ?? c.price;
+                      return (
+                        <option key={cId} value={cId}>
+                          {title} {price !== undefined ? `(${price === 0 ? t('upload.free') : `${price?.toLocaleString('vi-VN')} đ`})` : ''}
+                        </option>
+                      );
+                    })
+                  )}
                 </Form.Select>
               </div>
 
@@ -513,18 +623,23 @@ export default function UploadVideo() {
                     disabled={isBusy}
                     className="form-control-clean bg-white"
                   >
-                    {currentCourseChapters.map((ch) => (
-                      <option key={ch.ID} value={ch.ID}>
-                        {t('upload.chapter')} {ch.ChapterNumber}: {ch.Title}
-                      </option>
-                    ))}
+                    {currentCourseChapters.map((ch) => {
+                      const chId = ch.ID || ch.id;
+                      const chNum = ch.ChapterNumber || ch.chapterNumber || ch.chapter_number || 1;
+                      const title = ch.Title || ch.title || '';
+                      return (
+                        <option key={chId} value={chId}>
+                          {t('upload.chapter')} {chNum}: {title}
+                        </option>
+                      );
+                    })}
                   </Form.Select>
                 )}
 
                 {currentChapter && (
                   <div className="mt-2 text-secondary small">
                     <i className="bi bi-info-circle me-1 text-primary"></i>
-                    {currentChapter.Description}
+                    {currentChapter.Description || currentChapter.description}
                   </div>
                 )}
               </div>
@@ -548,47 +663,93 @@ export default function UploadVideo() {
                     />
                   </FloatingLabel>
 
-                  {/* Chọn File video bài học nhỏ */}
-                  <Form.Group controlId="lessonFileInput" className="mb-4">
-                    <Form.Label className="fw-semibold text-dark small d-flex justify-content-between">
-                      <span>
-                        {t('upload.video_file_label')} <span className="text-danger">*</span>
-                      </span>
-                      {selectedFile && (
-                        <span className="text-primary fw-bold">
-                          {formatBytes(selectedFile.size)}
-                        </span>
-                      )}
-                    </Form.Label>
-                    <Form.Control
-                      ref={fileInputRef}
-                      type="file"
-                      accept="video/mp4, video/quicktime, .mp4, .mov"
-                      onChange={handleFileChange}
-                      className="form-control-clean"
-                    />
-                    <Form.Text className="text-muted small">
-                      {t('upload.upload_recommendation')}
-                    </Form.Text>
-                  </Form.Group>
+                  {/* TAB CHUYỂN ĐỔI PHƯƠNG THỨC: TẢI FILE HOẶC DÁN URL */}
+                  <div className="mb-4">
+                    <label className="form-label fw-bold small text-dark mb-2">
+                      Phương Thức Nạp Video:
+                    </label>
+                    <div className="d-flex p-1 bg-light rounded-pill border" role="group">
+                      <Button
+                        type="button"
+                        variant={uploadMode === 'file' ? 'primary' : 'light'}
+                        size="sm"
+                        className={`w-50 rounded-pill py-2 fw-semibold d-flex align-items-center justify-content-center gap-2 border-0 ${
+                          uploadMode === 'file' ? 'shadow-sm' : 'text-secondary bg-transparent'
+                        }`}
+                        onClick={() => {
+                          setUploadMode('file');
+                          setValidationError(null);
+                        }}
+                        disabled={isBusy}
+                      >
+                        <i className="bi bi-file-earmark-play-fill"></i>
+                        <span>Tải Tệp Từ Máy Tính</span>
+                      </Button>
 
-                  {/* HOẶC NHẬP TRỰC TIẾP URL VIDEO TỪ BACKEND / CDN */}
-                  <Form.Group className="mb-4">
-                    <Form.Label className="fw-semibold text-dark small">
-                      <i className="bi bi-link-45deg me-1 text-primary"></i>
-                      Đường Dẫn Video Trực Tiếp (Backend API / CDN / S3 / HLS .m3u8 hoặc .mp4):
-                    </Form.Label>
-                    <Form.Control
-                      type="url"
-                      placeholder="https://example.com/stream/lesson.m3u8 hoặc https://example.com/video.mp4"
-                      value={customVideoUrl}
-                      onChange={(e) => setCustomVideoUrl(e.target.value)}
-                      className="form-control-clean"
-                    />
-                    <Form.Text className="text-muted small">
-                      (Tùy chọn) Lưu trực tiếp link phát này vào CSDL Backend qua endpoint <code>POST /api/v1/lesson</code>.
-                    </Form.Text>
-                  </Form.Group>
+                      <Button
+                        type="button"
+                        variant={uploadMode === 'url' ? 'primary' : 'light'}
+                        size="sm"
+                        className={`w-50 rounded-pill py-2 fw-semibold d-flex align-items-center justify-content-center gap-2 border-0 ${
+                          uploadMode === 'url' ? 'shadow-sm' : 'text-secondary bg-transparent'
+                        }`}
+                        onClick={() => {
+                          setUploadMode('url');
+                          setValidationError(null);
+                        }}
+                        disabled={isBusy}
+                      >
+                        <i className="bi bi-link-45deg fs-6"></i>
+                        <span>Dán Đường Dẫn URL</span>
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* TAB 1: CHỌN FILE VIDEO TỪ MÁY TÍNH */}
+                  {uploadMode === 'file' && (
+                    <Form.Group controlId="lessonFileInput" className="mb-4">
+                      <Form.Label className="fw-semibold text-dark small d-flex justify-content-between">
+                        <span>
+                          {t('upload.video_file_label')} <span className="text-danger">*</span>
+                        </span>
+                        {selectedFile && (
+                          <span className="text-primary fw-bold">
+                            {formatBytes(selectedFile.size)}
+                          </span>
+                        )}
+                      </Form.Label>
+                      <Form.Control
+                        ref={fileInputRef}
+                        type="file"
+                        accept="video/mp4, video/quicktime, .mp4, .mov"
+                        onChange={handleFileChange}
+                        className="form-control-clean"
+                      />
+                      <Form.Text className="text-muted small">
+                        {t('upload.upload_recommendation')}
+                      </Form.Text>
+                    </Form.Group>
+                  )}
+
+                  {/* TAB 2: NHẬP TRỰC TIẾP URL VIDEO TỪ BACKEND / CDN / S3 */}
+                  {uploadMode === 'url' && (
+                    <Form.Group className="mb-4">
+                      <Form.Label className="fw-semibold text-dark small">
+                        <i className="bi bi-link-45deg me-1 text-primary"></i>
+                        Đường Dẫn Video Trực Tiếp (CDN / S3 / HLS .m3u8 hoặc .mp4): <span className="text-danger">*</span>
+                      </Form.Label>
+                      <Form.Control
+                        type="url"
+                        placeholder="https://example.com/stream/lesson.m3u8 hoặc https://example.com/video.mp4"
+                        value={customVideoUrl}
+                        onChange={(e) => setCustomVideoUrl(e.target.value)}
+                        className="form-control-clean"
+                      />
+                      <Form.Text className="text-muted small">
+                        Lưu trực tiếp link phát này vào CSDL Backend qua endpoint <code>POST /api/v1/lesson</code>.
+                      </Form.Text>
+                    </Form.Group>
+                  )}
 
                   {/* THÔNG BÁO LỖI NẾU CÓ */}
                   {validationError && (
@@ -689,10 +850,15 @@ export default function UploadVideo() {
                           <Spinner animation="border" size="sm" />
                           <span>{t('upload.processing_lesson')}</span>
                         </>
-                      ) : (
+                      ) : uploadMode === 'file' ? (
                         <>
                           <i className="bi bi-cloud-arrow-up-fill fs-5"></i>
                           <span>{t('upload.upload_and_match_to_chapter')} {currentChapter?.ChapterNumber || 1}</span>
+                        </>
+                      ) : (
+                        <>
+                          <i className="bi bi-check-circle-fill fs-5"></i>
+                          <span>Lưu Bài Giảng Vào Chương {currentChapter?.ChapterNumber || 1}</span>
                         </>
                       )}
                     </Button>
@@ -715,8 +881,15 @@ export default function UploadVideo() {
                     {currentCourse?.Title}
                   </small>
                 </div>
-                <Badge bg="primary" className="rounded-pill px-2 py-1">
-                  {currentCourseChapters.length} {t('upload.chapter')}
+                <Badge bg="primary" className="rounded-pill px-2 py-1 d-flex align-items-center gap-1">
+                  {isLoadingLessons ? (
+                    <>
+                      <Spinner animation="border" size="sm" style={{ width: '0.75rem', height: '0.75rem' }} />
+                      <span style={{ fontSize: '0.75rem' }}>Đang nạp từ BE...</span>
+                    </>
+                  ) : (
+                    <span>{currentCourseChapters.length} {t('upload.chapter')}</span>
+                  )}
                 </Badge>
               </div>
 

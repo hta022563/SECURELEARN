@@ -204,12 +204,12 @@ export default function AdminUserManagement() {
     const r = formatRole(role);
     switch (r) {
       case 'Administrator':
-        return <Badge bg="danger" className="rounded-pill px-3 py-1">Admin</Badge>;
+        return <span className="fw-bold text-danger fs-6">Admin</span>;
       case 'Instructor':
-        return <Badge bg="warning" text="dark" className="rounded-pill px-3 py-1">Instructor</Badge>;
+        return <span className="fw-bold fs-6" style={{ color: '#d97706' }}>Instructor</span>;
       case 'Student':
       default:
-        return <Badge bg="primary" className="rounded-pill px-3 py-1">Student</Badge>;
+        return <span className="fw-bold text-primary fs-6">Student</span>;
     }
   };
 

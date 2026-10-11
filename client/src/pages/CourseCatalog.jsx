@@ -13,7 +13,7 @@ import {
   Modal,
 } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext';
-import { courses, users } from '../data/mockDatabase';
+import { users } from '../data/mockDatabase';
 import { checkCourseAccess, getEntitledCourseIds } from '../services/entitlementService';
 import { getCourses, searchCourses } from '../services/courseService';
 import CreateCourseModal from '../components/CreateCourseModal';
@@ -30,7 +30,7 @@ import CreateCourseModal from '../components/CreateCourseModal';
 export default function CourseCatalog() {
   const { lang } = useParams();
   const { t } = useTranslation();
-  const [courseList, setCourseList] = useState(courses);
+  const [courseList, setCourseList] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('ALL'); // 'ALL' | 'ENTITLED' | 'UNENTITLED'
   const [blockedModalCourse, setBlockedModalCourse] = useState(null);
@@ -49,7 +49,10 @@ export default function CourseCatalog() {
             setCourseList(data);
           }
         })
-        .catch((err) => console.warn('[CourseCatalog] Lỗi nạp khóa học:', err));
+        .catch((err) => {
+          console.warn('[CourseCatalog] Lỗi nạp khóa học:', err);
+          if (isMounted) setCourseList([]);
+        });
     }, 300);
 
     return () => {
@@ -63,19 +66,20 @@ export default function CourseCatalog() {
 
   // Danh sách ID các khóa học đã được cấp quyền cho người dùng hiện tại
   const entitledIds = useMemo(() => {
-    return getEntitledCourseIds(user);
-  }, [user]);
+    return getEntitledCourseIds(user, courseList);
+  }, [user, courseList]);
 
   // Lọc mềm theo từ khóa tìm kiếm và trạng thái quyền
   const filteredCourses = courseList.filter((course) => {
     const term = searchTerm.toLowerCase();
-    const matchesSearch =
-      course.Title.toLowerCase().includes(term) ||
-      course.Description.toLowerCase().includes(term);
+    const courseId = course.ID || course.id;
+    const title = (course.Title || course.title || '').toLowerCase();
+    const desc = (course.Description || course.description || '').toLowerCase();
+    const matchesSearch = title.includes(term) || desc.includes(term);
 
     if (!matchesSearch) return false;
 
-    const hasAccess = entitledIds.includes(course.ID);
+    const hasAccess = entitledIds.includes(courseId);
     if (filterType === 'ENTITLED') return hasAccess;
     if (filterType === 'UNENTITLED') return !hasAccess;
     return true;
@@ -83,20 +87,22 @@ export default function CourseCatalog() {
 
   // Xử lý khi nhấn vào khóa học
   const handleCourseAction = (course) => {
-    const access = checkCourseAccess(user, course.ID);
+    const courseId = course.ID || course.id;
+    const access = checkCourseAccess(user, courseId);
 
     if (access.hasAccess) {
       // Giảng viên -> Chuyển vào trang Preview bài giảng của Giảng viên
       if (user?.role === 'Instructor') {
-        navigate(`/instructor/preview/${course.ID}`);
+        navigate(`/${lang}/instructor/preview/${courseId}`);
       } else {
         // Học viên & Quản trị viên -> Chuyển vào trình phát video
-        navigate(`/student/player/${course.ID}`);
+        navigate(`/${lang}/student/player/${courseId}`);
       }
     } else {
       // Chưa được cấp quyền xem -> Chặn và hiển thị thông báo chính sách DRM
       setBlockedModalCourse({
         ...course,
+        ID: courseId,
         reasonMessage: access.message,
       });
     }
@@ -213,11 +219,14 @@ export default function CourseCatalog() {
             </Col>
           ) : (
             filteredCourses.map((course) => {
-              const instructorUser = users.find((u) => u.ID === course.Owner);
-              const isEntitled = entitledIds.includes(course.ID);
+              const cId = course.ID || course.id;
+              const title = course.Title || course.title || 'Khóa học';
+              const desc = course.Description || course.description || '';
+              const instructorUser = users.find((u) => u.ID === (course.Owner || course.owner));
+              const isEntitled = entitledIds.includes(cId);
 
               return (
-                <Col key={course.ID} xs={12} md={6} lg={4}>
+                <Col key={cId} xs={12} md={6} lg={4}>
                   <Card
                     className={`h-100 card-clean card-clean-hover overflow-hidden d-flex flex-column border-0 shadow-sm ${
                       !isEntitled ? 'border-light' : ''
@@ -243,25 +252,25 @@ export default function CourseCatalog() {
                           </Badge>
                         )}
                         <span className="small text-muted font-monospace">
-                          <code>{course.ID}</code>
+                          <code>{cId}</code>
                         </span>
                       </div>
 
-                      {course["Creation Time"] && (
+                      {(course["Creation Time"] || course.createdAt || course.creation_time) && (
                         <small className="text-secondary mt-3">
                           <i className="bi bi-calendar-event me-1"></i>
-                          {t('catalog.created_at')} {course["Creation Time"].split('T')[0]}
+                          {t('catalog.created_at')} {(course["Creation Time"] || course.createdAt || course.creation_time).split('T')[0]}
                         </small>
                       )}
                     </div>
 
                     <Card.Body className="d-flex flex-column p-4">
-                      <Card.Title className="fw-bold fs-5 text-dark mb-2 text-truncate" title={course.Title}>
-                        {course.Title}
+                      <Card.Title className="fw-bold fs-5 text-dark mb-2 text-truncate" title={title}>
+                        {title}
                       </Card.Title>
 
                       <Card.Text className="text-secondary small mb-3 flex-grow-1" style={{ minHeight: '60px' }}>
-                        {course.Description}
+                        {desc}
                       </Card.Text>
 
                       {/* Giảng viên */}

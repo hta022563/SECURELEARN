@@ -1,4 +1,4 @@
-import { entitlements, courses } from '../data/mockDatabase';
+import { entitlements } from '../data/mockDatabase';
 
 /**
  * =============================================================================
@@ -91,10 +91,10 @@ export function checkCourseAccess(user, courseId) {
  * @param {Object|null} user
  * @returns {string[]}
  */
-export function getEntitledCourseIds(user) {
+export function getEntitledCourseIds(user, allCourses = []) {
   if (!user) return [];
   if (user.role === 'Instructor' || user.role === 'Administrator') {
-    return courses.map((c) => c.ID);
+    return Array.isArray(allCourses) ? allCourses.map((c) => c.ID || c.id) : [];
   }
   const effectiveUserId = getEffectiveUserId(user);
   return entitlements

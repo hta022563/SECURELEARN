@@ -17,18 +17,17 @@ import axiosClient from '../api/axiosClient';
 
 import { useAuth } from '../context/AuthContext';
 import {
-  courses as mockCourses,
   entitlements,
   users,
 } from '../data/mockDatabase';
+import { getCourses } from '../services/courseService';
 
 /**
  * Component: MyCourses
  * 
  * Trang hiển thị danh sách khóa học của Học viên (Student Dashboard)
- * - Tự động gọi API GET /api/v1/student/courses thông qua axiosClient
- * - Nếu BE chưa hoàn thiện, tự động lấy dữ liệu mềm theo bảng entitlements và courses trong CSDL
- * - Không sử dụng bất kỳ dữ liệu cứng nào.
+ * - Nạp trực tiếp từ Backend API (GET /allcourses)
+ * - Không sử dụng bất kỳ dữ liệu mẫu coursera nào.
  */
 export default function MyCourses() {
   const { user } = useAuth();
@@ -40,55 +39,47 @@ export default function MyCourses() {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
-  // Hàm gọi API lấy danh sách khóa học (dữ liệu mềm hoàn toàn)
+  // Hàm gọi API lấy danh sách khóa học
   const fetchStudentCourses = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const res = await axiosClient.get('/student/courses');
-      const data = res?.data || res;
-      if (Array.isArray(data) && data.length > 0) {
-        setCourses(data);
-        return;
-      } else if (Array.isArray(res?.courses) && res.courses.length > 0) {
-        setCourses(res.courses);
-        return;
+      const allCourses = await getCourses();
+      if (Array.isArray(allCourses) && allCourses.length > 0) {
+        const currentUserId = user?.userId || '';
+        const userEntitlements = entitlements.filter(
+          (e) => e.UserID === currentUserId
+        );
+        const entitledCourseIds = new Set(userEntitlements.map((e) => e.CoursesID));
+
+        const formatted = allCourses
+          .filter((c) => {
+            const cId = c.ID || c.id;
+            return entitledCourseIds.size === 0 || entitledCourseIds.has(cId);
+          })
+          .map((course) => {
+            const cId = course.ID || course.id;
+            const ent = userEntitlements.find((e) => e.CoursesID === cId);
+            return {
+              id: cId,
+              title: course.Title || course.title,
+              description: course.Description || course.description,
+              owner: course.Owner || course.owner || course.instructor || '',
+              status: ent?.Status || 'Active',
+              joinDate: ent?.["Join Date"] || (course["Creation Time"] || course.createdAt),
+              completionDate: ent?.["Completion Date"] || null,
+              creationTime: course["Creation Time"] || course.createdAt,
+              price: course.Price ?? course.price,
+            };
+          });
+        setCourses(formatted);
+      } else {
+        setCourses([]);
       }
-      throw new Error('Chưa có dữ liệu từ máy chủ Backend.');
     } catch (err) {
-      console.warn('[MyCourses] Đang đọc dữ liệu mềm từ hệ thống CSDL:', err.message);
-
-      // Tra cứu mềm: lọc entitlements theo UserID của user hiện tại
-      const currentUserId = user?.userId || '';
-      const userEntitlements = entitlements.filter(
-        (e) => e.UserID === currentUserId
-      );
-
-      const activeEntitlements = userEntitlements;
-
-      // Ghép mềm giữa Entitlement, Course và User (Owner)
-      const formatted = activeEntitlements
-        .map((ent) => {
-          const course = mockCourses.find((c) => c.ID === ent.CoursesID);
-          if (!course) return null;
-          const ownerUser = users.find((u) => u.ID === course.Owner);
-
-          return {
-            id: course.ID,
-            title: course.Title,
-            description: course.Description,
-            owner: ownerUser?.Username || course.Owner || '',
-            status: ent.Status,
-            joinDate: ent["Join Date"],
-            completionDate: ent["Completion Date"],
-            creationTime: course["Creation Time"],
-            price: course.Price,
-          };
-        })
-        .filter(Boolean);
-
-      setCourses(formatted);
+      console.warn('[MyCourses] Lỗi nạp khóa học từ BE:', err.message);
+      setCourses([]);
     } finally {
       setLoading(false);
     }
