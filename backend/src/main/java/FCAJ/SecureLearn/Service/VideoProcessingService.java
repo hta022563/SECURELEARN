@@ -1,6 +1,7 @@
 package FCAJ.SecureLearn.Service;
 
 import io.awspring.cloud.s3.S3Template;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -35,7 +36,9 @@ public class VideoProcessingService {
     @Value("${app.s3.public-base-url}")
     private String publicBaseUrl;
 
-    public VideoProcessingService(S3Template s3Template, R2UploadService r2UploadService) {
+    public VideoProcessingService(
+            @Qualifier("r2S3Template") S3Template s3Template,
+            R2UploadService r2UploadService) {
         this.s3Template = s3Template;
         this.r2UploadService = r2UploadService;
     }

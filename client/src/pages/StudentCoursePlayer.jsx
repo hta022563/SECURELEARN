@@ -164,19 +164,14 @@ export default function StudentCoursePlayer() {
   const hasPrev = currentIdx > 0;
   const hasNext = currentIdx >= 0 && currentIdx < allLectures.length - 1;
 
-  // Dữ liệu mềm: Giảng viên phụ trách (tra cứu từ bảng users qua Owner)
-  const instructor = useMemo(() => {
-    if (!currentCourse) return null;
-    const targetUserId = activeLecture?.UploadedBy || currentCourse.Owner;
-    return users.find((u) => u.ID === targetUserId) || null;
-  }, [activeLecture, currentCourse]);
-
-  // Dữ liệu mềm: Nhật ký truy cập liên kết (từ bảng accessLogs qua AccessLogID)
-  const relatedLog = useMemo(() => {
-    const logId = activeLecture?.AccessLogID || currentCourse?.AccessLogID;
-    if (!logId) return null;
-    return accessLogs.find((l) => l.ID === logId) || null;
-  }, [activeLecture, currentCourse]);
+  // Lấy tên giảng viên trực tiếp từ dữ liệu khóa học/bài học của backend.
+  const instructorName =
+    activeLecture?.uploadedBy ||
+    activeLecture?.UploadedBy ||
+    currentCourse?.instructor ||
+    currentCourse?.Instructor ||
+    currentCourse?.owner ||
+    currentCourse?.Owner;
 
   // Chuyển bài học
   const handleSelectLecture = (lectureId) => {
@@ -462,24 +457,16 @@ export default function StudentCoursePlayer() {
 
                   {/* TAB 2: Giảng viên */}
                   <Tab eventKey="instructor" title="Giảng viên">
-                    {instructor ? (
+                    {instructorName ? (
                       <div className="d-flex align-items-center gap-3 p-3 bg-light rounded-3 border">
                         <div
                           className="rounded-circle bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center fw-bold fs-4"
                           style={{ width: '56px', height: '56px', flexShrink: 0 }}
                         >
-                          {instructor.Username.charAt(0).toUpperCase()}
+                          {String(instructorName).charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <h6 className="fw-bold text-dark mb-1">{instructor.Username}</h6>
-                          <span className="badge bg-secondary-subtle text-secondary rounded-pill px-2 py-1 small">
-                            Vai trò: {instructor.Role}
-                          </span>
-                          {instructor.CreationTime && (
-                            <small className="text-muted d-block mt-1">
-                              Tạo ngày: {instructor.CreationTime.split('T')[0]}
-                            </small>
-                          )}
+                          <h6 className="fw-bold text-dark mb-1">{instructorName}</h6>
                         </div>
                       </div>
                     ) : (
@@ -519,32 +506,9 @@ export default function StudentCoursePlayer() {
                     )}
                   </Tab>
 
-                  {/* TAB 4: Nhật ký & Bảo mật (Đọc từ AccessLog thực tế) */}
+                  {/* TAB 4: Nhật ký & Bảo mật */}
                   <Tab eventKey="drm" title="Nhật ký truy cập">
-                    {relatedLog ? (
-                      <div className="p-3 bg-light rounded-3 border small">
-                        <div className="row g-2">
-                          <div className="col-sm-6">
-                            <span className="text-muted d-block">Mã AccessLog:</span>
-                            <code className="text-primary">{relatedLog.ID}</code>
-                          </div>
-                          <div className="col-sm-6">
-                            <span className="text-muted d-block">Hành động ghi nhận:</span>
-                            <strong className="text-dark">{relatedLog.Action}</strong>
-                          </div>
-                          <div className="col-sm-6 mt-2">
-                            <span className="text-muted d-block">Thời điểm truy cập:</span>
-                            <span className="text-dark">{relatedLog.AcessTime}</span>
-                          </div>
-                          <div className="col-sm-6 mt-2">
-                            <span className="text-muted d-block">Mã Signed URL:</span>
-                            <code className="text-secondary">{relatedLog.SignedURLID}</code>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-muted small mb-0">Không có bản ghi nhật ký nào.</p>
-                    )}
+                    <p className="text-muted small mb-0">Nhật ký truy cập chưa được kết nối với backend.</p>
                   </Tab>
                 </Tabs>
               </Card.Body>

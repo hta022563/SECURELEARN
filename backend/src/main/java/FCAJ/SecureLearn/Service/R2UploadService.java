@@ -7,7 +7,7 @@ package FCAJ.SecureLearn.Service;
 import java.net.URL;
 import java.time.Duration;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -20,11 +20,14 @@ import io.awspring.cloud.s3.S3Template;
  */
 @Service
 public class R2UploadService {
-    @Autowired
-    private S3Template template;
+    private final S3Template template;
     
     @Value("${app.s3.public-base-url}")
     private String publicBaseUrl;
+
+    public R2UploadService(@Qualifier("r2S3Template") S3Template template) {
+        this.template = template;
+    }
     
     public URL generatePresignedPutUrl(String bucketName, String objectKey, Duration expiry, String contentType){
         ObjectMetadata objectMetadata = ObjectMetadata.builder().contentType(contentType).build();

@@ -43,32 +43,18 @@ export default function MyCourses() {
     try {
       const allCourses = await getCourses();
       if (Array.isArray(allCourses) && allCourses.length > 0) {
-        const currentUserId = user?.userId || '';
-        const userEntitlements = entitlements.filter(
-          (e) => e.UserID === currentUserId
-        );
-        const entitledCourseIds = new Set(userEntitlements.map((e) => e.CoursesID));
-
-        const formatted = allCourses
-          .filter((c) => {
-            const cId = c.ID || c.id;
-            return entitledCourseIds.size === 0 || entitledCourseIds.has(cId);
-          })
-          .map((course) => {
-            const cId = course.ID || course.id;
-            const ent = userEntitlements.find((e) => e.CoursesID === cId);
-            return {
-              id: cId,
-              title: course.Title || course.title,
-              description: course.Description || course.description,
-              owner: course.Owner || course.owner || course.instructor || '',
-              status: ent?.Status || 'Active',
-              joinDate: ent?.["Join Date"] || (course["Creation Time"] || course.createdAt),
-              completionDate: ent?.["Completion Date"] || null,
-              creationTime: course["Creation Time"] || course.createdAt,
-              price: course.Price ?? course.price,
-            };
-          });
+        // Temporary fallback until the backend provides per-user entitlements.
+        const formatted = allCourses.map((course) => ({
+          id: course.ID || course.id,
+          title: course.Title || course.title,
+          description: course.Description || course.description,
+          owner: course.Owner || course.owner || course.instructor || '',
+          status: 'Active',
+          joinDate: course['Creation Time'] || course.createdAt,
+          completionDate: null,
+          creationTime: course['Creation Time'] || course.createdAt,
+          price: course.Price ?? course.price,
+        }));
         setCourses(formatted);
       } else {
         setCourses([]);

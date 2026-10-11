@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 /**
- * Key định danh lưu thông tin phiên đăng nhập trong LocalStorage
+ * Key định danh lưu thông tin phiên đăng nhập trong SessionStorage
  */
 const STORAGE_KEY = 'securelearn_auth_user';
 
@@ -14,41 +14,49 @@ export const AuthContext = createContext(null);
  * AuthProvider: Cung cấp State quản lý phiên đăng nhập toàn cục cho ứng dụng
  */
 export function AuthProvider({ children }) {
-  // Lấy trạng thái khởi tạo từ localStorage (đảm bảo không bị mất đăng nhập khi F5)
+  // Keep the login through navigation/reloads in this tab, but not after it closes.
   const [user, setUser] = useState(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
+      const stored = sessionStorage.getItem(STORAGE_KEY);
       return stored ? JSON.parse(stored) : null;
     } catch (err) {
-      console.error('Lỗi phân tích cú pháp Auth LocalStorage:', err);
+      console.error('Lỗi phân tích cú pháp Auth SessionStorage:', err);
       return null;
     }
   });
 
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (err) {
+      console.error('Không thể xóa phiên đăng nhập cũ khỏi LocalStorage:', err);
+    }
+  }, []);
+
   /**
-   * Hàm Đăng nhập: Lưu state và ghi vào localStorage
+   * Hàm Đăng nhập: Lưu state và ghi vào sessionStorage
    * @param {Object} userData Gồm userId, name, email, role, token
    */
   const login = (userData) => {
     try {
       setUser(userData);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
     } catch (err) {
-      console.error('Không thể lưu phiên đăng nhập vào LocalStorage:', err);
+      console.error('Không thể lưu phiên đăng nhập vào SessionStorage:', err);
     }
   };
 
   /**
-   * Hàm Đăng xuất: Xóa state và làm sạch localStorage
+   * Hàm Đăng xuất: Xóa state và làm sạch sessionStorage
    */
   const logout = () => {
     try {
       setUser(null);
-      localStorage.removeItem(STORAGE_KEY);
+      sessionStorage.removeItem(STORAGE_KEY);
     } catch (err) {
-      console.error('Lỗi khi xóa Auth LocalStorage:', err);
+      console.error('Lỗi khi xóa Auth SessionStorage:', err);
     }
   };
 

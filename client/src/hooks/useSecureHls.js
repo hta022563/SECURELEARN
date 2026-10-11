@@ -194,6 +194,10 @@ export function useSecureHls(videoId, studentId, videoRef, courseId = null) {
           lowLatencyMode: false,
           maxBufferLength: 30,
           maxMaxBufferLength: 60,
+
+          manifestLoadingTimeOut: 30000,
+          fragLoadingTimeOut: 60000,
+          keyLoadingTimeOut:  30000,
           xhrSetup: (xhr, url) => {
             // Đính kèm các token hoặc header bảo mật bổ sung nếu cần
             xhr.withCredentials = false;

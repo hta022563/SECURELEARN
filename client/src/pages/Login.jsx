@@ -75,7 +75,7 @@ export default function Login() {
       // 2. Fetch the user's profile / role from the JWT claims
       // Temporarily store the accessToken so axiosClient / authService.me() can use it
       const tempUser = { token: tokens.accessToken };
-      localStorage.setItem('securelearn_auth_user', JSON.stringify(tempUser));
+      sessionStorage.setItem('securelearn_auth_user', JSON.stringify(tempUser));
 
       const profile = await apiMe();
 

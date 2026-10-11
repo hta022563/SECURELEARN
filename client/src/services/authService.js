@@ -24,7 +24,7 @@ const STORAGE_KEY = 'securelearn_auth_user';
 
 function getAccessToken() {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = sessionStorage.getItem(STORAGE_KEY);
     if (!stored) return null;
     return JSON.parse(stored)?.token ?? null;
   } catch {

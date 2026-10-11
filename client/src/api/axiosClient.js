@@ -11,14 +11,14 @@ const axiosClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 10000,
+  timeout: 10000000,
 });
 
 // Request Interceptor: Gắn token xác thực
 axiosClient.interceptors.request.use(
   (config) => {
     try {
-      const stored = localStorage.getItem('securelearn_auth_user');
+      const stored = sessionStorage.getItem('securelearn_auth_user');
       if (stored) {
         const user = JSON.parse(stored);
         if (user?.token) {

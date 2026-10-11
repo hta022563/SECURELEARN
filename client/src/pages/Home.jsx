@@ -101,7 +101,8 @@ export default function Home() {
 
   // Thống kê động (100% dữ liệu thực từ Backend)
   const totalCourses = coursesList?.length || 0;
-  const totalEnrollments = entitlements?.length || 0;
+  // Entitlement/enrollment data is not available from the backend yet.
+  const totalEnrollments = 0;
 
   // Lọc số câu hỏi hiển thị (hỗ trợ đa ngôn ngữ vi/en)
   const faqList = lang === 'en' ? FAQ_ITEMS_EN : FAQ_ITEMS;
@@ -316,7 +317,7 @@ export default function Home() {
                 const title = course.Title || course.title || 'Khóa học';
                 const desc = course.Description || course.description || '';
                 const price = course.Price ?? course.price;
-                const instructorUser = users.find((u) => u.ID === (course.Owner || course.owner));
+                const instructorName = course.Instructor || course.instructor || course.Owner || course.owner;
                 const isEntitled = entitledIds.includes(cId);
 
                 return (
@@ -366,11 +367,11 @@ export default function Home() {
                         </Card.Text>
 
                         {/* Giảng viên */}
-                        {instructorUser && (
+                        {instructorName && (
                           <div className="d-flex justify-content-between text-muted small mb-3 border-top pt-2">
                             <span>
                               <i className="bi bi-person-fill text-primary me-1"></i>
-                              {instructorUser.Username}
+                              {instructorName}
                             </span>
                           </div>
                         )}

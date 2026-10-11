@@ -221,7 +221,7 @@ export default function CourseCatalog() {
               const cId = course.ID || course.id;
               const title = course.Title || course.title || 'Khóa học';
               const desc = course.Description || course.description || '';
-              const instructorUser = users.find((u) => u.ID === (course.Owner || course.owner));
+              const instructorName = course.Instructor || course.instructor || course.Owner || course.owner;
               const isEntitled = entitledIds.includes(cId);
 
               return (
@@ -273,11 +273,11 @@ export default function CourseCatalog() {
                       </Card.Text>
 
                       {/* Giảng viên */}
-                      {instructorUser && (
+                      {instructorName && (
                         <div className="d-flex justify-content-between text-muted small mb-3 border-top pt-2">
                           <span>
                             <i className="bi bi-person-fill text-primary me-1"></i>
-                            {instructorUser.Username}
+                            {instructorName}
                           </span>
                         </div>
                       )}
