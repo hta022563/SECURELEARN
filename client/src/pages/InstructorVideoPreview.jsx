@@ -14,9 +14,6 @@ import {
 import { useAuth } from '../context/AuthContext';
 import SecureVideoPlayer from '../components/SecureVideoPlayer';
 import ReuploadVideoModal from '../components/ReuploadVideoModal';
-import {
-  accessLogs as dbAccessLogs,
-} from '../data/mockDatabase';
 import { getCourseWithLessons } from '../services/courseService';
 
 /**

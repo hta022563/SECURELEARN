@@ -489,6 +489,7 @@
     "confirm_pwd_placeholder": "Re-enter new password...",
     "saving_pwd": "Saving password...",
     "update_pwd": "Update Password",
-    "user_default": "User"
+    "user_default": "User",
+    "footer_slogan": "Digital Rights Management & Secure E-Learning Platform"
   }
 }

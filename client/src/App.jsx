@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 // 1. Context Providers & Guards
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -13,6 +14,21 @@ import SecureVideoPlayer from './components/SecureVideoPlayer';
 import MeshGradientBackground from './components/MeshGradientBackground';
 import Logo from './components/Logo';
 import ErrorBoundary from './components/ErrorBoundary';
+
+function AppFooter() {
+  const { t } = useTranslation();
+  return (
+    <footer className="bg-white text-muted border-top border-light-subtle py-3 text-center small mt-auto">
+      <div className="container d-flex flex-column flex-sm-row justify-content-between align-items-center gap-2">
+        <Logo size="sm" showBadge={false} />
+        <span className="text-secondary fw-medium">
+          {t('footer_slogan', 'Nền tảng E-Learning Bản quyền số & Bảo mật Video')}
+        </span>
+        <span className="text-muted">© 2026 SecureLearn Inc. All rights reserved.</span>
+      </div>
+    </footer>
+  );
+}
 
 // 3. Guest / Public Pages
 import Home from './pages/Home';
@@ -233,13 +249,7 @@ export default function App() {
 
 
             {/* Footer chân trang SecureLearn */}
-            <footer className="bg-white text-muted border-top border-light-subtle py-3 text-center small mt-auto">
-              <div className="container d-flex flex-column flex-sm-row justify-content-between align-items-center gap-2">
-                <Logo size="sm" showBadge={false} />
-                <span className="text-secondary">Nền tảng Video Trực Tuyến Bảo Mật • HLS AES-128 & Web Crypto ECDH</span>
-                <span className="text-muted">© 2026 SecureLearn Inc. All rights reserved.</span>
-              </div>
-            </footer>
+            <AppFooter />
           </div>
         </BrowserRouter>
       </ToastProvider>

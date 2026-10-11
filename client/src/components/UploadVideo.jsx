@@ -425,17 +425,19 @@ export default function UploadVideo() {
       const effectiveVideoUrl = newVideoRecord.videoUrl || `https://stream.securelearn.edu/videos/${targetCourseId}/${newVideoRecord.ID}.m3u8`;
 
       try {
-        // Gửi lên Backend Spring Boot: POST /api/v1/lesson
-        await createLesson({
-          courseId: targetCourseId,
-          course_id: targetCourseId,
-          chapter: targetChapterId,
-          chapter_id: targetChapterId,
-          title: lessonTitle.trim(),
-          description: currentChapter?.Title ? `Bài học thuộc chương ${currentChapter.Title}` : '',
-          url: effectiveVideoUrl,
-          videoURL: effectiveVideoUrl,
-        });
+        // Nếu bài học chưa được tự động tạo bởi quy trình /api/v1/upload/process thì gọi createLesson
+        if (!newVideoRecord?.fromBackendProcess) {
+          await createLesson({
+            courseId: targetCourseId,
+            course_id: targetCourseId,
+            chapter: targetChapterId,
+            chapter_id: targetChapterId,
+            title: lessonTitle.trim(),
+            description: currentChapter?.Title ? `Bài học thuộc chương ${currentChapter.Title}` : '',
+            url: effectiveVideoUrl,
+            videoURL: effectiveVideoUrl,
+          });
+        }
 
         // Đồng bộ lại danh sách bài học từ Backend API
         const updatedLessons = await getLessons(targetChapterId);
@@ -673,9 +675,8 @@ export default function UploadVideo() {
                         type="button"
                         variant={uploadMode === 'file' ? 'primary' : 'light'}
                         size="sm"
-                        className={`w-50 rounded-pill py-2 fw-semibold d-flex align-items-center justify-content-center gap-2 border-0 ${
-                          uploadMode === 'file' ? 'shadow-sm' : 'text-secondary bg-transparent'
-                        }`}
+                        className={`w-50 rounded-pill py-2 fw-semibold d-flex align-items-center justify-content-center gap-2 border-0 ${uploadMode === 'file' ? 'shadow-sm' : 'text-secondary bg-transparent'
+                          }`}
                         onClick={() => {
                           setUploadMode('file');
                           setValidationError(null);
@@ -690,9 +691,8 @@ export default function UploadVideo() {
                         type="button"
                         variant={uploadMode === 'url' ? 'primary' : 'light'}
                         size="sm"
-                        className={`w-50 rounded-pill py-2 fw-semibold d-flex align-items-center justify-content-center gap-2 border-0 ${
-                          uploadMode === 'url' ? 'shadow-sm' : 'text-secondary bg-transparent'
-                        }`}
+                        className={`w-50 rounded-pill py-2 fw-semibold d-flex align-items-center justify-content-center gap-2 border-0 ${uploadMode === 'url' ? 'shadow-sm' : 'text-secondary bg-transparent'
+                          }`}
                         onClick={() => {
                           setUploadMode('url');
                           setValidationError(null);
