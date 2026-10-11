@@ -429,7 +429,7 @@ export default function InstructorVideoPreview() {
                         <span>Giáo Trình Khóa Học</span>
                       </h6>
                       <small className="text-muted">
-                        {courseChapters.length} Chương • {allLectures.length} Bài giảng nhỏ
+                        {curriculum.length} Chương • {allLectures.length} Bài giảng nhỏ
                       </small>
                     </div>
                     <Badge bg="primary" className="rounded-pill px-2 py-1 small">
