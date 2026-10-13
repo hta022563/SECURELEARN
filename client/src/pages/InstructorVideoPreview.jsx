@@ -185,13 +185,6 @@ export default function InstructorVideoPreview() {
     navigate(`/instructor/preview/${id}`, { replace: true });
   };
 
-  // Tra cứu nhật ký truy cập (AccessLog) liên kết
-  const relatedLog = useMemo(() => {
-    const logId = activeLecture?.AccessLogID || currentCourse?.AccessLogID;
-    if (!logId) return null;
-    return dbAccessLogs.find((l) => l.ID === logId) || null;
-  }, [activeLecture, currentCourse]);
-
   return (
     <div className="py-4 bg-light min-vh-100">
       <Container fluid="xl">
@@ -380,35 +373,6 @@ export default function InstructorVideoPreview() {
                     </div>
                   </Tab>
 
-                  {/* TAB 3: Nhật ký truy cập (AccessLog) */}
-                  <Tab eventKey="logs" title="Nhật ký truy cập">
-                    {relatedLog ? (
-                      <div className="p-3 bg-light rounded-3 border small">
-                        <div className="row g-2">
-                          <div className="col-sm-6">
-                            <span className="text-muted d-block">Mã AccessLog:</span>
-                            <code className="text-primary">{relatedLog.ID}</code>
-                          </div>
-                          <div className="col-sm-6">
-                            <span className="text-muted d-block">Hành động ghi nhận:</span>
-                            <strong className="text-dark">{relatedLog.Action}</strong>
-                          </div>
-                          <div className="col-sm-6 mt-2">
-                            <span className="text-muted d-block">Thời điểm truy cập:</span>
-                            <span className="text-dark">{relatedLog.AcessTime}</span>
-                          </div>
-                          <div className="col-sm-6 mt-2">
-                            <span className="text-muted d-block">Mã Signed URL:</span>
-                            <code className="text-secondary">{relatedLog.SignedURLID}</code>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-muted small mb-0 p-3 bg-light rounded-3 border">
-                        Chưa có bản ghi nhật ký nào được ghi nhận cho bài học này.
-                      </p>
-                    )}
-                  </Tab>
                 </Tabs>
               </Card.Body>
             </Card>

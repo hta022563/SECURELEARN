@@ -9,6 +9,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.SecureRandom;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.stream.Stream;
 
@@ -20,6 +22,7 @@ import java.util.stream.Stream;
  *
  * HLS output layout in R2:
  *   hls/{baseKey}/master.m3u8        <- the playlist key stored on the lesson
+ *   hls/{baseKey}/content.key
  *   hls/{baseKey}/segment_000.ts
  *   hls/{baseKey}/segment_001.ts
  *   ...
@@ -28,20 +31,17 @@ import java.util.stream.Stream;
 public class VideoProcessingService {
 
     private final S3Template s3Template;
-    private final R2Service r2UploadService;
 
     @Value("${r2.bucket-name}")
     private String bucketName;
 
     public VideoProcessingService(
-            @Qualifier("r2S3Template") S3Template s3Template,
-            R2Service r2UploadService) {
+            @Qualifier("r2S3Template") S3Template s3Template) {
         this.s3Template = s3Template;
-        this.r2UploadService = r2UploadService;
     }
 
     /**
-     * Full pipeline: download raw video → transcode to HLS → upload segments → return playlist URL.
+    * Full pipeline: download raw video, encrypt HLS output, and return its playlist key.
      *
      * @param rawObjectKey  the R2 object key of the uploaded raw video,
      *                      e.g. "videos/courseId/1234567890_lecture1.mp4"
@@ -76,6 +76,12 @@ public class VideoProcessingService {
             //
             Path playlistFile = workDir.resolve("master.m3u8");
             Path segmentPattern = workDir.resolve("segment_%03d.ts");
+            Path keyFile = workDir.resolve("content.key");
+            Path keyInfoFile = workDir.resolve("key-info.txt");
+            byte[] contentKey = new byte[16];
+            new SecureRandom().nextBytes(contentKey);
+            Files.write(keyFile, contentKey);
+            Files.writeString(keyInfoFile, "securelearn-key\n" + keyFile.toAbsolutePath() + "\n");
 
             ProcessBuilder pb = new ProcessBuilder(
                     "ffmpeg", "-y",
@@ -88,6 +94,7 @@ public class VideoProcessingService {
                     "-hls_time", "6",
                     "-hls_list_size", "0",
                     "-hls_segment_type", "mpegts",
+                    "-hls_key_info_file", keyInfoFile.toAbsolutePath().toString(),
                     "-hls_segment_filename", segmentPattern.toAbsolutePath().toString(),
                     "-f", "hls",
                     playlistFile.toAbsolutePath().toString()
@@ -111,12 +118,13 @@ public class VideoProcessingService {
                      });
             }
 
+            String keyObjectKey = baseKey + "/content.key";
+            uploadBytes(contentKey, keyObjectKey, "application/octet-stream");
+            Arrays.fill(contentKey, (byte) 0);
+
             // Keep segment references relative; playback signs each segment URL.
             String playlistKey = baseKey + "/master.m3u8";
             uploadFile(playlistFile, playlistKey, "application/vnd.apple.mpegurl");
-
-            // ── 6. Delete the raw source file from R2 (no longer needed) ────
-            r2UploadService.deleteObject(bucketName, rawObjectKey);
 
             return playlistKey;
 
@@ -130,6 +138,17 @@ public class VideoProcessingService {
 
     private void uploadFile(Path file, String objectKey, String contentType) {
         try (InputStream in = Files.newInputStream(file)) {
+            s3Template.upload(bucketName, objectKey, in,
+                    io.awspring.cloud.s3.ObjectMetadata.builder()
+                            .contentType(contentType)
+                            .build());
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to upload " + objectKey + " to R2", e);
+        }
+    }
+
+    private void uploadBytes(byte[] data, String objectKey, String contentType) {
+        try (InputStream in = new java.io.ByteArrayInputStream(data)) {
             s3Template.upload(bucketName, objectKey, in,
                     io.awspring.cloud.s3.ObjectMetadata.builder()
                             .contentType(contentType)
