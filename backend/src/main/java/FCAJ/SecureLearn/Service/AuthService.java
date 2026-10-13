@@ -11,6 +11,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -220,4 +221,60 @@ public class AuthService {
             default           -> "STUDENT";
         };
     }
+    
+   public void deleteAccount(String email){
+       try{
+       boolean isAdmin = cognitoClient.adminListGroupsForUser(AdminListGroupsForUserRequest.builder().userPoolId(userPoolId).username(email).build()).groups().stream().anyMatch(g -> "ADMIN".equals(g.groupName()));
+       if(isAdmin){
+           ListUsersInGroupRequest userListRequest = ListUsersInGroupRequest.builder().userPoolId(userPoolId).groupName("ADMIN").build();
+           ListUsersInGroupResponse userList = cognitoClient.listUsersInGroup(userListRequest);
+           int count = userList.users().size();
+           if(count <= 1){
+               throw new IllegalArgumentException("Cannot delete the last admin");
+       }
+       }
+       AdminDeleteUserRequest request = AdminDeleteUserRequest.builder().userPoolId(userPoolId).username(email).build();
+       cognitoClient.adminDeleteUser(request);
+       }catch (UserNotFoundException e){
+           throw new IllegalArgumentException("User cannot be found");
+       }catch (CognitoIdentityProviderException e){
+           throw new RuntimeException("Could not delete user: " + e.awsErrorDetails().errorMessage(), e);
+       }
+   }
+   
+   public void updateAccountByUser(String accessToken, String newPassword, String oldPassword){
+       try{
+           cognitoClient.changePassword(ChangePasswordRequest.builder().previousPassword(oldPassword).proposedPassword(newPassword).accessToken(accessToken).build());
+       }catch (UserNotFoundException e){
+           throw new IllegalArgumentException("User cannot be found");
+       }catch (CognitoIdentityProviderException e){
+           throw new RuntimeException("Could not delete user: " + e.awsErrorDetails().errorMessage(), e);
+       }
+   }
+   
+   public void updateAccountByAdmin(String email, String password){
+       try{
+           cognitoClient.adminSetUserPassword(AdminSetUserPasswordRequest.builder().userPoolId(userPoolId).username(email).password(password).build());
+       }catch (UserNotFoundException e){
+           throw new IllegalArgumentException("User cannot be found");
+       }catch (CognitoIdentityProviderException e){
+           throw new RuntimeException("Could not delete user: " + e.awsErrorDetails().errorMessage(), e);
+       }
+   }
+   
+   public ListUsersResponse getUserPage(String nextToken, int limit){
+       try{
+           ListUsersRequest.Builder request = ListUsersRequest.builder()
+                   .userPoolId(userPoolId)
+                   .limit(limit);
+           if (nextToken != null && !nextToken.isBlank()) {
+               request.paginationToken(nextToken);
+           }
+           return cognitoClient.listUsers(request.build());
+       }catch (CognitoIdentityProviderException e){
+           throw new RuntimeException("Could not retrieve users: " + e.awsErrorDetails().errorMessage(), e);
+       }
+   }
+   
+  
 }
