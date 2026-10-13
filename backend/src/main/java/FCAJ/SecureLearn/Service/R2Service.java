@@ -55,9 +55,13 @@ public class R2Service {
     }
 
     public String readObjectAsString(String bucketName, String objectKey) {
+        return new String(readObjectAsBytes(bucketName, objectKey), StandardCharsets.UTF_8);
+    }
+
+    public byte[] readObjectAsBytes(String bucketName, String objectKey) {
         var response = template.download(bucketName, objectKey);
         try (var input = response.getInputStream()) {
-            return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+            return input.readAllBytes();
         } catch (Exception e) {
             throw new IllegalStateException("Failed to read R2 object " + objectKey, e);
         }
@@ -77,7 +81,7 @@ public class R2Service {
         return value.startsWith(prefix + "/") ? value.substring(prefix.length() + 1) : null;
     }
     
-    void deleteObject(String bucketName, String objectKey){
+    public void deleteObject(String bucketName, String objectKey){
         template.deleteObject(bucketName, objectKey);
     }
 

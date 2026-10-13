@@ -175,8 +175,7 @@ public class CourseController {
      */
     @GetMapping("/chapter/{chapterId}/lessons")
     public ResponseEntity<List<LessonResponse>> getAllLessonsInChapter(@PathVariable UUID chapterId){
-        List<Lesson> lessons = lessonService.getLessonInChapter(chapterId);
-        return ResponseEntity.ok(lessons.stream().map(LessonResponse::from).toList());
+        return ResponseEntity.ok(lessonService.getLessonResponsesInChapter(chapterId));
     }
     
     /**
@@ -185,8 +184,7 @@ public class CourseController {
      */
     @GetMapping("/lesson/{id}")
     public ResponseEntity<LessonResponse> getLessonById(@PathVariable UUID id){
-        Lesson lesson = lessonService.getLessonInfo(id);
-        return ResponseEntity.ok(LessonResponse.from(lesson));
+        return ResponseEntity.ok(lessonService.getLessonResponse(id));
     }
     
     /**

@@ -88,11 +88,8 @@ public class SecurityConfiguration {
 
                 // Playback manifests use a short-lived signed token; playback URL issuance remains JWT-protected.
                 .requestMatchers(HttpMethod.GET, "/api/v1/lesson/*/manifest").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/lesson/*/key").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/lesson/*/playback").authenticated()
-
-                // Course entitlements are managed only by administrators.
-                .requestMatchers(HttpMethod.PUT, "/api/v1/course/*/entitlements/*").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/api/v1/course/*/entitlements/*").hasRole("ADMIN")
 
                 // Rules 4–5: public read endpoints
                 .requestMatchers(HttpMethod.GET,  "/api/v1/allcourses").permitAll()
