@@ -30,6 +30,7 @@ import FCAJ.SecureLearn.Service.ChapterService;
 import FCAJ.SecureLearn.Service.CourseService;
 import FCAJ.SecureLearn.Service.LessonService;
 import FCAJ.SecureLearn.Response.ChapterResponse;
+import FCAJ.SecureLearn.Response.LessonResponse;
 
 /**
  * REST Controller for Course, Chapter, and Lesson management.
@@ -173,9 +174,9 @@ public class CourseController {
      * GET /api/v1/chapter/{chapterId}/lessons
      */
     @GetMapping("/chapter/{chapterId}/lessons")
-    public ResponseEntity<List<Lesson>> getAllLessonsInChapter(@PathVariable UUID chapterId){
+    public ResponseEntity<List<LessonResponse>> getAllLessonsInChapter(@PathVariable UUID chapterId){
         List<Lesson> lessons = lessonService.getLessonInChapter(chapterId);
-        return ResponseEntity.ok(lessons);
+        return ResponseEntity.ok(lessons.stream().map(LessonResponse::from).toList());
     }
     
     /**
@@ -183,9 +184,9 @@ public class CourseController {
      * GET /api/v1/lesson/{id}
      */
     @GetMapping("/lesson/{id}")
-    public ResponseEntity<Lesson> getLessonById(@PathVariable UUID id){
+    public ResponseEntity<LessonResponse> getLessonById(@PathVariable UUID id){
         Lesson lesson = lessonService.getLessonInfo(id);
-        return ResponseEntity.ok(lesson);
+        return ResponseEntity.ok(LessonResponse.from(lesson));
     }
     
     /**

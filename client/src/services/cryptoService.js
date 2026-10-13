@@ -82,7 +82,7 @@ export async function generateClientECDHKeyPair() {
       name: 'ECDH',
       namedCurve: 'P-256',
     },
-    true, // extractable (cần extract Public Key gửi lên Server)
+    true,
     ['deriveKey', 'deriveBits']
   );
 }
@@ -98,81 +98,45 @@ export async function exportPublicKeyRaw(publicKey) {
 /**
  * 4. Mock Backend Server: Xử lý trao đổi khóa ECDH
  * POST /api/v1/keys/exchange
- *
- * Server-side logic (mô phỏng):
- * - Tạo cặp khóa ECDH của Server
- * - Dùng Public Key Client + Private Key Server để sinh Shared Secret
- * - Dùng Shared Secret dẫn xuất khóa AES-GCM (256-bit)
- * - Mã hóa khóa nội dung AES-128 (16 bytes thật của video) bằng khóa AES-GCM
- * - Trả về: Server Public Key, Ciphertext của AES-128 Key, và IV (Initialization Vector)
  */
 export async function mockExchangeKeysApi(payload) {
   const { videoId, studentId, clientPublicKeyB64, keyUri } = payload;
-
-  // Giả lập độ trễ mạng khi handshake
   await new Promise((resolve) => setTimeout(resolve, 500));
 
   if (!clientPublicKeyB64) {
     throw new Error('400: Không nhận được Public Key từ Client.');
   }
 
-  // 1. Server sinh cặp khóa ECDH tạm thời (Ephemeral ECDH Key Pair)
   const serverKeyPair = await window.crypto.subtle.generateKey(
-    {
-      name: 'ECDH',
-      namedCurve: 'P-256',
-    },
+    { name: 'ECDH', namedCurve: 'P-256' },
     true,
     ['deriveKey', 'deriveBits']
   );
-
-  // 2. Server import Client Public Key
   const clientPublicKeyBuffer = base64ToArrayBuffer(clientPublicKeyB64);
   const clientPubKey = await window.crypto.subtle.importKey(
     'raw',
     clientPublicKeyBuffer,
-    {
-      name: 'ECDH',
-      namedCurve: 'P-256',
-    },
+    { name: 'ECDH', namedCurve: 'P-256' },
     false,
     []
   );
-
-  // 3. Server tính Shared Secret và dẫn xuất khóa AES-GCM để wrap key
   const serverSharedKey = await window.crypto.subtle.deriveKey(
-    {
-      name: 'ECDH',
-      public: clientPubKey,
-    },
+    { name: 'ECDH', public: clientPubKey },
     serverKeyPair.privateKey,
-    {
-      name: 'AES-GCM',
-      length: 256,
-    },
+    { name: 'AES-GCM', length: 256 },
     false,
     ['encrypt']
   );
-
-  // 4. Khóa AES-128 gốc của video (16 bytes = 128 bit)
-  // Trong thực tế, Server truy xuất khóa này từ Key Management Service (KMS) ứng với videoId
   const rawAes128Key = new Uint8Array([
     0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6,
     0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c,
   ]);
-
-  // 5. Server mã hóa khóa AES-128 bằng Shared Key (AES-GCM)
-  const iv = window.crypto.getRandomValues(new Uint8Array(12)); // 96-bit IV tiêu chuẩn cho AES-GCM
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
   const encryptedKeyBuffer = await window.crypto.subtle.encrypt(
-    {
-      name: 'AES-GCM',
-      iv,
-    },
+    { name: 'AES-GCM', iv },
     serverSharedKey,
     rawAes128Key
   );
-
-  // 6. Server export Public Key của chính mình
   const serverPublicKeyRaw = await window.crypto.subtle.exportKey('raw', serverKeyPair.publicKey);
 
   return {
@@ -185,12 +149,6 @@ export async function mockExchangeKeysApi(payload) {
 
 /**
  * 5. Client giải mã ECDH để lấy lại Key AES-128 gốc
- * 
- * @param {CryptoKeyPair} clientKeyPair Cặp khóa của Client
- * @param {string} serverPublicKeyB64 Public Key từ Server
- * @param {string} encryptedKeyB64 Khóa AES-128 đã mã hóa
- * @param {string} ivB64 Vector khởi tạo IV
- * @returns {Promise<ArrayBuffer>} Khóa AES-128 16 bytes thô
  */
 export async function deriveAndDecryptContentKey(
   clientKeyPair,
@@ -198,47 +156,26 @@ export async function deriveAndDecryptContentKey(
   encryptedKeyB64,
   ivB64
 ) {
-  // 1. Import Server Public Key vào Web Crypto
   const serverPubKeyBuffer = base64ToArrayBuffer(serverPublicKeyB64);
   const serverPublicKey = await window.crypto.subtle.importKey(
     'raw',
     serverPubKeyBuffer,
-    {
-      name: 'ECDH',
-      namedCurve: 'P-256',
-    },
+    { name: 'ECDH', namedCurve: 'P-256' },
     false,
     []
   );
-
-  // 2. Client tính Shared Secret giống hệt Server (Tính chất đối xứng của ECDH)
   const clientSharedKey = await window.crypto.subtle.deriveKey(
-    {
-      name: 'ECDH',
-      public: serverPublicKey,
-    },
+    { name: 'ECDH', public: serverPublicKey },
     clientKeyPair.privateKey,
-    {
-      name: 'AES-GCM',
-      length: 256,
-    },
+    { name: 'AES-GCM', length: 256 },
     false,
     ['decrypt']
   );
-
-  // 3. Dùng Shared Key để giải mã lấy ra khóa AES-128 gốc
   const encryptedBuffer = base64ToArrayBuffer(encryptedKeyB64);
   const ivBuffer = base64ToArrayBuffer(ivB64);
-
-  const decryptedAesKeyBuffer = await window.crypto.subtle.decrypt(
-    {
-      name: 'AES-GCM',
-      iv: new Uint8Array(ivBuffer),
-    },
+  return await window.crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: new Uint8Array(ivBuffer) },
     clientSharedKey,
     encryptedBuffer
   );
-
-  // Trả về ArrayBuffer 16 bytes sẵn sàng cho HLS.js
-  return decryptedAesKeyBuffer;
 }

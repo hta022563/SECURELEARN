@@ -118,9 +118,9 @@ export default function ReuploadVideoModal({ show, onHide, video, onSuccess }) {
       setUploadStage('processing');
       const updatedUrl = `https://stream.securelearn.edu/${objectKey}`;
       const updatedRecord = await reuploadVideo(video.ID, {
-        title: newTitle.trim(),
         url: updatedUrl,
         videoURL: updatedUrl,
+        title: newTitle.trim(),
       });
 
       setUploadStage('done');

@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import FCAJ.SecureLearn.Request.VideoUploadRequest;
 import FCAJ.SecureLearn.Service.LessonService;
-import FCAJ.SecureLearn.Service.R2UploadService;
+import FCAJ.SecureLearn.Service.R2Service;
 import FCAJ.SecureLearn.Service.VideoProcessingService;
 
 /**
@@ -31,21 +31,21 @@ import FCAJ.SecureLearn.Service.VideoProcessingService;
  *    Browser tells the backend the upload is done.
  *    Backend downloads the raw file from R2, runs FFmpeg → HLS, uploads
  *    the segments + playlist back to R2, creates the Lesson record, and
- *    returns the lesson ID and the public playlist URL.
- *    Returns: { lessonId, playlistUrl }
+ *    stores the private playlist object key on the lesson and returns its ID.
+ *    Returns: { lessonId }
  */
 @RestController
 @RequestMapping("/api/v1/upload")
 public class UploadController {
 
-    private final R2UploadService r2Service;
+    private final R2Service r2Service;
     private final VideoProcessingService processingService;
     private final LessonService lessonService;
 
     @Value("${r2.bucket-name}")
     private String bucketName;
 
-    public UploadController(R2UploadService r2Service,
+    public UploadController(R2Service r2Service,
                             VideoProcessingService processingService,
                             LessonService lessonService) {
         this.r2Service = r2Service;
@@ -129,7 +129,7 @@ public class UploadController {
      * Response:
      * {
      *   "lessonId":    "uuid",
-     *   "playlistUrl": "https://pub.r2.dev/hls/courseId/ts_lecture1/master.m3u8"
+    *   "lessonId": "uuid"
      * }
      *
      * This call blocks while FFmpeg runs — for long videos consider making
@@ -165,15 +165,20 @@ public class UploadController {
 
         try {
             // ── Transcode raw video → HLS segments → upload to R2 ────────
-            String playlistUrl = processingService.processToHls(objectKey);
+                String playlistKey = processingService.processToHls(objectKey);
 
-            // ── Create the lesson record with the playlist URL ────────────
-            UUID lessonId = lessonService.addLessonReturningId(
-                    chapterId, title, description, playlistUrl, courseId);
+                String existingLessonId = body.get("lessonId");
+                UUID lessonId;
+                if (existingLessonId != null && !existingLessonId.isBlank()) {
+                lessonId = UUID.fromString(existingLessonId);
+                lessonService.updateLesson(courseId, lessonId, title, description, playlistKey);
+                } else {
+                lessonId = lessonService.addLessonReturningId(
+                    chapterId, title, description, playlistKey, courseId);
+                }
 
             return ResponseEntity.ok(Map.of(
-                    "lessonId",    lessonId.toString(),
-                    "playlistUrl", playlistUrl
+                    "lessonId", lessonId.toString()
             ));
 
         } catch (RuntimeException e) {

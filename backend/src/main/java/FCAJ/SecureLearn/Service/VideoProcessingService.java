@@ -19,7 +19,7 @@ import java.util.stream.Stream;
  * Prerequisites: ffmpeg must be available on the system PATH (added to Dockerfile).
  *
  * HLS output layout in R2:
- *   hls/{baseKey}/master.m3u8        ← the playlist URL returned to the caller
+ *   hls/{baseKey}/master.m3u8        <- the playlist key stored on the lesson
  *   hls/{baseKey}/segment_000.ts
  *   hls/{baseKey}/segment_001.ts
  *   ...
@@ -28,17 +28,14 @@ import java.util.stream.Stream;
 public class VideoProcessingService {
 
     private final S3Template s3Template;
-    private final R2UploadService r2UploadService;
+    private final R2Service r2UploadService;
 
     @Value("${r2.bucket-name}")
     private String bucketName;
 
-    @Value("${app.s3.public-base-url}")
-    private String publicBaseUrl;
-
     public VideoProcessingService(
             @Qualifier("r2S3Template") S3Template s3Template,
-            R2UploadService r2UploadService) {
+            R2Service r2UploadService) {
         this.s3Template = s3Template;
         this.r2UploadService = r2UploadService;
     }
@@ -48,8 +45,7 @@ public class VideoProcessingService {
      *
      * @param rawObjectKey  the R2 object key of the uploaded raw video,
      *                      e.g. "videos/courseId/1234567890_lecture1.mp4"
-     * @return the public URL of the HLS master playlist,
-     *         e.g. "https://pub.r2.dev/hls/courseId/1234567890_lecture1/master.m3u8"
+    * @return the R2 object key of the HLS playlist.
      */
     public String processToHls(String rawObjectKey) throws IOException, InterruptedException {
         // Derive a base key for the HLS output from the raw object key
@@ -115,23 +111,14 @@ public class VideoProcessingService {
                      });
             }
 
-            // ── 4. Rewrite the playlist to use absolute R2 public URLs ───────
-            //
-            // FFmpeg writes relative segment filenames (segment_000.ts).
-            // The player needs absolute URLs so rewrite them before uploading.
-            String playlistContent = Files.readString(playlistFile);
-            String absolutePlaylist = rewritePlaylistUrls(playlistContent, baseKey);
-            Path rewrittenPlaylist = workDir.resolve("master_final.m3u8");
-            Files.writeString(rewrittenPlaylist, absolutePlaylist);
-
-            // ── 5. Upload the rewritten playlist to R2 ───────────────────────
+            // Keep segment references relative; playback signs each segment URL.
             String playlistKey = baseKey + "/master.m3u8";
-            uploadFile(rewrittenPlaylist, playlistKey, "application/vnd.apple.mpegurl");
+            uploadFile(playlistFile, playlistKey, "application/vnd.apple.mpegurl");
 
             // ── 6. Delete the raw source file from R2 (no longer needed) ────
             r2UploadService.deleteObject(bucketName, rawObjectKey);
 
-            return r2UploadService.getPublicUrl(playlistKey);
+            return playlistKey;
 
         } finally {
             // Clean up the local temp directory regardless of success or failure
@@ -150,27 +137,6 @@ public class VideoProcessingService {
         } catch (IOException e) {
             throw new RuntimeException("Failed to upload " + objectKey + " to R2", e);
         }
-    }
-
-    /**
-     * Replaces relative segment filenames in the M3U8 playlist with absolute public R2 URLs.
-     *
-     * e.g. "segment_000.ts" → "https://pub.r2.dev/hls/courseId/timestamp/segment_000.ts"
-     */
-    private String rewritePlaylistUrls(String playlist, String baseKey) {
-        String[] lines = playlist.split("\n");
-        StringBuilder sb = new StringBuilder();
-        for (String line : lines) {
-            String trimmed = line.trim();
-            if (!trimmed.isEmpty() && !trimmed.startsWith("#")) {
-                // This is a segment filename line — make it absolute
-                sb.append(publicBaseUrl).append("/").append(baseKey).append("/").append(trimmed);
-            } else {
-                sb.append(line);
-            }
-            sb.append("\n");
-        }
-        return sb.toString();
     }
 
     private void deleteDirectory(Path dir) {
