@@ -1,4 +1,4 @@
-import apiClient from '../api/axiosClient';
+import apiClient from '../api/axiosClient.js';
 
 /**
  * =============================================================================
@@ -375,6 +375,13 @@ export async function getLessonById(id) {
     return null;
   }
 }
+
+/**
+ * Lấy URL phát video bảo mật từ PlaybackController (Spring Boot & Cloudflare R2)
+ * Backend: GET /api/v1/lesson/{id}/playback
+ * Trả về: { playbackUrl, expiresAt }
+ */
+export { getLessonPlayback } from './playbackService.js';
 
 /**
  * Tạo mới một bài học trong chương trên Backend

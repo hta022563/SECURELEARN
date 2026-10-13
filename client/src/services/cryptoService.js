@@ -25,17 +25,17 @@ export function base64ToArrayBuffer(base64) {
   return bytes.buffer;
 }
 
-import apiClient from '../api/axiosClient';
+import apiClient from '../api/axiosClient.js';
+import { getLessonPlayback } from './playbackService.js';
 
 /**
- * Lấy URL luồng video từ Backend API (Spring Boot / DynamoDB / S3)
+ * Lấy URL luồng video phát bảo mật từ Backend PlaybackController (Spring Boot / Cloudflare R2)
  * Endpoint Backend:
- * - GET /api/v1/lesson (với partitionKey và sortKey)
- * - hoặc GET /api/v1/course (với partitionKey)
+ * - GET /api/v1/lesson/{id}/playback (Tạo phiên phát & cấp token / presigned URL)
  */
 export async function fetchSignedUrl(videoId, studentId, courseId = null) {
-  if (!studentId || !videoId) {
-    throw new Error('400: Thiếu thông tin xác thực Video ID hoặc Student ID.');
+  if (!videoId) {
+    throw new Error('400: Thiếu thông tin định danh Video/Lesson ID.');
   }
 
   if (videoId === 'unauthorized') {
@@ -46,11 +46,40 @@ export async function fetchSignedUrl(videoId, studentId, courseId = null) {
     throw new Error('410: Signed URL bài giảng đã hết hạn truy cập.');
   }
 
-  // 1. Thử gọi API Backend lấy Lesson theo ID: GET /api/v1/lesson/{id}
+  // 1. Nếu videoId tự thân là một URL trực tiếp hoàn chỉnh (http://, https://, blob:)
+  if (
+    typeof videoId === 'string' &&
+    (videoId.startsWith('http://') || videoId.startsWith('https://') || videoId.startsWith('blob:'))
+  ) {
+    return {
+      streamUrl: videoId,
+      expiresAt: Date.now() + 3600000,
+    };
+  }
+
+  // 2. Gọi PlaybackController Backend: GET /api/v1/lesson/{id}/playback
+  // Đây là luồng chính thức: Backend xác thực JWT, kiểm tra Entitlement và sinh link phát (.m3u8 kèm token hoặc presigned MP4)
+  try {
+    const playbackData = await getLessonPlayback(videoId);
+    if (playbackData?.playbackUrl) {
+      return {
+        streamUrl: playbackData.playbackUrl,
+        expiresAt: playbackData.expiresAt || Date.now() + 3600000,
+      };
+    }
+  } catch (playbackErr) {
+    // Nếu là lỗi phân quyền (403/401), ném lỗi ngay để UI hiển thị thông báo
+    if (playbackErr.message?.includes('403') || playbackErr.message?.includes('401')) {
+      throw playbackErr;
+    }
+    console.warn(`[cryptoService] Gọi /lesson/${videoId}/playback không thành công, thử tra cứu metadata:`, playbackErr.message);
+  }
+
+  // 3. Fallback dự phòng: Thử tra cứu Lesson metadata GET /api/v1/lesson/{id}
   try {
     const res = await apiClient.get(`/lesson/${videoId}`);
     const stream = res?.url || res?.videoURL || res?.videoUrl;
-    if (stream) {
+    if (stream && (stream.startsWith('http://') || stream.startsWith('https://') || stream.startsWith('blob:'))) {
       return {
         streamUrl: stream,
         expiresAt: Date.now() + 3600000,
@@ -60,16 +89,8 @@ export async function fetchSignedUrl(videoId, studentId, courseId = null) {
     console.warn(`[cryptoService] Không tìm thấy bài học qua GET /lesson/${videoId}:`, e.message);
   }
 
-  // 3. Nếu videoId tự thân là một URL trực tiếp (http://, https://, blob:)
-  if (typeof videoId === 'string' && (videoId.startsWith('http://') || videoId.startsWith('https://') || videoId.startsWith('blob:'))) {
-    return {
-      streamUrl: videoId,
-      expiresAt: Date.now() + 3600000,
-    };
-  }
-
   // 4. Nếu không tìm thấy video trên Backend
-  throw new Error(`404: Không tìm thấy đường dẫn video (videoURL) cho bài giảng "${videoId}" trên hệ thống Backend.`);
+  throw new Error(`404: Không tìm thấy đường dẫn video cho bài giảng "${videoId}" trên hệ thống Backend.`);
 }
 
 /**

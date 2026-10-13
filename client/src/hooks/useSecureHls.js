@@ -49,7 +49,9 @@ export function useSecureHls(videoId, studentId, videoRef, courseId = null) {
         const { streamUrl } = await fetchSignedUrl(videoId, studentId, courseId);
         if (isCancelled) return;
 
-        if (!streamUrl.includes('.m3u8')) {
+        const isHlsStream = streamUrl.includes('.m3u8') || streamUrl.includes('/manifest');
+
+        if (!isHlsStream) {
           const videoElement = videoRef.current;
           if (videoElement) {
             videoElement.src = streamUrl;

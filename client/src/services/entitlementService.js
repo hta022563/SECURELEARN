@@ -1,11 +1,15 @@
+import apiClient from '../api/axiosClient.js';
+
 /**
  * =============================================================================
  * SERVICE: entitlementService (QUẢN LÝ QUYỀN TRUY CẬP KHÓA HỌC)
  * =============================================================================
  * Quản lý và kiểm tra quyền truy cập khóa học cho người dùng thực tế:
+ * - Tích hợp với CourseEntitlementController (Spring Boot):
+ *     PUT    /api/v1/course/{courseId}/entitlements/{userSub}  (Admin cấp quyền)
+ *     DELETE /api/v1/course/{courseId}/entitlements/{userSub}  (Admin thu hồi quyền)
  * - Giảng viên (Instructor) & Quản trị viên (Administrator): Toàn quyền xem mọi khóa học và bài giảng.
  * - Học viên (Student): Được cấp quyền truy cập các khóa học đã ghi danh.
- * - Hỗ trợ lưu trữ trạng thái ghi danh động trong phiên làm việc, không dùng dữ liệu mô phỏng tĩnh.
  * =============================================================================
  */
 
@@ -16,6 +20,7 @@ const ENROLLMENTS_STORAGE_KEY = 'securelearn_user_enrollments';
  */
 function getStoredEnrollments(userId) {
   try {
+    if (typeof localStorage === 'undefined') return null;
     const raw = localStorage.getItem(`${ENROLLMENTS_STORAGE_KEY}_${userId}`);
     if (raw) return JSON.parse(raw);
   } catch (e) {
@@ -30,6 +35,7 @@ function getStoredEnrollments(userId) {
 export function recordCourseEnrollment(userId, courseId) {
   if (!userId || !courseId) return;
   try {
+    if (typeof localStorage === 'undefined') return;
     const key = `${ENROLLMENTS_STORAGE_KEY}_${userId}`;
     const raw = localStorage.getItem(key);
     const list = raw ? JSON.parse(raw) : [];
@@ -112,3 +118,34 @@ export function getEntitledCourseIds(user, allCourses = []) {
   }
   return [];
 }
+
+/**
+ * Cấp quyền xem khóa học cho người dùng (Role Admin)
+ * Backend: PUT /api/v1/course/{courseId}/entitlements/{userSub}
+ *
+ * @param {string} courseId - UUID của khóa học
+ * @param {string} userSub - Sub/ID của người dùng được cấp quyền
+ */
+export async function grantCourseEntitlement(courseId, userSub) {
+  if (!courseId || !userSub) {
+    throw new Error('400: Thiếu thông tin courseId hoặc userSub.');
+  }
+  const res = await apiClient.put(`/course/${courseId}/entitlements/${userSub}`);
+  recordCourseEnrollment(userSub, courseId);
+  return res;
+}
+
+/**
+ * Thu hồi quyền xem khóa học của người dùng (Role Admin)
+ * Backend: DELETE /api/v1/course/{courseId}/entitlements/{userSub}
+ *
+ * @param {string} courseId - UUID của khóa học
+ * @param {string} userSub - Sub/ID của người dùng bị thu hồi quyền
+ */
+export async function revokeCourseEntitlement(courseId, userSub) {
+  if (!courseId || !userSub) {
+    throw new Error('400: Thiếu thông tin courseId hoặc userSub.');
+  }
+  return await apiClient.delete(`/course/${courseId}/entitlements/${userSub}`);
+}
+

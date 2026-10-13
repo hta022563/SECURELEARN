@@ -34,15 +34,21 @@ export default function SecureVideoPlayer({
   // Hook bảo vệ Client-side: Focus Blackout, Anti-PrintScreen, Anti-Debugging
   const { isScreenHidden, hideReason } = useSecurePlayer(videoRef);
 
-  // Tự động load lại video khi videoUrl thay đổi
+  // Kiểm tra xem videoUrl có phải là URL phát trực tiếp hoàn chỉnh không (http://, https://, blob:)
+  const isDirectUrl = Boolean(
+    typeof videoUrl === 'string' &&
+    (videoUrl.startsWith('http://') || videoUrl.startsWith('https://') || videoUrl.startsWith('blob:'))
+  );
+
+  // Tự động load lại video khi videoUrl thay đổi và là URL trực tiếp
   React.useEffect(() => {
-    if (videoRef.current && videoUrl) {
+    if (videoRef.current && isDirectUrl) {
       videoRef.current.load();
     }
-  }, [videoUrl]);
+  }, [videoUrl, isDirectUrl]);
 
-  // Hook xử lý Signed URL HLS và giải mã ECDH (chỉ chạy khi có videoId và không truyền trực tiếp videoUrl)
-  const activeVideoId = videoUrl ? null : videoId;
+  // Hook xử lý Signed URL HLS / PlaybackController (chỉ chạy khi có videoId và không truyền trực tiếp URL web)
+  const activeVideoId = isDirectUrl ? null : (videoId || videoUrl);
   const { isLoading, error, isReady, securityStatus, reload } = useSecureHls(
     activeVideoId,
     studentId,
@@ -72,7 +78,7 @@ export default function SecureVideoPlayer({
         {/* Thẻ Video HTML5 với đầy đủ các thuộc tính bảo mật theo yêu cầu */}
         <video
           ref={videoRef}
-          src={videoUrl || undefined}
+          src={isDirectUrl ? videoUrl : undefined}
           className="w-100 h-100 d-block"
           controls
           controlsList="nodownload" // Chặn nút tải xuống trên trình duyệt Chromium

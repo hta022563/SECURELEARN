@@ -6,7 +6,7 @@ import axios from 'axios';
  * - Tự động định tuyến baseURL theo biến môi trường
  */
 const axiosClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1',
+  baseURL: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || 'http://localhost:8080/api/v1',
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
@@ -18,11 +18,13 @@ const axiosClient = axios.create({
 axiosClient.interceptors.request.use(
   (config) => {
     try {
-      const stored = sessionStorage.getItem('securelearn_auth_user');
-      if (stored) {
-        const user = JSON.parse(stored);
-        if (user?.token) {
-          config.headers.Authorization = `Bearer ${user.token}`;
+      if (typeof sessionStorage !== 'undefined') {
+        const stored = sessionStorage.getItem('securelearn_auth_user');
+        if (stored) {
+          const user = JSON.parse(stored);
+          if (user?.token) {
+            config.headers.Authorization = `Bearer ${user.token}`;
+          }
         }
       }
     } catch (e) {
