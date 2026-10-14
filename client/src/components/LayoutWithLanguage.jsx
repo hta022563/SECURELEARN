@@ -1,12 +1,57 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Outlet, useParams, useNavigate, useLocation, Link } from 'react-router-dom';
-import { Navbar, Nav, Container, Dropdown, Badge, NavDropdown, Button } from 'react-bootstrap';
 import { useTranslation } from 'react-i18next';
+import {
+  Menu,
+  X,
+  ChevronDown,
+  Sun,
+  Moon,
+  Languages,
+  Check,
+  Settings,
+  LogOut,
+  GraduationCap,
+  BookOpen,
+  PlayCircle,
+  Video,
+  UploadCloud,
+  Eye,
+  Shield,
+  Users,
+  Sparkles,
+  Sliders,
+  Fingerprint,
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastProvider';
+import { useTheme } from '../context/ThemeContext';
 import Logo from './Logo';
 import { logoutBackendSession } from '../services/courseService';
 
+function AppFooter({ isPortal }) {
+  const { t } = useTranslation();
+  return (
+    <footer className={`mt-auto border-t border-slate-200/80 bg-white/80 py-5 text-center text-xs text-slate-500 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400 ${isPortal ? 'lg:pl-60 xl:lg:pl-64' : ''}`}>
+      <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 sm:flex-row sm:px-6 lg:px-8">
+        <Logo size="sm" showBadge={false} />
+        <span className="font-medium text-slate-600 dark:text-slate-300">
+          {t('footer_slogan', 'Nền tảng E-Learning Bản quyền số & Bảo mật Video')}
+        </span>
+        <span>© 2026 SecureLearn Inc. All rights reserved.</span>
+      </div>
+    </footer>
+  );
+}
+
+/**
+ * =============================================================================
+ * COMPONENT: LayoutWithLanguage (Pure Tailwind CSS Layout & Navbar)
+ * =============================================================================
+ * - Thanh Navbar dùng chung cho TẤT CẢ User: Trang Chủ & Khóa Học (Catalog)
+ * - Mỗi User có Portal riêng với các chức năng chuyên biệt theo vai trò Role
+ * - Đồng bộ Light & Dark Theme toàn diện, đa ngôn ngữ /:lang
+ */
 export default function LayoutWithLanguage() {
   const { lang } = useParams();
   const navigate = useNavigate();
@@ -14,33 +59,46 @@ export default function LayoutWithLanguage() {
   const { t, i18n } = useTranslation();
   const { user, isAuthenticated, logout } = useAuth();
   const { showToast } = useToast();
+  const { theme, toggleTheme } = useTheme();
 
-  // ── Theme state (light / dark) ──────────────────────────────────────────
-  const [theme, setTheme] = useState(() => localStorage.getItem('securelearn-theme') || 'light');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [langDropdownOpen, setLangDropdownOpen] = useState(false);
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
+  const langDropdownRef = useRef(null);
+  const userDropdownRef = useRef(null);
+
+  // Đóng dropdown khi click ra ngoài
   useEffect(() => {
-    localStorage.setItem('securelearn-theme', theme);
-    document.documentElement.setAttribute('data-bs-theme', theme);
-  }, [theme]);
+    function handleClickOutside(event) {
+      if (langDropdownRef.current && !langDropdownRef.current.contains(event.target)) {
+        setLangDropdownOpen(false);
+      }
+      if (userDropdownRef.current && !userDropdownRef.current.contains(event.target)) {
+        setUserDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
-  const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light');
-  // ────────────────────────────────────────────────────────────────────────
+  // Tự động đóng mobile menu & popovers khi chuyển trang
+  useEffect(() => {
+    setMobileMenuOpen(false);
+    setUserDropdownOpen(false);
+    setLangDropdownOpen(false);
+  }, [location.pathname]);
 
   useEffect(() => {
     if (lang !== 'vi' && lang !== 'en') {
-      // Nếu URL không có tiền tố ngôn ngữ (ví dụ user bấm Link to="/catalog")
-      // Ta lấy toàn bộ path hiện tại và gắn thêm ngôn ngữ đang lưu
       const savedLang = localStorage.getItem('i18nextLng') || 'vi';
       const fallbackLang = (savedLang === 'en' || savedLang === 'vi') ? savedLang : 'vi';
-
-      // location.pathname lúc này là "/catalog", location.search là "?abc"
       navigate(`/${fallbackLang}${location.pathname}${location.search}${location.hash}`, { replace: true });
     } else if (i18n.language !== lang) {
       i18n.changeLanguage(lang);
     }
   }, [lang, i18n, navigate, location]);
 
-  // Ngăn render sai UI khi URL đang được redirect
   if (lang !== 'vi' && lang !== 'en') {
     return null;
   }
@@ -50,6 +108,7 @@ export default function LayoutWithLanguage() {
     pathSegments[1] = newLang;
     const newPath = pathSegments.join('/') + location.search + location.hash;
     navigate(newPath);
+    setLangDropdownOpen(false);
   };
 
   const handleLogout = async () => {
@@ -67,179 +126,380 @@ export default function LayoutWithLanguage() {
 
   const renderRoleBadge = (role) => {
     switch (role) {
-      case 'Administrator': return <Badge bg="danger" className="ms-1 rounded-pill">Admin</Badge>;
-      case 'Instructor': return <Badge bg="warning" text="dark" className="ms-1 rounded-pill">Instructor</Badge>;
+      case 'Administrator':
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 dark:bg-rose-950/70 text-rose-700 dark:text-rose-300 border border-rose-200/80 dark:border-rose-800/80 whitespace-nowrap">
+            Admin
+          </span>
+        );
+      case 'Instructor':
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-950/70 text-amber-700 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/80 whitespace-nowrap">
+            Instructor
+          </span>
+        );
       case 'Student':
-      default: return <Badge bg="primary" className="ms-1 rounded-pill">Student</Badge>;
+      default:
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800/80 whitespace-nowrap">
+            Student
+          </span>
+        );
     }
   };
 
+  const getNavLinkClass = (path) => {
+    const active = isActive(path);
+    return active
+      ? 'px-3 xl:px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-semibold bg-blue-50 text-blue-600 dark:bg-blue-950/70 dark:text-blue-400 transition-all duration-200 no-underline whitespace-nowrap shrink-0'
+      : 'px-3 xl:px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/60 transition-all duration-200 no-underline whitespace-nowrap shrink-0';
+  };
+
+  const getProfilePath = () => {
+    if (user?.role === 'Administrator') return `/${lang}/admin/profile`;
+    if (user?.role === 'Instructor') return `/${lang}/instructor/profile`;
+    return `/${lang}/student/profile`;
+  };
+
+  const isStudentPortalActive = location.pathname.includes('/student');
+  const isInstructorPortalActive = location.pathname.includes('/instructor');
+  const isAdminPortalActive = location.pathname.includes('/admin');
+  const isPortal = isStudentPortalActive || isInstructorPortalActive || isAdminPortalActive || location.pathname.includes('/portal');
+
   return (
-    <div className="d-flex flex-column min-vh-100">
-      <Navbar bg="white" expand="lg" sticky="top" className="border-bottom py-2 shadow-sm" style={{ zIndex: 1030 }}>
-        <Container fluid className="px-3 px-lg-4 px-xxl-5">
-          <Navbar.Brand as={Link} to={`/${lang}/home`} className="d-flex align-items-center me-3 me-xl-4 text-decoration-none py-0">
-            <Logo size="sm" showBadge={true} badgeText="E-LEARNING" />
-          </Navbar.Brand>
+    <div className="flex flex-col min-h-screen">
+      {/* =====================================================================
+       * NAVBAR CHÍNH (PURE TAILWIND CSS)
+       * ===================================================================== */}
+      <nav className="sticky top-0 z-40 w-full border-b border-slate-200/80 bg-white/95 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/95 shadow-xs">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2.5 sm:px-6 lg:px-8">
+          {/* Cụm Trái: Logo SecureLearn + Menu chung (Trang Chủ & Khóa Học) nằm cạnh nhau */}
+          <div className="flex items-center gap-5 xl:gap-6 min-w-0">
+            <Link to={`/${lang}/home`} className="flex items-center gap-2 no-underline shrink-0">
+              <Logo size="sm" showBadge={true} badgeText="E-LEARNING" />
+            </Link>
 
-          <Navbar.Toggle aria-controls="main-navbar">
-            <i className="bi bi-list fs-3 text-primary"></i>
-          </Navbar.Toggle>
+            {/* Desktop Navigation: Nằm ngay cạnh Logo bên trái */}
+            <div className="hidden lg:flex items-center gap-1.5 xl:gap-2 shrink-0">
+              <Link to={`/${lang}/home`} className={getNavLinkClass('/home')}>
+                {t('navbar.home', 'Trang Chủ')}
+              </Link>
+              <Link to={`/${lang}/catalog`} className={getNavLinkClass('/catalog')}>
+                {t('navbar.courses', 'Khóa Học')}
+              </Link>
+            </div>
+          </div>
 
-          <Navbar.Collapse id="main-navbar">
-            <Nav className="me-auto my-2 my-lg-0 align-items-lg-center gap-1 gap-xl-2">
-              {!isAuthenticated && (
-                <>
-                  <Nav.Link as={Link} to={`/${lang}/home`} className={isActive('/home') ? 'nav-pill-active' : 'nav-link-custom'}>
-                    {t('common.home', 'Home')}
-                  </Nav.Link>
-                  <Nav.Link as={Link} to={`/${lang}/catalog`} className={isActive('/catalog') ? 'nav-pill-active' : 'nav-link-custom'}>
-                    {t('common.catalog', 'Catalog')}
-                  </Nav.Link>
-                </>
-              )}
+          {/* Cụm điều khiển Mobile */}
+          <div className="flex items-center gap-1.5 lg:hidden">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200/80 bg-white/80 text-slate-700 shadow-xs dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-200"
+              title={theme === 'light' ? 'Chuyển sang chế độ tối' : 'Chuyển sang chế độ sáng'}
+            >
+              {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4 text-amber-400" />}
+            </button>
 
-              {isAuthenticated && user?.role === 'Student' && (
-                <>
-                  <Nav.Link as={Link} to={`/${lang}/student/courses`} className={isActive('/student/courses') ? 'nav-pill-active' : 'nav-link-custom'}>
-                    {t('navbar.my_courses')}
-                  </Nav.Link>
-                  <Nav.Link as={Link} to={`/${lang}/catalog`} className={isActive('/catalog') ? 'nav-pill-active' : 'nav-link-custom'}>
-                    {t('navbar.course_catalog')}
-                  </Nav.Link>
-                </>
-              )}
-
-              {isAuthenticated && user?.role === 'Instructor' && (
-                <>
-                  <Nav.Link as={Link} to={`/${lang}/instructor/videos`} className={isActive('/instructor/videos') ? 'nav-pill-active' : 'nav-link-custom'}>
-                    {t('navbar.manage_videos')}
-                  </Nav.Link>
-                  <Nav.Link as={Link} to={`/${lang}/instructor/upload`} className={isActive('/instructor/upload') ? 'nav-pill-active' : 'nav-link-custom'}>
-                    {t('navbar.upload_drm')}
-                  </Nav.Link>
-                  <Nav.Link as={Link} to={`/${lang}/catalog`} className={isActive('/catalog') ? 'nav-pill-active' : 'nav-link-custom'}>
-                    {t('navbar.explore_courses')}
-                  </Nav.Link>
-                </>
-              )}
-
-              {isAuthenticated && user?.role === 'Administrator' && (
-                <>
-                  <Nav.Link as={Link} to={`/${lang}/admin/users`} className={isActive('/admin/users') ? 'nav-pill-active' : 'nav-link-custom'}>
-                    {t('navbar.manage_users')}
-                  </Nav.Link>
-                  <Nav.Link as={Link} to={`/${lang}/admin/alerts`} className={isActive('/admin/alerts') ? 'nav-pill-active' : 'nav-link-custom'}>
-                    {t('navbar.ai_alerts')}
-                  </Nav.Link>
-                  <Nav.Link as={Link} to={`/${lang}/admin/config`} className={isActive('/admin/config') ? 'nav-pill-active' : 'nav-link-custom'}>
-                    {t('navbar.r2_config')}
-                  </Nav.Link>
-                  <Nav.Link as={Link} to={`/${lang}/admin/trace`} className={isActive('/admin/trace') ? 'nav-pill-active' : 'nav-link-custom'}>
-                    {t('navbar.watermark_tracing')}
-                  </Nav.Link>
-                </>
-              )}
-            </Nav>
-
-            <Nav className="align-items-lg-center gap-2">
-
-              {/* ── THEME TOGGLE ☀️🌙 ─────────────────────────────── */}
-              <Button
-                variant="link"
-                onClick={toggleTheme}
-                className="d-flex align-items-center justify-content-center rounded-circle border-0 p-0 text-secondary"
-                style={{ width: '40px', height: '40px', textDecoration: 'none' }}
-                title={theme === 'light' ? 'Chuyển sang chế độ tối' : 'Chuyển sang chế độ sáng'}
+            {/* Dropdown đổi ngôn ngữ Mobile */}
+            <div className="relative" ref={langDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setLangDropdownOpen(!langDropdownOpen)}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200/80 bg-white/80 text-slate-700 shadow-xs dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-200"
               >
-                {theme === 'light'
-                  ? <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 256 256"><path d="M233.54,142.23a8,8,0,0,0-8-2,88.08,88.08,0,0,1-109.8-109.8,8,8,0,0,0-10-10,104.84,104.84,0,0,0-52.91,37A104,104,0,0,0,136,224a103.09,103.09,0,0,0,62.52-20.88,104.84,104.84,0,0,0,37-52.91A8,8,0,0,0,233.54,142.23ZM188.9,190.34A88,88,0,0,1,65.66,67.11a89,89,0,0,1,31.4-26A106,106,0,0,0,96,56,104.11,104.11,0,0,0,200,160a106,106,0,0,0,14.92-1.06A89,89,0,0,1,188.9,190.34Z"/></svg>
-                  : <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="#f59e0b" viewBox="0 0 256 256"><path d="M120,40V16a8,8,0,0,1,16,0V40a8,8,0,0,1-16,0Zm72,88a64,64,0,1,1-64-64A64.07,64.07,0,0,1,192,128Zm-16,0a48,48,0,1,0-48,48A48.05,48.05,0,0,0,176,128ZM58.34,69.66A8,8,0,0,0,69.66,58.34l-16-16A8,8,0,0,0,42.34,53.66Zm0,116.68-16,16a8,8,0,0,0,11.32,11.32l16-16a8,8,0,0,0-11.32-11.32ZM192,72a8,8,0,0,0,5.66-2.34l16-16a8,8,0,0,0-11.32-11.32l-16,16A8,8,0,0,0,192,72Zm5.66,114.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32-11.32ZM48,128a8,8,0,0,0-8-8H16a8,8,0,0,0,0,16H40A8,8,0,0,0,48,128Zm80,80a8,8,0,0,0-8,8v24a8,8,0,0,0,16,0V216A8,8,0,0,0,128,208Zm112-88H216a8,8,0,0,0,0,16h24a8,8,0,0,0,0-16Z"/></svg>
-                }
-              </Button>
+                <Languages className="h-4 w-4" />
+              </button>
 
-              <Dropdown align="end">
-                <Dropdown.Toggle
-                  variant="link"
-                  id="dropdown-language"
-                  className="d-flex align-items-center justify-content-center rounded-circle border-0 text-secondary hover-bg-light"
-                  style={{ width: '40px', height: '40px', padding: 0 }}
-                  title="Toggle Language"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 256 256">
-                    <path d="M247.15,212.42l-56-112a8,8,0,0,0-14.31,0l-21.71,43.43A88,88,0,0,1,108,126.93,103.65,103.65,0,0,0,135.69,64H160a8,8,0,0,0,0-16H104V32a8,8,0,0,0-16,0V48H32a8,8,0,0,0,0,16h87.63A87.76,87.76,0,0,1,96,116.35a87.74,87.74,0,0,1-19-31,8,8,0,1,0-15.08,5.34A103.63,103.63,0,0,0,84,127a87.55,87.55,0,0,1-52,17,8,8,0,0,0,0,16,103.46,103.46,0,0,0,64-22.08,104.18,104.18,0,0,0,51.44,21.31l-26.6,53.19a8,8,0,0,0,14.31,7.16L148.94,192h70.11l13.79,27.58A8,8,0,0,0,240,224a8,8,0,0,0,7.15-11.58ZM156.94,176,184,121.89,211.05,176Z"></path>
-                  </svg>
-                </Dropdown.Toggle>
-
-                <Dropdown.Menu className="shadow-sm border-0 rounded-4 mt-2 p-2" style={{ minWidth: '140px' }}>
-                  <Dropdown.Item
-                    onClick={() => changeLanguage('en')}
-                    className={`rounded-3 d-flex align-items-center gap-2 py-2 fw-medium ${lang === 'en' ? 'bg-primary bg-opacity-10 text-primary' : 'text-dark'}`}
-                  >
-                    <span>English</span>
-                  </Dropdown.Item>
-
-                  <Dropdown.Item
+              {langDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-36 origin-top-right rounded-2xl border border-slate-200/80 bg-white/95 p-1.5 shadow-xl backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/95 z-50 animate-in fade-in zoom-in-95 duration-150">
+                  <button
+                    type="button"
                     onClick={() => changeLanguage('vi')}
-                    className={`rounded-3 d-flex align-items-center gap-2 py-2 fw-medium ${lang === 'vi' ? 'bg-primary bg-opacity-10 text-primary' : 'text-dark'}`}
+                    className={`flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-xs font-semibold ${
+                      lang === 'vi' ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400' : 'text-slate-700 dark:text-slate-200'
+                    }`}
                   >
                     <span>Tiếng Việt</span>
-                  </Dropdown.Item>
-                </Dropdown.Menu>
-              </Dropdown>
+                    {lang === 'vi' && <Check className="h-3.5 w-3.5" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => changeLanguage('en')}
+                    className={`flex w-full items-center justify-between rounded-xl px-3 py-1.5 text-xs font-semibold ${
+                      lang === 'en' ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400' : 'text-slate-700 dark:text-slate-200'
+                    }`}
+                  >
+                    <span>English</span>
+                    {lang === 'en' && <Check className="h-3.5 w-3.5" />}
+                  </button>
+                </div>
+              )}
+            </div>
 
-              {isAuthenticated && user ? (
-                <NavDropdown
-                  align="end"
-                  title={
-                    <span className="d-inline-flex align-items-center text-dark fw-semibold">
-                      <span
-                        className="rounded-circle d-inline-flex align-items-center justify-content-center me-2 text-white fw-bold shadow-sm"
-                        style={{ width: '34px', height: '34px', fontSize: '0.85rem', background: 'linear-gradient(135deg, #2563eb, #3b82f6)' }}
-                      >
-                        {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
-                      </span>
-                      <span className="me-2 text-truncate" style={{ maxWidth: '140px' }}>
-                        {user.name || t('navbar.user_default')}
-                      </span>
-                      {renderRoleBadge(user.role)}
-                    </span>
-                  }
-                  className="user-dropdown-custom shadow-sm"
+            {/* Nút Hamburger menu */}
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200/80 bg-white/80 text-slate-700 shadow-xs dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-200"
+              aria-label="Toggle navigation menu"
+            >
+              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          </div>
+
+          {/* =====================================================================
+           * DESKTOP RIGHT CONTROLS: THEME + LANG + USER / AUTH
+           * ===================================================================== */}
+          <div className="hidden lg:flex items-center gap-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/80 bg-white/80 text-slate-700 shadow-xs backdrop-blur-md hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-300 dark:hover:bg-slate-800 transition-all duration-200"
+              title={theme === 'light' ? 'Chuyển sang chế độ tối' : 'Chuyển sang chế độ sáng'}
+            >
+              {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5 text-amber-400" />}
+            </button>
+
+            {/* Dropdown Đổi Ngôn Ngữ Desktop */}
+            <div className="relative" ref={langDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setLangDropdownOpen(!langDropdownOpen)}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/80 bg-white/80 text-slate-700 shadow-xs backdrop-blur-md hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-300 dark:hover:bg-slate-800 transition-all duration-200"
+                title="Đổi ngôn ngữ / Change language"
+              >
+                <Languages className="h-5 w-5" />
+              </button>
+
+              {langDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-40 origin-top-right rounded-2xl border border-slate-200/80 bg-white/95 p-1.5 shadow-xl backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/95 z-50 animate-in fade-in zoom-in-95 duration-150">
+                  <button
+                    type="button"
+                    onClick={() => changeLanguage('vi')}
+                    className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold ${
+                      lang === 'vi' ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <span>Tiếng Việt</span>
+                    {lang === 'vi' && <Check className="h-4 w-4" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => changeLanguage('en')}
+                    className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold ${
+                      lang === 'en' ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <span>English</span>
+                    {lang === 'en' && <Check className="h-4 w-4" />}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {isAuthenticated && user ? (
+              <div className="relative" ref={userDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                  className="flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/90 p-1.5 pr-3 text-slate-800 shadow-xs hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900/90 dark:text-slate-100 dark:hover:bg-slate-800 transition-all duration-200 whitespace-nowrap"
                 >
-                  <div className="px-3 py-2 border-bottom bg-light">
-                    <small className="text-muted d-block">{t('navbar.auth_account')}</small>
-                    <strong className="text-primary">{user.name}</strong>
-                    <div className="text-muted small text-truncate" style={{ maxWidth: '200px' }}>
-                      {user.email}
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-xs font-bold text-white shadow-xs">
+                    {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                  </span>
+                  <span className="max-w-[130px] truncate text-xs font-semibold">
+                    {user.name || t('navbar.user_default')}
+                  </span>
+                  {renderRoleBadge(user.role)}
+                  <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${userDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {userDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-64 origin-top-right rounded-2xl border border-slate-200/80 bg-white/95 p-2 shadow-xl backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/95 z-50 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/60 mb-1">
+                      <span className="block text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                        {t('navbar.auth_account')}
+                      </span>
+                      <strong className="block text-sm font-bold text-slate-900 dark:text-white truncate">
+                        {user.name}
+                      </strong>
+                      <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                        {user.email}
+                      </div>
                     </div>
+
+                    {/* Phím tắt đến Trang vai trò của User */}
+                    {user.role === 'Administrator' && (
+                      <Link
+                        to={`/${lang}/admin/portal`}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 dark:text-rose-300 dark:bg-rose-950/60 dark:hover:bg-rose-900/60 transition-colors no-underline mb-1"
+                      >
+                        <Shield className="h-4 w-4" />
+                        <span>{t('navbar.admin_portal', 'Trang Quản Trị')}</span>
+                      </Link>
+                    )}
+                    {user.role === 'Instructor' && (
+                      <Link
+                        to={`/${lang}/instructor/portal`}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 dark:text-amber-300 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 transition-colors no-underline mb-1"
+                      >
+                        <Video className="h-4 w-4" />
+                        <span>{t('navbar.instructor_portal', 'Trang Giảng Viên')}</span>
+                      </Link>
+                    )}
+                    {user.role === 'Student' && (
+                      <Link
+                        to={`/${lang}/student/portal`}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 dark:text-blue-300 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 transition-colors no-underline mb-1"
+                      >
+                        <GraduationCap className="h-4 w-4" />
+                        <span>{t('navbar.student_portal', 'Trang Học Viên')}</span>
+                      </Link>
+                    )}
+
+                    <Link
+                      to={getProfilePath()}
+                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800 transition-colors no-underline"
+                    >
+                      <Settings className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <span>{t('navbar.profile_password')}</span>
+                    </Link>
+
+                    <div className="my-1 h-px bg-slate-100 dark:bg-slate-800" />
+
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/50 transition-colors"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      <span>{t('navbar.logout')}</span>
+                    </button>
                   </div>
-                  <NavDropdown.Item as={Link} to={`/${lang}/profile`} className="py-2">
-                    <i className="bi bi-person-gear me-2 text-primary"></i>{t('navbar.profile_password')}
-                  </NavDropdown.Item>
-                  <NavDropdown.Divider />
-                  <NavDropdown.Item onClick={handleLogout} className="py-2 text-danger">
-                    <i className="bi bi-box-arrow-right me-2"></i>{t('navbar.logout')}
-                  </NavDropdown.Item>
-                </NavDropdown>
-              ) : (
-                <div className="d-flex align-items-center gap-2 mt-2 mt-lg-0">
-                  <Link to={`/${lang}/login`} className="btn-secondary-pill text-decoration-none small">
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Link
+                  to={`/${lang}/login`}
+                  className="inline-flex items-center justify-center rounded-full border border-slate-200/80 bg-white px-4 py-1.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-all duration-200 no-underline"
+                >
+                  {t('common.login', 'Login')}
+                </Link>
+                <Link
+                  to={`/${lang}/register`}
+                  className="inline-flex items-center justify-center rounded-full bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 transition-all duration-200 no-underline"
+                >
+                  {t('common.register', 'Register')}
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* =====================================================================
+         * MOBILE DRAWER MENU: CHỈ COMMON LINKS (TRANG CHỦ & KHÓA HỌC)
+         * ===================================================================== */}
+        {mobileMenuOpen && (
+          <div className="border-t border-slate-200/80 bg-white/95 px-4 pt-3 pb-5 dark:border-slate-800 dark:bg-slate-900/95 lg:hidden animate-in slide-in-from-top-2 duration-200">
+            <div className="flex flex-col gap-1.5">
+              {/* Common Links: Home & Courses */}
+              <Link to={`/${lang}/home`} className={getNavLinkClass('/home')}>
+                {t('navbar.home', 'Trang Chủ')}
+              </Link>
+              <Link to={`/${lang}/catalog`} className={getNavLinkClass('/catalog')}>
+                {t('navbar.courses', 'Khóa Học')}
+              </Link>
+
+              {/* Guest Login/Register for Mobile */}
+              {!isAuthenticated && (
+                <div className="mt-3 flex gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <Link
+                    to={`/${lang}/login`}
+                    className="flex-1 text-center py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 no-underline"
+                  >
                     {t('common.login', 'Login')}
                   </Link>
-                  <Link to={`/${lang}/register`} className="btn-primary-pill text-decoration-none small">
+                  <Link
+                    to={`/${lang}/register`}
+                    className="flex-1 text-center py-2 rounded-xl bg-blue-600 text-xs font-semibold text-white no-underline"
+                  >
                     {t('common.register', 'Register')}
                   </Link>
                 </div>
               )}
-            </Nav>
-          </Navbar.Collapse>
-        </Container>
-      </Navbar>
 
-      <main className="flex-grow-1 bg-transparent">
+              {/* Logged in User Profile in Mobile */}
+              {isAuthenticated && user && (
+                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between px-1">
+                    <div>
+                      <div className="text-sm font-bold text-slate-900 dark:text-white">{user.name}</div>
+                      <div className="text-xs text-slate-500">{user.email}</div>
+                    </div>
+                    {renderRoleBadge(user.role)}
+                  </div>
+
+                  {/* Nút bấm vào Trang vai trò riêng biệt trong Mobile */}
+                  {user.role === 'Administrator' && (
+                    <Link
+                      to={`/${lang}/admin/portal`}
+                      className="w-full text-center py-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-xs font-bold text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900 flex items-center justify-center gap-2 no-underline"
+                    >
+                      <Shield className="h-4 w-4" />
+                      <span>{t('navbar.admin_portal', 'Trang Quản Trị')}</span>
+                    </Link>
+                  )}
+                  {user.role === 'Instructor' && (
+                    <Link
+                      to={`/${lang}/instructor/portal`}
+                      className="w-full text-center py-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-xs font-bold text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900 flex items-center justify-center gap-2 no-underline"
+                    >
+                      <Video className="h-4 w-4" />
+                      <span>{t('navbar.instructor_portal', 'Trang Giảng Viên')}</span>
+                    </Link>
+                  )}
+                  {user.role === 'Student' && (
+                    <Link
+                      to={`/${lang}/student/portal`}
+                      className="w-full text-center py-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-xs font-bold text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900 flex items-center justify-center gap-2 no-underline"
+                    >
+                      <GraduationCap className="h-4 w-4" />
+                      <span>{t('navbar.student_portal', 'Trang Học Viên')}</span>
+                    </Link>
+                  )}
+
+                  <div className="flex gap-2">
+                    <Link
+                      to={getProfilePath()}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex-1 text-center py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 no-underline"
+                    >
+                      {t('navbar.profile_password')}
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="flex-1 py-2 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-xs font-semibold text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900"
+                    >
+                      {t('navbar.logout')}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </nav>
+
+      {/* Main Outlet */}
+      <main className="flex-1">
         <Outlet />
       </main>
+
+      {/* Footer */}
+      <AppFooter isPortal={isPortal} />
     </div>
   );
 }

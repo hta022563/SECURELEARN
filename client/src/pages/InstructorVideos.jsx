@@ -1,20 +1,25 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import {
-  Container,
-  Row,
-  Col,
-  Card,
-  Table,
-  Badge,
-  Button,
-  Modal,
-  Form,
-  FloatingLabel,
-  InputGroup,
-  Accordion,
-} from 'react-bootstrap';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import {
+  GraduationCap,
+  FolderPlus,
+  UploadCloud,
+  Search,
+  ShieldCheck,
+  Edit,
+  Play,
+  Trash2,
+  FolderOpen,
+  Info,
+  Plus,
+  Clock,
+  HardDrive,
+  RefreshCw,
+  X,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -55,10 +60,7 @@ function formatBytes(bytes) {
 
 /**
  * =============================================================================
- * COMPONENT: InstructorVideos (Cấu trúc phân cấp gọn gàng: Khóa Học -> Bài Nhỏ)
- * =============================================================================
- * - Hiển thị Khóa học tổng thể trước (Parent), không bung hàng loạt bài nhỏ gây rối mắt
- * - Nhấn vào từng khóa học để mở giao diện quản lý / chỉnh sửa từng phần nhỏ bên trong
+ * COMPONENT: InstructorVideos (Pure Tailwind CSS & Lucide Icons)
  * =============================================================================
  */
 export default function InstructorVideos() {
@@ -81,7 +83,6 @@ export default function InstructorVideos() {
           setCoursesList(data);
 
           if (data.length > 0) {
-            // Nạp động cấu trúc chương và bài học từ Backend API
             try {
               const courseDetails = await Promise.all(
                 data.map((c) => getCourseWithLessons(c.ID || c.id))
@@ -120,6 +121,14 @@ export default function InstructorVideos() {
 
   // State Modal quản lý chi tiết bài giảng của Khóa học được chọn
   const [selectedCourseForDetail, setSelectedCourseForDetail] = useState(null);
+  const [openDetailChapters, setOpenDetailChapters] = useState({ 0: true });
+
+  const toggleDetailChapter = (idx) => {
+    setOpenDetailChapters((prev) => ({
+      ...prev,
+      [idx]: !prev[idx],
+    }));
+  };
 
   // State Modal chỉnh sửa tiêu đề của bài giảng nhỏ
   const [editingVideo, setEditingVideo] = useState(null);
@@ -160,31 +169,32 @@ export default function InstructorVideos() {
 
   // Tính toán dữ liệu tổng hợp từng Khóa học (Parent Overview)
   const courseSummaries = useMemo(() => {
-    // Lọc các khóa học của giảng viên (hoặc tất cả nếu demo)
-    const myCourses = coursesList.filter((c) => (c.Owner === user?.userId || c.owner === user?.userId || c.instructor === user?.username));
+    const myCourses = coursesList.filter(
+      (c) => c.Owner === user?.userId || c.owner === user?.userId || c.instructor === user?.username
+    );
     const targetCourses = myCourses.length > 0 ? myCourses : coursesList;
 
     return targetCourses.map((course) => {
       const courseId = course.ID || course.id;
-      // Các chương thuộc khóa học này
       const courseChaps = chaptersList
         .filter((ch) => ch.CoursesID === courseId || ch.course_id === courseId || ch.courseId === courseId)
         .sort((a, b) => (a.ChapterNumber || 1) - (b.ChapterNumber || 1));
 
-      // Các video thuộc khóa học này
       const courseVideos = videosList.filter((v) => {
         const vCourseId = v.courseId || v.course_id;
         if (vCourseId) return String(vCourseId) === String(courseId);
         return courseChaps.some((ch) => {
           const chId = ch.ID || ch.id;
-          return (v.chapterId && String(v.chapterId) === String(chId)) || (v.chapter_id && String(v.chapter_id) === String(chId));
+          return (
+            (v.chapterId && String(v.chapterId) === String(chId)) ||
+            (v.chapter_id && String(v.chapter_id) === String(chId))
+          );
         });
       });
 
       const totalSeconds = courseVideos.reduce((acc, v) => acc + (v.Length || v.duration || 0), 0);
       const totalBytes = courseVideos.reduce((acc, v) => acc + (v.Size || v.file_size || 0), 0);
 
-      // Cấu trúc phân cấp từng chương chứa các bài nhỏ
       const structuredChapters = courseChaps.map((chap) => {
         const chapId = chap.ID || chap.id;
         const chapVideos = courseVideos.filter((v) => {
@@ -192,7 +202,6 @@ export default function InstructorVideos() {
           return vChapId && String(vChapId) === String(chapId);
         });
 
-        // Loại bỏ trùng lặp ID (ngăn lỗi double bài học)
         const uniqueChapVideos = [];
         const seenIds = new Set();
         for (const v of chapVideos) {
@@ -203,8 +212,10 @@ export default function InstructorVideos() {
           }
         }
 
-        // Sắp xếp bài học theo thứ tự thời gian tạo (bài cũ ở trên, bài mới ở DƯỚI CÙNG)
-        uniqueChapVideos.sort((a, b) => new Date(a.UploadTime || a.uploadTime || 0) - new Date(b.UploadTime || b.uploadTime || 0));
+        uniqueChapVideos.sort(
+          (a, b) =>
+            new Date(a.UploadTime || a.uploadTime || 0) - new Date(b.UploadTime || b.uploadTime || 0)
+        );
 
         return {
           ...chap,
@@ -225,7 +236,6 @@ export default function InstructorVideos() {
     });
   }, [coursesList, chaptersList, videosList, user]);
 
-  // Lọc theo từ khóa tìm kiếm
   const filteredCourses = courseSummaries.filter((c) => {
     const term = searchTerm.toLowerCase();
     const title = (c.Title || c.title || '').toLowerCase();
@@ -233,13 +243,11 @@ export default function InstructorVideos() {
     return title.includes(term) || desc.includes(term);
   });
 
-  // Mở modal sửa tên bài nhỏ
   const handleOpenEditVideoModal = (video) => {
     setEditingVideo(video);
     setFormVideoTitle(video.Title || video.title || '');
   };
 
-  // Lưu chỉnh sửa bài nhỏ (Lưu bền vững vào LocalStorage)
   const handleSaveVideoTitle = async (e) => {
     e.preventDefault();
     if (!formVideoTitle.trim()) {
@@ -254,7 +262,6 @@ export default function InstructorVideos() {
       prev.map((v) => (v.ID === editingVideo.ID ? { ...v, Title: updatedTitle } : v))
     );
 
-    // Cập nhật cả trong modal chi tiết nếu đang mở
     if (selectedCourseForDetail) {
       setSelectedCourseForDetail((prev) => {
         if (!prev) return null;
@@ -274,7 +281,6 @@ export default function InstructorVideos() {
     setEditingVideo(null);
   };
 
-  // Mở modal chi tiết khóa học và tải trực tiếp từ Backend API
   const handleOpenCourseDetail = async (course) => {
     setSelectedCourseForDetail(course);
     try {
@@ -295,13 +301,16 @@ export default function InstructorVideos() {
     }
   };
 
-  // Xóa toàn bộ khóa học (Cascades trên Backend: DELETE /api/v1/course/{id})
   const handleDeleteCourse = async (courseId, courseTitle, e) => {
     if (e) e.stopPropagation();
-    if (window.confirm(`Bạn có chắc chắn muốn xóa khóa học "${courseTitle}"? Thao tác này sẽ xóa toàn bộ chương và bài học bên trong.`)) {
+    if (
+      window.confirm(
+        `Bạn có chắc chắn muốn xóa khóa học "${courseTitle}"? Thao tác này sẽ xóa toàn bộ chương và bài học bên trong.`
+      )
+    ) {
       try {
         await deleteCourse(courseId);
-        setCoursesList((prev) => prev.filter((c) => (c.ID !== courseId && c.id !== courseId)));
+        setCoursesList((prev) => prev.filter((c) => c.ID !== courseId && c.id !== courseId));
         showToast(`Đã xóa thành công khóa học: "${courseTitle}".`, 'info', 'Đã Xóa Khóa Học');
       } catch (err) {
         showToast(`Lỗi xóa khóa học: ${err.message}`, 'danger', 'Lỗi');
@@ -309,7 +318,6 @@ export default function InstructorVideos() {
     }
   };
 
-  // Xóa bài giảng nhỏ
   const handleDeleteVideo = async (videoId, videoTitle) => {
     if (window.confirm(`${t('instructor.delete_video_confirm')} "${videoTitle}"?`)) {
       await deleteVideo(videoId);
@@ -331,7 +339,6 @@ export default function InstructorVideos() {
     }
   };
 
-  // Mở modal sửa chương
   const handleOpenEditChapterModal = (chapter, e) => {
     if (e) e.stopPropagation();
     setEditingChapter(chapter);
@@ -339,7 +346,6 @@ export default function InstructorVideos() {
     setChapterFormDesc(chapter.Description || '');
   };
 
-  // Lưu chỉnh sửa chương
   const handleSaveChapter = async (e) => {
     e.preventDefault();
     if (!chapterFormTitle.trim()) {
@@ -376,10 +382,15 @@ export default function InstructorVideos() {
     setEditingChapter(null);
   };
 
-  // Xóa chương
   const handleDeleteChapter = async (chapterId, chapterTitle, e) => {
     if (e) e.stopPropagation();
-    if (window.confirm(`${t('instructor.delete_chapter_confirm')} "${chapterTitle}" ${t('instructor.delete_chapter_confirm_suffix')}`)) {
+    if (
+      window.confirm(
+        `${t('instructor.delete_chapter_confirm')} "${chapterTitle}" ${t(
+          'instructor.delete_chapter_confirm_suffix'
+        )}`
+      )
+    ) {
       await deleteChapter(chapterId);
       setChaptersList((prev) => prev.filter((c) => c.ID !== chapterId));
       if (selectedCourseForDetail) {
@@ -397,451 +408,512 @@ export default function InstructorVideos() {
   };
 
   return (
-    <Container fluid="lg" className="py-4">
-      {/* ===================================================================
-       * 1. HEADER BANNER & THAO TÁC NHANH
-       * =================================================================== */}
-      <div className="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4 pb-3 border-bottom">
+    <div className="py-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* 1. HEADER BANNER */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 pb-4 border-b border-slate-200/80 dark:border-slate-800">
         <div>
-          <div className="badge-pill-soft mb-2">
-            <i className="bi bi-mortarboard-fill text-primary"></i>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 text-xs font-semibold mb-2">
+            <GraduationCap className="h-3.5 w-3.5" />
             <span>{t('instructor.management_space')}</span>
           </div>
-          <h2 className="fw-bold text-dark mb-1">
-            {t('instructor.courses_and_videos')} <span className="text-primary">{t('instructor.my_courses_suffix')}</span>
+          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-1">
+            {t('instructor.courses_and_videos')}{' '}
+            <span className="text-blue-600 dark:text-blue-400">
+              {t('instructor.my_courses_suffix')}
+            </span>
           </h2>
-          <p className="text-secondary mb-0 small">
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
             {t('instructor.management_desc')}
           </p>
         </div>
 
-        <div className="d-flex gap-2">
-          <Button
-            variant="outline-primary"
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            type="button"
             onClick={() => setShowCreateCourseModal(true)}
-            className="rounded-pill d-flex align-items-center gap-2 px-3 fw-medium"
+            className="inline-flex items-center gap-1.5 rounded-full border border-blue-600/30 bg-blue-50/50 dark:bg-blue-950/30 px-4 py-2 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-100 transition-all cursor-pointer"
           >
-            <i className="bi bi-folder-plus"></i>
+            <FolderPlus className="h-3.5 w-3.5" />
             <span>{t('instructor.add_course')}</span>
-          </Button>
-          <Button
+          </button>
+          <button
+            type="button"
             onClick={() => navigate(`/${lang}/instructor/upload`)}
-            className="btn-primary-pill d-flex align-items-center gap-2"
+            className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 px-5 py-2 text-xs font-semibold text-white shadow-xs transition-all cursor-pointer"
           >
-            <i className="bi bi-cloud-arrow-up fs-5"></i>
+            <UploadCloud className="h-3.5 w-3.5" />
             <span>{t('instructor.upload_video_part')}</span>
-          </Button>
+          </button>
         </div>
       </div>
 
-      {/* ===================================================================
-       * 2. BỘ TÌM KIẾM
-       * =================================================================== */}
-      <div className="card-clean border shadow-sm p-3 mb-4 bg-white">
-        <Row className="g-3 align-items-center justify-content-between">
-          <Col md={6}>
-            <InputGroup size="sm">
-              <InputGroup.Text className="bg-light border-light-subtle text-muted">
-                <i className="bi bi-search"></i>
-              </InputGroup.Text>
-              <Form.Control
-                type="text"
-                placeholder={t('instructor.search_course_placeholder')}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="form-control-clean border-start-0"
-              />
-            </InputGroup>
-          </Col>
-          <Col md={6} className="text-md-end text-muted small">
-            {t('instructor.manage')} <strong className="text-primary">{filteredCourses.length}</strong> {t('instructor.copyrighted_courses')}
-          </Col>
-        </Row>
+      {/* 2. BỘ TÌM KIẾM */}
+      <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 shadow-sm border border-slate-200/80 dark:border-slate-800 mb-8">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="relative w-full sm:w-96">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+              <Search className="h-4 w-4" />
+            </div>
+            <input
+              type="text"
+              placeholder={t('instructor.search_course_placeholder')}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+            />
+          </div>
+          <div className="text-xs text-slate-500 dark:text-slate-400">
+            {t('instructor.manage')}{' '}
+            <strong className="text-blue-600 dark:text-blue-400 font-bold">
+              {filteredCourses.length}
+            </strong>{' '}
+            {t('instructor.copyrighted_courses')}
+          </div>
+        </div>
       </div>
 
-      {/* ===================================================================
-       * 3. DANH SÁCH KHÓA HỌC GỐC (PARENT COURSES - GỌN GÀNG, KHÔNG RỐI MẮT)
-       * =================================================================== */}
-      <Row className="g-4 mb-4">
+      {/* 3. DANH SÁCH KHÓA HỌC GỐC */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         {filteredCourses.length === 0 ? (
-          <Col xs={12} className="text-center py-5 card-clean bg-white border">
-            <i className="bi bi-journal-x fs-1 text-muted d-block mb-2"></i>
-            <h6 className="text-dark fw-bold">{t('instructor.no_course_found')}</h6>
-            <p className="text-secondary small mb-3">{t('instructor.create_course_prompt')}</p>
-            <Button
-              variant="primary"
-              size="sm"
+          <div className="col-span-full text-center py-16 px-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+            <FolderOpen className="h-12 w-12 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+            <h6 className="text-base font-bold text-slate-900 dark:text-white mb-1">
+              {t('instructor.no_course_found')}
+            </h6>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+              {t('instructor.create_course_prompt')}
+            </p>
+            <button
+              type="button"
               onClick={() => setShowCreateCourseModal(true)}
-              className="btn-primary-pill px-3"
+              className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 px-5 py-2 text-xs font-semibold text-white shadow-xs"
             >
               {t('instructor.add_course')}
-            </Button>
-          </Col>
+            </button>
+          </div>
         ) : (
           filteredCourses.map((course) => (
-            <Col key={course.ID} xs={12} md={6} lg={4}>
-              <Card className="h-100 card-clean card-clean-hover overflow-hidden d-flex flex-column border shadow-sm bg-white">
-                {/* Header Thẻ Khóa Học */}
-                <div className="p-3 bg-primary bg-opacity-10 border-bottom d-flex justify-content-between align-items-center">
-                  <Badge bg="primary" className="px-3 py-2 rounded-pill fw-semibold">
-                    <i className="bi bi-shield-check me-1"></i>DRM HLS Ready
-                  </Badge>
-                  <span className="small text-muted font-monospace">
-                    <code>{course.ID}</code>
-                  </span>
+            <div
+              key={course.ID}
+              className="flex flex-col rounded-3xl overflow-hidden bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200"
+            >
+              {/* Header Thẻ Khóa Học */}
+              <div className="p-4 bg-blue-50/70 dark:bg-blue-950/30 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                <span className="inline-flex items-center gap-1 px-3 py-1 text-[11px] font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-950/60 rounded-full">
+                  <ShieldCheck className="h-3 w-3 text-blue-600" />
+                  <span>DRM HLS Ready</span>
+                </span>
+                <span className="text-[11px] font-mono text-slate-400">
+                  {course.ID}
+                </span>
+              </div>
+
+              <div className="p-5 flex flex-col flex-1">
+                <h3
+                  className="font-bold text-base text-slate-900 dark:text-white mb-2 line-clamp-1"
+                  title={course.Title}
+                >
+                  {course.Title}
+                </h3>
+
+                <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mb-4 flex-1">
+                  {course.Description}
+                </p>
+
+                {/* Thống kê cấu trúc */}
+                <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl mb-4 border border-slate-100 dark:border-slate-800 text-xs space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">{t('instructor.course_structure')}</span>
+                    <strong className="text-slate-700 dark:text-slate-300">
+                      {course.chaptersCount} {t('instructor.chapters')} • {course.videosCount} {t('instructor.lessons')}
+                    </strong>
+                  </div>
+                  <div className="flex justify-between text-[11px] text-slate-400">
+                    <span>{t('instructor.duration_and_size')}</span>
+                    <span>
+                      {formatDuration(course.totalSeconds)} • {formatBytes(course.totalBytes)}
+                    </span>
+                  </div>
                 </div>
 
-                <Card.Body className="d-flex flex-column p-4">
-                  <Card.Title className="fw-bold fs-5 text-dark mb-2 text-truncate" title={course.Title}>
-                    {course.Title}
-                  </Card.Title>
+                {/* Thao tác */}
+                <div className="flex items-center gap-1.5 mt-auto pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenCourseDetail(course)}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 px-3 py-2 text-xs font-semibold text-white shadow-xs transition-all cursor-pointer"
+                  >
+                    <Edit className="h-3.5 w-3.5" />
+                    <span>{t('instructor.edit_lesson')}</span>
+                  </button>
 
-                  <Card.Text className="text-secondary small mb-3 flex-grow-1" style={{ minHeight: '50px' }}>
-                    {course.Description}
-                  </Card.Text>
+                  <button
+                    type="button"
+                    title={t('instructor.view')}
+                    onClick={() => navigate(`/${lang}/instructor/preview/${course.ID || course.id}`)}
+                    className="p-2 rounded-full border border-slate-200 dark:border-slate-700 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-all cursor-pointer"
+                  >
+                    <Play className="h-3.5 w-3.5" />
+                  </button>
 
-                  {/* Thống kê cấu trúc: Số chương & Số bài học nhỏ */}
-                  <div className="p-3 bg-light rounded-3 mb-3 border small">
-                    <div className="d-flex justify-content-between mb-1">
-                      <span className="text-muted">{t('instructor.course_structure')}</span>
-                      <strong className="text-dark">
-                        {course.chaptersCount} {t('instructor.chapters')} • {course.videosCount} {t('instructor.lessons')}
-                      </strong>
-                    </div>
-                    <div className="d-flex justify-content-between text-muted">
-                      <span>{t('instructor.duration_and_size')}</span>
-                      <span>
-                        {formatDuration(course.totalSeconds)} • {formatBytes(course.totalBytes)}
-                      </span>
-                    </div>
-                  </div>
+                  <button
+                    type="button"
+                    title="Upload video"
+                    onClick={() =>
+                      navigate(`/${lang}/instructor/upload`, {
+                        state: { courseId: course.ID || course.id },
+                      })
+                    }
+                    className="p-2 rounded-full border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                  >
+                    <UploadCloud className="h-3.5 w-3.5" />
+                  </button>
 
-                  {/* Thao tác chính: Mở quản lý bài giảng nhỏ, Xem trước & Xóa khóa học */}
-                  <div className="d-flex gap-2 mt-auto">
-                    <Button
-                      variant="primary"
-                      className="btn-primary-pill flex-grow-1 d-flex align-items-center justify-content-center gap-1 small py-2"
-                      onClick={() => handleOpenCourseDetail(course)}
-                    >
-                      <i className="bi bi-pencil-square"></i>
-                      <span>{t('instructor.edit_lesson')}</span>
-                    </Button>
-                    <Button
-                      variant="outline-primary"
-                      className="rounded-pill px-3 py-2 small d-flex align-items-center justify-content-center gap-1"
-                      onClick={() => navigate(`/${lang}/instructor/preview/${course.ID || course.id}`)}
-                    >
-                      <i className="bi bi-play-circle"></i>
-                      <span>{t('instructor.view')}</span>
-                    </Button>
-                    <Button
-                      variant="outline-secondary"
-                      className="rounded-pill px-3 py-2 small d-flex align-items-center justify-content-center"
-                      onClick={() => navigate(`/${lang}/instructor/upload`, { state: { courseId: course.ID || course.id } })}
-                    >
-                      <i className="bi bi-cloud-arrow-up"></i>
-                    </Button>
-                    <Button
-                      variant="outline-danger"
-                      className="rounded-pill px-3 py-2 small d-flex align-items-center justify-content-center"
-                      title="Xóa khóa học (DELETE /api/v1/course/{id})"
-                      onClick={(e) => handleDeleteCourse(course.ID || course.id, course.Title, e)}
-                    >
-                      <i className="bi bi-trash"></i>
-                    </Button>
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
+                  <button
+                    type="button"
+                    title="Xóa khóa học"
+                    onClick={(e) => handleDeleteCourse(course.ID || course.id, course.Title, e)}
+                    className="p-2 rounded-full border border-rose-200 dark:border-rose-900/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-all cursor-pointer"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
           ))
         )}
-      </Row>
+      </div>
 
-      {/* ===================================================================
-       * 4. MODAL CHI TIẾT: QUẢN LÝ TỪNG CHƯƠNG & CHỈNH SỬA TỪNG BÀI NHỎ
-       * =================================================================== */}
-      <Modal
-        show={Boolean(selectedCourseForDetail)}
-        onHide={() => setSelectedCourseForDetail(null)}
-        size="lg"
-        centered
-        backdrop="static"
-      >
-        <Modal.Header closeButton className="border-bottom bg-light">
-          <Modal.Title className="fs-5 fw-bold text-dark d-flex align-items-center gap-2">
-            <i className="bi bi-folder2-open text-primary fs-4"></i>
-            <span>{t('instructor.lecture_structure')} {selectedCourseForDetail?.Title}</span>
-          </Modal.Title>
-        </Modal.Header>
-
-        <Modal.Body className="p-4">
-          <div className="alert alert-info border-0 bg-primary bg-opacity-10 text-dark small p-3 rounded-3 mb-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <div>
-              <i className="bi bi-info-circle-fill text-primary me-2"></i>
-              {t('instructor.course_contains')} <strong>{selectedCourseForDetail?.chaptersCount} {t('instructor.chapters_and')}</strong>
-              <strong>{selectedCourseForDetail?.videosCount} {t('instructor.lessons_dot')}</strong>
+      {/* 4. MODAL CHI TIẾT: QUẢN LÝ TỪNG CHƯƠNG */}
+      {Boolean(selectedCourseForDetail) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-3xl max-h-[90vh] flex flex-col rounded-3xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-850">
+              <div className="flex items-center gap-2">
+                <FolderOpen className="h-5 w-5 text-blue-600" />
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  {t('instructor.lecture_structure')} {selectedCourseForDetail?.Title}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedCourseForDetail(null)}
+                className="p-1 rounded-full text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
-            <Button
-              variant="primary"
-              size="sm"
-              className="rounded-pill px-3"
-              onClick={() => {
-                const cid = selectedCourseForDetail?.ID;
-                setSelectedCourseForDetail(null);
-                navigate(`/${lang}/instructor/upload`, { state: { courseId: cid } });
-              }}
-            >
-              <i className="bi bi-plus-lg me-1"></i>{t('instructor.upload_more_lessons')}
-            </Button>
-          </div>
 
-          {/* Cây danh mục theo từng chương */}
-          {selectedCourseForDetail?.structuredChapters.length === 0 ? (
-            <div className="text-center py-4 text-muted small">
-              {t('instructor.no_chapters_prompt_1')} <strong>{t('instructor.upload_video_part')}</strong> {t('instructor.no_chapters_prompt_2')}
-            </div>
-          ) : (
-            <Accordion defaultActiveKey="0" className="accordion-clean">
-              {selectedCourseForDetail?.structuredChapters.map((chap, idx) => (
-                <Accordion.Item key={chap.ID} eventKey={String(idx)} className="mb-3 border rounded-3 overflow-hidden">
-                  <Accordion.Header>
-                    <div className="d-flex justify-content-between align-items-center w-100 pe-3 flex-wrap gap-2">
-                      <div className="d-flex align-items-center gap-2">
-                        <span className="fw-bold text-dark">
-                          {t('instructor.chapters')} {chap.ChapterNumber}: {chap.Title}
-                        </span>
-                        <Badge bg="secondary" className="bg-opacity-25 text-dark fw-normal small">
-                          {chap.videos.length} {t('instructor.lessons_count')}
-                        </Badge>
-                      </div>
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-4">
+              <div className="p-3.5 rounded-2xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-900/60 flex items-center justify-between flex-wrap gap-2 text-xs">
+                <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+                  <Info className="h-4 w-4 text-blue-600 shrink-0" />
+                  <span>
+                    {t('instructor.course_contains')}{' '}
+                    <strong>{selectedCourseForDetail?.chaptersCount} {t('instructor.chapters_and')}</strong>{' '}
+                    <strong>{selectedCourseForDetail?.videosCount} {t('instructor.lessons_dot')}</strong>
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const cid = selectedCourseForDetail?.ID;
+                    setSelectedCourseForDetail(null);
+                    navigate(`/${lang}/instructor/upload`, { state: { courseId: cid } });
+                  }}
+                  className="inline-flex items-center gap-1 rounded-full bg-blue-600 hover:bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white shadow-xs"
+                >
+                  <Plus className="h-3 w-3" />
+                  <span>{t('instructor.upload_more_lessons')}</span>
+                </button>
+              </div>
 
-                      <div className="d-flex align-items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          variant="light"
-                          size="sm"
-                          className="rounded-pill px-2 py-0 small text-primary"
-                          style={{ fontSize: '0.75rem' }}
-                          onClick={(e) => handleOpenEditChapterModal(chap, e)}
-                        >
-                          <i className="bi bi-pencil me-1"></i>{t('instructor.edit_chapter')}
-                        </Button>
-                        <Button
-                          variant="light"
-                          size="sm"
-                          className="rounded-pill px-2 py-0 small text-success"
-                          style={{ fontSize: '0.75rem' }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const cid = selectedCourseForDetail?.ID;
-                            setSelectedCourseForDetail(null);
-                            navigate(`/${lang}/instructor/upload`, { state: { courseId: cid, chapterId: chap.ID } });
-                          }}
-                        >
-                          <i className="bi bi-plus me-1"></i>{t('instructor.add_lesson')}
-                        </Button>
-                        <Button
-                          variant="light"
-                          size="sm"
-                          className="rounded-pill px-2 py-0 small text-danger"
-                          style={{ fontSize: '0.75rem' }}
-                          onClick={(e) => handleDeleteChapter(chap.ID, chap.Title, e)}
-                        >
-                          <i className="bi bi-trash"></i>
-                        </Button>
-                      </div>
-                    </div>
-                  </Accordion.Header>
+              {/* Danh sách chương */}
+              {selectedCourseForDetail?.structuredChapters.length === 0 ? (
+                <div className="text-center py-8 text-xs text-slate-400">
+                  {t('instructor.no_chapters_prompt_1')} <strong>{t('instructor.upload_video_part')}</strong> {t('instructor.no_chapters_prompt_2')}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {selectedCourseForDetail?.structuredChapters.map((chap, idx) => {
+                    const isOpen = openDetailChapters[idx] !== false;
 
-                  <Accordion.Body className="p-0 bg-white">
-                    {chap.Description && (
-                      <div className="p-3 bg-light border-bottom text-muted small fst-italic">
-                        {chap.Description}
-                      </div>
-                    )}
-                    {chap.videos.length === 0 ? (
-                      <div className="text-muted small p-3 text-center">
-                        {t('instructor.no_videos_in_chapter')}{' '}
-                        <Button
-                          variant="link"
-                          size="sm"
-                          className="p-0 text-decoration-none"
-                          onClick={() => {
-                            const cid = selectedCourseForDetail?.ID;
-                            setSelectedCourseForDetail(null);
-                            navigate(`/${lang}/instructor/upload`, { state: { courseId: cid, chapterId: chap.ID } });
-                          }}
+                    return (
+                      <div
+                        key={chap.ID}
+                        className="rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900"
+                      >
+                        <div
+                          onClick={() => toggleDetailChapter(idx)}
+                          className="flex items-center justify-between p-4 bg-slate-50/70 dark:bg-slate-850 hover:bg-slate-100/50 cursor-pointer transition-colors"
                         >
-                          <span dangerouslySetInnerHTML={{ __html: t('instructor.upload_lesson_now') }} />
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="list-group list-group-flush">
-                        {chap.videos.map((vid, vIdx) => (
-                          <div
-                            key={vid.ID}
-                            className="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2 p-3 hover-bg-light"
-                          >
-                            <div className="d-flex align-items-center gap-3">
-                              <div
-                                className="rounded-circle bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center fw-bold"
-                                style={{ width: '32px', height: '32px', fontSize: '0.85rem' }}
-                              >
-                                {vIdx + 1}
-                              </div>
-                              <div>
-                                <h6 className="fw-bold text-dark mb-0">{vid.Title}</h6>
-                                <div className="small text-muted d-flex gap-3 mt-1">
-                                  <span>
-                                    <i className="bi bi-clock me-1 text-primary"></i>
-                                    {formatDuration(vid.Length)}
-                                  </span>
-                                  <span>
-                                    <i className="bi bi-hdd me-1 text-secondary"></i>
-                                    {formatBytes(vid.Size)}
-                                  </span>
-                                  <span>
-                                    <code>{vid.ID}</code>
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-xs text-slate-900 dark:text-white">
+                              {t('instructor.chapters')} {chap.ChapterNumber}: {chap.Title}
+                            </span>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                              {chap.videos.length} {t('instructor.lessons_count')}
+                            </span>
+                          </div>
 
-                            <div className="d-flex gap-2">
-                              <Button
-                                variant="outline-primary"
-                                size="sm"
-                                className="rounded-pill px-3 d-flex align-items-center gap-1"
-                                onClick={() => navigate(`/${lang}/instructor/preview/${vid.ID}`)}
-                              >
-                                <i className="bi bi-play-circle"></i>
-                                <span>{t('instructor.view')}</span>
-                              </Button>
-                              <Button
-                                variant="outline-secondary"
-                                size="sm"
-                                className="rounded-pill px-3 d-flex align-items-center gap-1"
-                                onClick={() => handleOpenEditVideoModal(vid)}
-                              >
-                                <i className="bi bi-pencil"></i>
-                                <span>{t('instructor.edit_name')}</span>
-                              </Button>
-                              <Button
-                                variant="outline-primary"
-                                size="sm"
-                                className="rounded-pill px-3 d-flex align-items-center gap-1"
-                                onClick={() => handleOpenReuploadModal(vid)}
-                              >
-                                <i className="bi bi-arrow-repeat"></i>
-                                <span>{t('instructor.reupload_video')}</span>
-                              </Button>
-                              <Button
-                                variant="outline-danger"
-                                size="sm"
-                                className="rounded-pill px-2 d-flex align-items-center"
-                                onClick={() => handleDeleteVideo(vid.ID, vid.Title)}
-                              >
-                                <i className="bi bi-trash"></i>
-                              </Button>
+                          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              onClick={(e) => handleOpenEditChapterModal(chap, e)}
+                              className="px-2 py-1 rounded-full text-[11px] font-semibold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+                            >
+                              {t('instructor.edit_chapter')}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const cid = selectedCourseForDetail?.ID;
+                                setSelectedCourseForDetail(null);
+                                navigate(`/${lang}/instructor/upload`, {
+                                  state: { courseId: cid, chapterId: chap.ID },
+                                });
+                              }}
+                              className="px-2 py-1 rounded-full text-[11px] font-semibold text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                            >
+                              {t('instructor.add_lesson')}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeleteChapter(chap.ID, chap.Title, e)}
+                              className="p-1 rounded-full text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                            <div className="text-slate-400 ml-1">
+                              {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                             </div>
                           </div>
-                        ))}
+                        </div>
+
+                        {isOpen && (
+                          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                            {chap.Description && (
+                              <div className="p-3 bg-slate-50/40 dark:bg-slate-850/40 text-xs text-slate-400 italic">
+                                {chap.Description}
+                              </div>
+                            )}
+
+                            {chap.videos.length === 0 ? (
+                              <div className="p-4 text-center text-xs text-slate-400">
+                                {t('instructor.no_videos_in_chapter')}
+                              </div>
+                            ) : (
+                              chap.videos.map((vid, vIdx) => (
+                                <div
+                                  key={vid.ID}
+                                  className="p-3.5 flex items-center justify-between flex-wrap gap-2 hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors"
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-xs shrink-0">
+                                      {vIdx + 1}
+                                    </div>
+                                    <div>
+                                      <h5 className="font-bold text-xs text-slate-900 dark:text-white mb-0.5">
+                                        {vid.Title}
+                                      </h5>
+                                      <div className="flex items-center gap-3 text-[11px] text-slate-400">
+                                        <span className="flex items-center gap-1">
+                                          <Clock className="h-3 w-3 text-blue-500" />
+                                          {formatDuration(vid.Length)}
+                                        </span>
+                                        <span className="flex items-center gap-1">
+                                          <HardDrive className="h-3 w-3 text-slate-400" />
+                                          {formatBytes(vid.Size)}
+                                        </span>
+                                        <span className="font-mono">{vid.ID}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => navigate(`/${lang}/instructor/preview/${vid.ID}`)}
+                                      className="inline-flex items-center gap-1 rounded-full border border-blue-200 dark:border-blue-900 px-3 py-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50"
+                                    >
+                                      <Play className="h-3 w-3" />
+                                      <span>{t('instructor.view')}</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenEditVideoModal(vid)}
+                                      className="inline-flex items-center gap-1 rounded-full border border-slate-200 dark:border-slate-700 px-3 py-1 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100"
+                                    >
+                                      <Edit className="h-3 w-3" />
+                                      <span>{t('instructor.edit_name')}</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenReuploadModal(vid)}
+                                      className="inline-flex items-center gap-1 rounded-full border border-blue-200 dark:border-blue-900 px-3 py-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50"
+                                    >
+                                      <RefreshCw className="h-3 w-3" />
+                                      <span>{t('instructor.reupload_video')}</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteVideo(vid.ID, vid.Title)}
+                                      className="p-1.5 rounded-full text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </Accordion.Body>
-                </Accordion.Item>
-              ))}
-            </Accordion>
-          )}
-        </Modal.Body>
-
-        <Modal.Footer className="border-top bg-light">
-          <Button variant="secondary" onClick={() => setSelectedCourseForDetail(null)} className="rounded-pill px-4">
-            {t('common.close')}
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      {/* ===================================================================
-       * 5. MODAL SỬA TIÊU ĐỀ BÀI HỌC NHỎ
-       * =================================================================== */}
-      <Modal show={Boolean(editingVideo)} onHide={() => setEditingVideo(null)} centered>
-        <Modal.Header closeButton>
-          <Modal.Title className="fs-6 fw-bold">
-            <i className="bi bi-pencil-square text-primary me-2"></i>
-            {t('instructor.edit_video_title')}
-          </Modal.Title>
-        </Modal.Header>
-        <Form onSubmit={handleSaveVideoTitle}>
-          <Modal.Body>
-            <div className="mb-3">
-              <label className="form-label small text-muted">{t('instructor.video_id')} </label>{' '}
-              <code>{editingVideo?.ID}</code>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
-            <FloatingLabel controlId="editVideoTitle" label={t('instructor.lesson_title_required')} className="mb-3 text-secondary">
-              <Form.Control
-                type="text"
-                value={formVideoTitle}
-                onChange={(e) => setFormVideoTitle(e.target.value)}
-                required
-                className="form-control-clean"
-                autoFocus
-              />
-            </FloatingLabel>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="light" onClick={() => setEditingVideo(null)} className="rounded-pill px-3">
-              {t('common.cancel')}
-            </Button>
-            <Button type="submit" variant="primary" className="btn-primary-pill px-3">
-              {t('common.save')}
-            </Button>
-          </Modal.Footer>
-        </Form>
-      </Modal>
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-850 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSelectedCourseForDetail(null)}
+                className="rounded-full border border-slate-200 dark:border-slate-700 px-5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100"
+              >
+                {t('common.close')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-      {/* ===================================================================
-       * 6. MODAL SỬA THÔNG TIN CHƯƠNG / PHẦN HỌC
-       * =================================================================== */}
-      <Modal show={Boolean(editingChapter)} onHide={() => setEditingChapter(null)} centered>
-        <Modal.Header closeButton>
-          <Modal.Title className="fs-6 fw-bold">
-            <i className="bi bi-folder-check text-primary me-2"></i>
-            {t('instructor.edit_chapter_info')}
-          </Modal.Title>
-        </Modal.Header>
-        <Form onSubmit={handleSaveChapter}>
-          <Modal.Body>
-            <FloatingLabel controlId="editChapterTitle" label={t('instructor.chapter_title_required')} className="mb-3 text-secondary">
-              <Form.Control
-                type="text"
-                value={chapterFormTitle}
-                onChange={(e) => setChapterFormTitle(e.target.value)}
-                required
-                className="form-control-clean"
-                autoFocus
-              />
-            </FloatingLabel>
-            <FloatingLabel controlId="editChapterDesc" label={t('instructor.short_description')} className="mb-3 text-secondary">
-              <Form.Control
-                as="textarea"
-                style={{ height: '90px' }}
-                value={chapterFormDesc}
-                onChange={(e) => setChapterFormDesc(e.target.value)}
-                className="form-control-clean"
-              />
-            </FloatingLabel>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="light" onClick={() => setEditingChapter(null)} className="rounded-pill px-3">
-              {t('common.cancel')}
-            </Button>
-            <Button type="submit" variant="primary" className="btn-primary-pill px-3">
-              {t('common.save')}
-            </Button>
-          </Modal.Footer>
-        </Form>
-      </Modal>
+      {/* 5. MODAL SỬA TIÊU ĐỀ BÀI HỌC NHỎ */}
+      {Boolean(editingVideo) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <h4 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Edit className="h-4 w-4 text-blue-600" />
+                <span>{t('instructor.edit_video_title')}</span>
+              </h4>
+              <button
+                type="button"
+                onClick={() => setEditingVideo(null)}
+                className="p-1 rounded-full text-slate-400 hover:bg-slate-100"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveVideoTitle} className="space-y-4">
+              <div className="text-xs text-slate-400">
+                <span>{t('instructor.video_id')} </span>
+                <code className="text-blue-600">{editingVideo?.ID}</code>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  {t('instructor.lesson_title_required')}
+                </label>
+                <input
+                  type="text"
+                  value={formVideoTitle}
+                  onChange={(e) => setFormVideoTitle(e.target.value)}
+                  required
+                  autoFocus
+                  className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60 px-4 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingVideo(null)}
+                  className="rounded-full border border-slate-200 dark:border-slate-700 px-4 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50"
+                >
+                  {t('common.cancel')}
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-full bg-blue-600 hover:bg-blue-700 px-5 py-1.5 text-xs font-semibold text-white shadow-xs"
+                >
+                  {t('common.save')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 6. MODAL SỬA THÔNG TIN CHƯƠNG */}
+      {Boolean(editingChapter) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <h4 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <FolderOpen className="h-4 w-4 text-blue-600" />
+                <span>{t('instructor.edit_chapter_info')}</span>
+              </h4>
+              <button
+                type="button"
+                onClick={() => setEditingChapter(null)}
+                className="p-1 rounded-full text-slate-400 hover:bg-slate-100"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveChapter} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  {t('instructor.chapter_title_required')}
+                </label>
+                <input
+                  type="text"
+                  value={chapterFormTitle}
+                  onChange={(e) => setChapterFormTitle(e.target.value)}
+                  required
+                  autoFocus
+                  className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60 px-4 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  {t('instructor.short_description')}
+                </label>
+                <textarea
+                  rows={3}
+                  value={chapterFormDesc}
+                  onChange={(e) => setChapterFormDesc(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60 p-3 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingChapter(null)}
+                  className="rounded-full border border-slate-200 dark:border-slate-700 px-4 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50"
+                >
+                  {t('common.cancel')}
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-full bg-blue-600 hover:bg-blue-700 px-5 py-1.5 text-xs font-semibold text-white shadow-xs"
+                >
+                  {t('common.save')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* MODAL TẠO KHÓA HỌC MỚI */}
       <CreateCourseModal
@@ -859,6 +931,6 @@ export default function InstructorVideos() {
         video={reuploadingVideo}
         onSuccess={handleReuploadSuccess}
       />
-    </Container>
+    </div>
   );
 }

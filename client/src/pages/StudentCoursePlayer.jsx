@@ -1,18 +1,22 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
-  Container,
-  Row,
-  Col,
-  Card,
-  Button,
-  Badge,
-  ProgressBar,
-  Accordion,
-  Tabs,
-  Tab,
-  Form,
-} from 'react-bootstrap';
+  ChevronLeft,
+  ShieldAlert,
+  AlertTriangle,
+  GraduationCap,
+  Compass,
+  ChevronDown,
+  ChevronUp,
+  Play,
+  CheckCircle,
+  ArrowLeft,
+  ArrowRight,
+  Save,
+  User,
+  Clock,
+  BookOpen,
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import SecureVideoPlayer from '../components/SecureVideoPlayer';
 import { checkCourseAccess } from '../services/entitlementService';
@@ -21,13 +25,12 @@ import { getCourseWithLessons } from '../services/courseService';
 /**
  * =============================================================================
  * PAGE: StudentCoursePlayer (Giao diện học tập kết nối Backend API)
- * =============================================================================
- * - Tự động nạp dữ liệu khóa học và bài giảng (Lessons) từ Backend API
- * - Phát luồng videoURL được lưu trên Backend cho từng bài học
+ * Pure Tailwind CSS & Lucide Icons
  * =============================================================================
  */
 export default function StudentCoursePlayer() {
-  const { videoId: paramCourseOrVideoId } = useParams();
+  const { lang, videoId: paramCourseOrVideoId } = useParams();
+  const currentLang = lang || 'vi';
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -35,7 +38,20 @@ export default function StudentCoursePlayer() {
   const [backendData, setBackendData] = useState(null);
   const [isLoadingBackend, setIsLoadingBackend] = useState(true);
 
-  React.useEffect(() => {
+  // Tab State
+  const [activeTab, setActiveTab] = useState('overview');
+
+  // Accordion State
+  const [openChapters, setOpenChapters] = useState({ 0: true });
+
+  const toggleChapter = (index) => {
+    setOpenChapters((prev) => ({
+      ...prev,
+      [index]: !prev[index],
+    }));
+  };
+
+  useEffect(() => {
     let isMounted = true;
     setIsLoadingBackend(true);
     getCourseWithLessons(paramCourseOrVideoId)
@@ -56,7 +72,7 @@ export default function StudentCoursePlayer() {
     };
   }, [paramCourseOrVideoId]);
 
-  // 1. Dữ liệu: Xác định Khóa học hiện tại (chỉ lấy từ Backend API)
+  // 1. Dữ liệu: Xác định Khóa học hiện tại
   const currentCourse = useMemo(() => {
     return backendData?.course || null;
   }, [backendData]);
@@ -137,8 +153,7 @@ export default function StudentCoursePlayer() {
   // 3. Bài giảng đang phát
   const [activeLectureId, setActiveLectureId] = useState('');
 
-  // Tự động đồng bộ bài giảng đầu tiên khi curriculum nạp xong
-  React.useEffect(() => {
+  useEffect(() => {
     if (allLectures && allLectures.length > 0) {
       setActiveLectureId((prev) => {
         if (prev && allLectures.some((l) => l.ID === prev)) return prev;
@@ -149,7 +164,7 @@ export default function StudentCoursePlayer() {
     }
   }, [allLectures]);
 
-  // State tương tác người dùng (động)
+  // State tương tác người dùng
   const [completedLectures, setCompletedLectures] = useState([]);
   const [notes, setNotes] = useState('');
   const [savedNotes, setSavedNotes] = useState([]);
@@ -159,12 +174,10 @@ export default function StudentCoursePlayer() {
     return allLectures.find((l) => l.ID === activeLectureId) || allLectures[0] || null;
   }, [allLectures, activeLectureId]);
 
-  // Vị trí bài giảng hiện tại trong danh sách
   const currentIdx = allLectures.findIndex((l) => l.ID === activeLectureId);
   const hasPrev = currentIdx > 0;
   const hasNext = currentIdx >= 0 && currentIdx < allLectures.length - 1;
 
-  // Lấy tên giảng viên trực tiếp từ dữ liệu khóa học/bài học của backend.
   const instructorName =
     activeLecture?.uploadedBy ||
     activeLecture?.UploadedBy ||
@@ -173,7 +186,6 @@ export default function StudentCoursePlayer() {
     currentCourse?.owner ||
     currentCourse?.Owner;
 
-  // Chuyển bài học
   const handleSelectLecture = (lectureId) => {
     setActiveLectureId(lectureId);
     window.scrollTo({ top: 120, behavior: 'smooth' });
@@ -209,7 +221,6 @@ export default function StudentCoursePlayer() {
     setNotes('');
   };
 
-  // Helper chuyển đổi số giây sang định dạng mm:ss
   const formatDuration = (seconds) => {
     if (!seconds && seconds !== 0) return '';
     const m = Math.floor(seconds / 60);
@@ -217,26 +228,29 @@ export default function StudentCoursePlayer() {
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  // Helper chuyển đổi bytes sang MB
   const formatBytes = (bytes) => {
     if (!bytes && bytes !== 0) return '';
     const mb = bytes / (1024 * 1024);
     return `${mb.toFixed(1)} MB`;
   };
 
-  // Tính phần trăm tiến độ
   const progressPercent = allLectures.length > 0
     ? Math.round((completedLectures.length / allLectures.length) * 100)
     : 0;
 
   if (!currentCourse) {
     return (
-      <Container className="py-5 text-center">
-        <h5 className="text-muted">Không tìm thấy dữ liệu khóa học.</h5>
-        <Button onClick={() => navigate('/catalog')} className="btn-primary-pill mt-3">
+      <div className="py-20 text-center max-w-md mx-auto px-4">
+        <h5 className="text-slate-500 dark:text-slate-400 text-sm mb-4">
+          Không tìm thấy dữ liệu khóa học.
+        </h5>
+        <button
+          onClick={() => navigate(`/${currentLang}/catalog`)}
+          className="inline-flex items-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 px-6 py-2.5 text-xs font-semibold text-white shadow-xs"
+        >
           Về danh mục khóa học
-        </Button>
-      </Container>
+        </button>
+      </div>
     );
   }
 
@@ -245,372 +259,396 @@ export default function StudentCoursePlayer() {
   // =============================================================================
   if (!accessResult.hasAccess) {
     return (
-      <div className="py-5 bg-light min-vh-100 d-flex align-items-center">
-        <Container>
-          <Row className="justify-content-center">
-            <Col xs={12} md={8} lg={6}>
-              <Card className="card-clean border-0 shadow-lg p-4 p-md-5 text-center bg-white rounded-4">
-                <div
-                  className="rounded-circle mx-auto mb-4 d-flex align-items-center justify-content-center shadow-sm"
-                  style={{ width: '80px', height: '80px', background: 'rgba(239, 68, 68, 0.1)', color: '#dc2626' }}
-                >
-                  <i className="bi bi-shield-slash-fill fs-1"></i>
-                </div>
+      <div className="min-h-[80vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div className="w-full max-w-md text-center bg-white dark:bg-slate-900 rounded-3xl p-8 sm:p-10 shadow-xl shadow-slate-200/50 dark:shadow-slate-950/50 border border-slate-200/80 dark:border-slate-800 transition-all">
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 mb-6 shadow-sm">
+            <ShieldAlert className="h-10 w-10 stroke-[1.75]" />
+          </div>
 
-                <Badge bg="danger" className="align-self-center px-3 py-2 rounded-pill fw-bold mb-3 shadow-sm">
-                  CHƯA CẤP QUYỀN XEM • BẢO MẬT DRM
-                </Badge>
+          <span className="inline-block px-3 py-1 text-xs font-bold tracking-wider uppercase text-rose-600 dark:text-rose-400 bg-rose-100/60 dark:bg-rose-900/40 rounded-full mb-3">
+            CHƯA CẤP QUYỀN XEM • BẢO MẬT DRM
+          </span>
 
-                <h3 className="fw-extrabold text-dark mb-2">
-                  Quyền Truy Cập Bị Từ Chối
-                </h3>
+          <h3 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white mb-2">
+            Quyền Truy Cập Bị Từ Chối
+          </h3>
 
-                <p className="text-muted small mb-3">
-                  Khóa học: <strong className="text-dark">{currentCourse.Title}</strong> (<code>{currentCourse.ID}</code>)
-                </p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+            Khóa học: <strong className="text-slate-800 dark:text-slate-200">{currentCourse.Title}</strong> (
+            <code className="text-blue-600">{currentCourse.ID}</code>)
+          </p>
 
-                <div className="alert alert-warning border-0 bg-warning bg-opacity-10 text-dark small text-start p-3 rounded-3 mb-4">
-                  <div className="d-flex gap-2">
-                    <i className="bi bi-exclamation-triangle-fill text-warning fs-5 flex-shrink-0"></i>
-                    <div>
-                      <strong>Chính sách bản quyền SecureLearn:</strong> Khóa học trong danh mục khóa học chưa được cấp quyền xem thì chưa thể xem được. Chỉ các khóa học đã được ghi danh trong mục <strong>"Khóa học của tôi"</strong> mới có thể xem video bài giảng.
-                    </div>
-                  </div>
-                </div>
+          <div className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-2xl text-xs text-amber-800 dark:text-amber-200 text-left flex items-start gap-2.5 mb-6 leading-relaxed">
+            <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+            <div>
+              <strong>Chính sách bản quyền SecureLearn:</strong> Khóa học trong danh mục khóa học chưa được cấp quyền xem thì chưa thể xem được. Chỉ các khóa học đã được ghi danh trong mục <strong>"Khóa học của tôi"</strong> mới có thể xem video bài giảng.
+            </div>
+          </div>
 
-                <div className="d-flex justify-content-center gap-3 flex-wrap">
-                  <Button
-                    variant="primary"
-                    onClick={() => navigate('/student/courses')}
-                    className="btn-primary-pill d-flex align-items-center gap-2 px-4 py-2"
-                  >
-                    <i className="bi bi-mortarboard-fill"></i>
-                    <span>Vào Khóa Học Của Tôi</span>
-                  </Button>
-                  <Button
-                    variant="outline-secondary"
-                    onClick={() => navigate('/catalog')}
-                    className="rounded-pill d-flex align-items-center gap-2 px-4 py-2"
-                  >
-                    <i className="bi bi-compass"></i>
-                    <span>Danh Mục Khóa Học</span>
-                  </Button>
-                </div>
-              </Card>
-            </Col>
-          </Row>
-        </Container>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <button
+              onClick={() => navigate(`/${currentLang}/student/courses`)}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 px-5 py-2.5 text-xs font-semibold text-white shadow-md shadow-blue-500/20"
+            >
+              <GraduationCap className="h-4 w-4" />
+              <span>Vào Khóa Học Của Tôi</span>
+            </button>
+            <button
+              onClick={() => navigate(`/${currentLang}/catalog`)}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-5 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-750 shadow-xs"
+            >
+              <Compass className="h-4 w-4 text-slate-400" />
+              <span>Danh Mục Khóa Học</span>
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="py-4 bg-light min-vh-100">
-      <Container fluid="xl">
-        {/* ===================================================================
-         * 1. TOP HEADER & BREADCRUMB (Hoàn toàn dữ liệu mềm)
-         * =================================================================== */}
-        <div className="bg-white p-3 p-md-4 rounded-4 shadow-sm mb-4 border border-light-subtle">
-          <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
-            <div>
-              <div className="d-flex align-items-center gap-2 small text-muted mb-2">
-                <Link to="/student/courses" className="text-decoration-none text-secondary">
-                  <i className="bi bi-chevron-left me-1"></i>Khóa học của tôi
-                </Link>
-                <span>/</span>
-                <span className="text-primary fw-semibold">{currentCourse.Title}</span>
-              </div>
-
-              <h3 className="fw-bold text-dark mb-1 d-flex align-items-center gap-2 flex-wrap">
-                <span>{currentCourse.Title}</span>
-                {currentCourse.Price != null && (
-                  <Badge bg="light" text="dark" className="border fw-normal fs-6">
-                    {currentCourse.Price === 0 ? 'Miễn phí' : `${currentCourse.Price.toLocaleString('vi-VN')} đ`}
-                  </Badge>
-                )}
-              </h3>
+    <div className="py-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* 1. TOP HEADER & BREADCRUMB */}
+      <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl shadow-sm mb-6 border border-slate-200/80 dark:border-slate-800">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <div className="flex items-center gap-2 text-xs text-slate-400 mb-1.5">
+              <Link
+                to={`/${currentLang}/student/courses`}
+                className="inline-flex items-center gap-1 text-slate-500 dark:text-slate-400 hover:text-blue-600 no-underline font-medium"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                <span>Khóa học của tôi</span>
+              </Link>
+              <span>/</span>
+              <span className="text-blue-600 dark:text-blue-400 font-semibold truncate max-w-xs sm:max-w-md">
+                {currentCourse.Title}
+              </span>
             </div>
 
-            {/* Thanh tiến độ tóm tắt */}
-            {allLectures.length > 0 && (
-              <div className="d-flex flex-column align-items-md-end" style={{ minWidth: '220px' }}>
-                <div className="d-flex justify-content-between w-100 small mb-1">
-                  <span className="text-muted">Tiến độ bài học:</span>
-                  <span className="fw-bold text-primary">{progressPercent}%</span>
-                </div>
-                <ProgressBar
-                  now={progressPercent}
-                  variant="primary"
-                  style={{ height: '7px', width: '100%' }}
-                  className="rounded-pill"
-                />
-                <span className="text-muted small mt-1" style={{ fontSize: '0.78rem' }}>
-                  {completedLectures.length}/{allLectures.length} bài đã hoàn thành
+            <div className="flex items-center gap-3 flex-wrap">
+              <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+                {currentCourse.Title}
+              </h2>
+              {currentCourse.Price != null && (
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                  {currentCourse.Price === 0 ? 'Miễn phí' : `${currentCourse.Price.toLocaleString('vi-VN')} đ`}
                 </span>
+              )}
+            </div>
+          </div>
+
+          {/* Thanh tiến độ tóm tắt */}
+          {allLectures.length > 0 && (
+            <div className="w-full md:w-56 shrink-0 space-y-1.5">
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-400">Tiến độ bài học:</span>
+                <span className="font-bold text-blue-600 dark:text-blue-400">{progressPercent}%</span>
               </div>
+              <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-blue-600 rounded-full transition-all duration-300"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+              <span className="text-[11px] text-slate-400 block text-right">
+                {completedLectures.length}/{allLectures.length} bài đã hoàn thành
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 2. MAIN 2-COLUMN STAGE */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* CỘT TRÁI (COL-8): Video Player & Tabs */}
+        <div className="lg:col-span-8 space-y-5">
+          {/* TRÌNH PHÁT VIDEO CHÍNH */}
+          <div>
+            <SecureVideoPlayer
+              videoId={activeLecture?.ID || currentCourse.ID}
+              courseId={currentCourse?.ID}
+              videoUrl={activeLecture?.videoURL || activeLecture?.videoUrl}
+              studentId={user?.userId || ''}
+              title={activeLecture?.Title || currentCourse.Title}
+              embedded={true}
+            />
+          </div>
+
+          {/* THANH ĐIỀU HƯỚNG BÀI HỌC */}
+          {activeLecture && (
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-3 shadow-xs flex items-center justify-between flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={!hasPrev}
+                onClick={handlePrevLecture}
+                className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 disabled:opacity-40 px-4 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-750 transition-all cursor-pointer"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                <span>Bài trước</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => toggleComplete(activeLecture.ID)}
+                className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                  completedLectures.includes(activeLecture.ID)
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'border border-emerald-500/50 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30'
+                }`}
+              >
+                <CheckCircle className="h-3.5 w-3.5" />
+                <span>
+                  {completedLectures.includes(activeLecture.ID)
+                    ? 'Đã hoàn thành'
+                    : 'Đánh dấu hoàn thành'}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                disabled={!hasNext}
+                onClick={handleNextLecture}
+                className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 disabled:opacity-40 px-4 py-1.5 text-xs font-semibold text-white shadow-xs transition-all cursor-pointer"
+              >
+                <span>Bài tiếp theo</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* TABS CHI TIẾT */}
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm">
+            {/* Tab Buttons */}
+            <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3 mb-5 overflow-x-auto">
+              {[
+                { id: 'overview', label: 'Tổng quan' },
+                { id: 'instructor', label: 'Giảng viên' },
+                { id: 'notes', label: 'Ghi chú' },
+                { id: 'drm', label: 'Nhật ký truy cập' },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`rounded-full px-4 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                    activeTab === tab.id
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Tab Contents */}
+            {activeTab === 'overview' && (
+              <div className="space-y-4">
+                {activeLecture && (
+                  <h4 className="text-base font-bold text-slate-900 dark:text-white">
+                    {activeLecture.Title}
+                  </h4>
+                )}
+
+                {activeLecture?.chapterTitle && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Thuộc chương:{' '}
+                    <strong className="text-slate-700 dark:text-slate-300">
+                      Chương {activeLecture.chapterNumber}: {activeLecture.chapterTitle}
+                    </strong>
+                  </p>
+                )}
+
+                {activeLecture?.chapterDescription && (
+                  <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 text-xs">
+                    <h6 className="font-bold text-slate-900 dark:text-white mb-1">Mô tả chương mục:</h6>
+                    <p className="text-slate-500 dark:text-slate-400 mb-0">
+                      {activeLecture.chapterDescription}
+                    </p>
+                  </div>
+                )}
+
+                {currentCourse.Description && (
+                  <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 text-xs">
+                    <h6 className="font-bold text-slate-900 dark:text-white mb-1">Mô tả khóa học:</h6>
+                    <p className="text-slate-500 dark:text-slate-400 mb-0">
+                      {currentCourse.Description}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'instructor' && (
+              <div>
+                {instructorName ? (
+                  <div className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                    <div className="w-12 h-12 rounded-2xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-lg shrink-0">
+                      {String(instructorName).charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <h5 className="font-bold text-slate-900 dark:text-white text-sm mb-0.5">
+                        {instructorName}
+                      </h5>
+                      <span className="text-[11px] text-slate-400">Giảng viên phụ trách</span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400 mb-0">Chưa có thông tin giảng viên.</p>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'notes' && (
+              <div className="space-y-4">
+                <form onSubmit={handleSaveNote} className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Ghi chú cá nhân của bạn:
+                    </label>
+                    <textarea
+                      rows={3}
+                      placeholder="Nhập ghi chú cho bài giảng này..."
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60 p-3 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 px-4 py-2 text-xs font-semibold text-white shadow-xs"
+                  >
+                    <Save className="h-3.5 w-3.5" />
+                    <span>Lưu ghi chú</span>
+                  </button>
+                </form>
+
+                {savedNotes.length > 0 && (
+                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                    <h6 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                      Ghi chú đã ghi:
+                    </h6>
+                    {savedNotes.map((n, idx) => (
+                      <div
+                        key={idx}
+                        className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl text-xs text-slate-600 dark:text-slate-300 border border-slate-100 dark:border-slate-800 flex items-start gap-2"
+                      >
+                        <span className="text-blue-600 dark:text-blue-400 font-semibold shrink-0">
+                          [{n.time}]
+                        </span>
+                        <span>{n.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'drm' && (
+              <p className="text-xs text-slate-400 mb-0">
+                Nhật ký truy cập chưa được kết nối với backend.
+              </p>
             )}
           </div>
         </div>
 
-        {/* ===================================================================
-         * 2. MAIN 2-COLUMN STAGE (Video Player + Curriculum Accordion)
-         * =================================================================== */}
-        <Row className="g-4">
-          {/* CỘT TRÁI (COL-8): Video Player & Tabs chi tiết bài giảng */}
-          <Col lg={8}>
-            {/* TRÌNH PHÁT VIDEO CHÍNH */}
-            <div className="mb-3">
-              <SecureVideoPlayer
-                videoId={activeLecture?.ID || currentCourse.ID}
-                courseId={currentCourse?.ID}
-                videoUrl={activeLecture?.videoURL || activeLecture?.videoUrl}
-                studentId={user?.userId || ''}
-                title={activeLecture?.Title || currentCourse.Title}
-                embedded={true}
-              />
+        {/* CỘT PHẢI (COL-4): Curriculum Accordion */}
+        <div className="lg:col-span-4">
+          <div className="sticky top-20 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div className="bg-slate-50/60 dark:bg-slate-850 border-b border-slate-100 dark:border-slate-800 py-4 px-5">
+              <h4 className="font-bold text-sm text-slate-900 dark:text-white mb-0.5">
+                Chương Trình Giảng Dạy
+              </h4>
+              <p className="text-[11px] text-slate-400 mb-0">
+                {curriculum.length} Chương • {allLectures.length} Bài giảng
+              </p>
             </div>
 
-            {/* THANH ĐIỀU HƯỚNG BÀI HỌC */}
-            {activeLecture && (
-              <Card className="card-clean border shadow-sm p-3 mb-4 bg-white rounded-3">
-                <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                  <Button
-                    variant="outline-secondary"
-                    size="sm"
-                    className="rounded-pill px-3 d-flex align-items-center gap-1"
-                    disabled={!hasPrev}
-                    onClick={handlePrevLecture}
-                  >
-                    <i className="bi bi-arrow-left"></i>
-                    <span>Bài trước</span>
-                  </Button>
+            <div className="max-h-[calc(100vh-220px)] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+              {curriculum.map((chap, cIdx) => {
+                const isOpen = openChapters[cIdx] !== false;
 
-                  <Button
-                    variant={completedLectures.includes(activeLecture.ID) ? 'success' : 'outline-success'}
-                    size="sm"
-                    className="rounded-pill px-3 d-flex align-items-center gap-2"
-                    onClick={() => toggleComplete(activeLecture.ID)}
-                  >
-                    <i
-                      className={`bi ${completedLectures.includes(activeLecture.ID)
-                        ? 'bi-check-circle-fill'
-                        : 'bi-check-circle'
-                        }`}
-                    ></i>
-                    <span>
-                      {completedLectures.includes(activeLecture.ID)
-                        ? 'Đã hoàn thành'
-                        : 'Đánh dấu hoàn thành'}
-                    </span>
-                  </Button>
-
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    className="rounded-pill px-3 d-flex align-items-center gap-1"
-                    disabled={!hasNext}
-                    onClick={handleNextLecture}
-                  >
-                    <span>Bài tiếp theo</span>
-                    <i className="bi bi-arrow-right"></i>
-                  </Button>
-                </div>
-              </Card>
-            )}
-
-            {/* TABS CHI TIẾT (Hoàn toàn dữ liệu mềm) */}
-            <Card className="card-clean border shadow-sm rounded-4 overflow-hidden bg-white mb-4">
-              <Card.Body className="p-4">
-                <Tabs defaultActiveKey="overview" className="mb-4 custom-nav-tabs">
-                  {/* TAB 1: Tổng quan bài học */}
-                  <Tab eventKey="overview" title="Tổng quan">
-                    {activeLecture && (
-                      <h5 className="fw-bold text-dark mb-2">
-                        {activeLecture.Title}
-                      </h5>
-                    )}
-
-                    {activeLecture?.chapterTitle && (
-                      <p className="text-secondary small mb-3">
-                        Thuộc chương: <strong>Chương {activeLecture.chapterNumber}: {activeLecture.chapterTitle}</strong>
-                      </p>
-                    )}
-
-                    {activeLecture?.chapterDescription && (
-                      <div className="p-3 bg-light rounded-3 border mb-3 small">
-                        <h6 className="fw-bold text-dark mb-1">Mô tả chương mục:</h6>
-                        <p className="text-secondary mb-0">
-                          {activeLecture.chapterDescription}
-                        </p>
+                return (
+                  <div key={chap.ID}>
+                    {/* Chapter Header */}
+                    <button
+                      type="button"
+                      onClick={() => toggleChapter(cIdx)}
+                      className="w-full flex items-center justify-between p-4 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                    >
+                      <div className="pr-2">
+                        <span className="font-bold text-xs text-slate-800 dark:text-slate-200 block">
+                          Chương {chap.ChapterNumber}: {chap.Title}
+                        </span>
+                        <span className="text-[11px] text-slate-400">
+                          {chap.videos.length} bài
+                        </span>
                       </div>
-                    )}
-
-                    {currentCourse.Description && (
-                      <div className="p-3 bg-light rounded-3 border small">
-                        <h6 className="fw-bold text-dark mb-1">Mô tả khóa học:</h6>
-                        <p className="text-secondary mb-0">
-                          {currentCourse.Description}
-                        </p>
+                      <div className="text-slate-400">
+                        {isOpen ? (
+                          <ChevronUp className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
                       </div>
-                    )}
-                  </Tab>
+                    </button>
 
-                  {/* TAB 2: Giảng viên */}
-                  <Tab eventKey="instructor" title="Giảng viên">
-                    {instructorName ? (
-                      <div className="d-flex align-items-center gap-3 p-3 bg-light rounded-3 border">
-                        <div
-                          className="rounded-circle bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center fw-bold fs-4"
-                          style={{ width: '56px', height: '56px', flexShrink: 0 }}
-                        >
-                          {String(instructorName).charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                          <h6 className="fw-bold text-dark mb-1">{instructorName}</h6>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-muted small mb-0">Chưa có thông tin giảng viên.</p>
-                    )}
-                  </Tab>
+                    {/* Chapter Video List */}
+                    {isOpen && (
+                      <div className="bg-slate-50/40 dark:bg-slate-950/20 divide-y divide-slate-100 dark:divide-slate-800">
+                        {chap.videos.map((vid) => {
+                          const isActive = vid.ID === activeLectureId;
+                          const isCompleted = completedLectures.includes(vid.ID);
 
-                  {/* TAB 3: Ghi chú học viên (Tương tác mềm) */}
-                  <Tab eventKey="notes" title="Ghi chú">
-                    <Form onSubmit={handleSaveNote}>
-                      <Form.Group className="mb-2">
-                        <Form.Label className="fw-semibold text-dark small">Ghi chú cá nhân của bạn:</Form.Label>
-                        <Form.Control
-                          as="textarea"
-                          rows={3}
-                          placeholder="Nhập ghi chú cho bài giảng này..."
-                          value={notes}
-                          onChange={(e) => setNotes(e.target.value)}
-                          className="form-control-clean small"
-                        />
-                      </Form.Group>
-                      <Button type="submit" size="sm" variant="primary" className="rounded-pill px-3">
-                        <i className="bi bi-save me-1"></i>Lưu ghi chú
-                      </Button>
-                    </Form>
+                          return (
+                            <div
+                              key={vid.ID}
+                              onClick={() => handleSelectLecture(vid.ID)}
+                              className={`flex items-center justify-between p-3.5 text-xs transition-colors cursor-pointer ${
+                                isActive
+                                  ? 'bg-blue-50/80 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-bold border-l-4 border-blue-600'
+                                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100/60 dark:hover:bg-slate-800/60'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5 overflow-hidden mr-2">
+                                {isActive ? (
+                                  <Play className="h-4 w-4 text-blue-600 fill-blue-600 shrink-0" />
+                                ) : isCompleted ? (
+                                  <CheckCircle className="h-4 w-4 text-emerald-500 fill-emerald-500 shrink-0" />
+                                ) : (
+                                  <Play className="h-4 w-4 text-slate-400 shrink-0" />
+                                )}
+                                <span className="truncate" title={vid.Title}>
+                                  {vid.Title}
+                                </span>
+                              </div>
 
-                    {savedNotes.length > 0 && (
-                      <div className="mt-3 border-top pt-3">
-                        <h6 className="small fw-bold text-muted mb-2">Ghi chú đã ghi:</h6>
-                        {savedNotes.map((n, idx) => (
-                          <div key={idx} className="p-2 mb-2 bg-light rounded-2 small text-secondary border">
-                            <span className="text-primary fw-semibold me-2">[{n.time}]</span>
-                            {n.text}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </Tab>
-
-                  {/* TAB 4: Nhật ký & Bảo mật */}
-                  <Tab eventKey="drm" title="Nhật ký truy cập">
-                    <p className="text-muted small mb-0">Nhật ký truy cập chưa được kết nối với backend.</p>
-                  </Tab>
-                </Tabs>
-              </Card.Body>
-            </Card>
-          </Col>
-
-          {/* CỘT PHẢI (COL-4): Curriculum Accordion (Chương & Bài giảng mềm 100%) */}
-          <Col lg={4}>
-            <div className="sticky-top" style={{ top: '85px', zIndex: 10 }}>
-              <Card className="card-clean border shadow-sm rounded-4 overflow-hidden bg-white">
-                <Card.Header className="bg-white border-bottom py-3 px-3">
-                  <div className="d-flex justify-content-between align-items-center">
-                    <div>
-                      <h6 className="fw-bold text-dark mb-0">Chương Trình Giảng Dạy</h6>
-                      <small className="text-muted">
-                        {courseChapters.length} Chương • {allLectures.length} Bài giảng
-                      </small>
-                    </div>
-                  </div>
-                </Card.Header>
-
-                <div style={{ maxHeight: 'calc(100vh - 210px)', overflowY: 'auto' }}>
-                  <Accordion defaultActiveKey="0" flush>
-                    {curriculum.map((chap, cIdx) => (
-                      <Accordion.Item key={chap.ID} eventKey={cIdx.toString()}>
-                        <Accordion.Header>
-                          <div className="w-100 pe-2">
-                            <div className="d-flex justify-content-between align-items-center">
-                              <span className="fw-bold text-dark small">
-                                Chương {chap.ChapterNumber}: {chap.Title}
-                              </span>
-                              <span className="text-muted small ps-2" style={{ fontSize: '0.75rem' }}>
-                                {chap.videos.length} bài
-                              </span>
+                              <div className="flex items-center gap-1.5 shrink-0 text-[10px] text-slate-400">
+                                {isActive && (
+                                  <span className="px-2 py-0.5 rounded-full bg-blue-600 text-white font-semibold">
+                                    Đang phát
+                                  </span>
+                                )}
+                                {vid.Length != null && (
+                                  <span>{formatDuration(vid.Length)}</span>
+                                )}
+                                {vid.Size != null && (
+                                  <span>{formatBytes(vid.Size)}</span>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </Accordion.Header>
-
-                        <Accordion.Body className="p-0">
-                          <ul className="list-group list-group-flush small">
-                            {chap.videos.map((vid) => {
-                              const isActive = vid.ID === activeLectureId;
-                              const isCompleted = completedLectures.includes(vid.ID);
-
-                              return (
-                                <li
-                                  key={vid.ID}
-                                  onClick={() => handleSelectLecture(vid.ID)}
-                                  className={`list-group-item list-group-item-action d-flex align-items-center justify-content-between p-3 border-0 border-bottom ${isActive
-                                    ? 'bg-primary-subtle text-primary fw-bold'
-                                    : 'text-dark'
-                                    }`}
-                                  style={{ cursor: 'pointer' }}
-                                >
-                                  <div className="d-flex align-items-center gap-2 overflow-hidden me-2">
-                                    <i
-                                      className={`bi ${isActive
-                                        ? 'bi-play-circle-fill text-primary fs-5'
-                                        : isCompleted
-                                          ? 'bi-check-circle-fill text-success fs-5'
-                                          : 'bi-play-circle text-muted fs-5'
-                                        }`}
-                                    ></i>
-                                    <span className="text-truncate" title={vid.Title}>
-                                      {vid.Title}
-                                    </span>
-                                  </div>
-
-                                  <div className="d-flex align-items-center gap-2 flex-shrink-0">
-                                    {isActive && (
-                                      <span
-                                        className="badge bg-primary text-white rounded-pill"
-                                        style={{ fontSize: '0.68rem' }}
-                                      >
-                                        Đang phát
-                                      </span>
-                                    )}
-                                    {vid.Length != null && (
-                                      <span className="text-muted small" style={{ fontSize: '0.78rem' }}>
-                                        {formatDuration(vid.Length)}
-                                      </span>
-                                    )}
-                                    {vid.Size != null && (
-                                      <span className="text-secondary opacity-75" style={{ fontSize: '0.7rem' }}>
-                                        {formatBytes(vid.Size)}
-                                      </span>
-                                    )}
-                                  </div>
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        </Accordion.Body>
-                      </Accordion.Item>
-                    ))}
-                  </Accordion>
-                </div>
-              </Card>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-          </Col>
-        </Row>
-      </Container>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

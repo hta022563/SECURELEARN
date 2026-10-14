@@ -1,21 +1,24 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation, Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  Container,
-  Row,
-  Col,
-  Card,
-  Form,
-  FloatingLabel,
-  Button,
-  ProgressBar,
-  Spinner,
-  Alert,
-  Badge,
-  Modal,
-  Accordion,
-} from 'react-bootstrap';
+  Layers,
+  FolderPlus,
+  UploadCloud,
+  Plus,
+  PlayCircle,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  Loader2,
+  X,
+  ChevronDown,
+  ChevronUp,
+  FileVideo,
+  Link2,
+  Zap,
+  Sparkles,
+} from 'lucide-react';
 import { useVideoUpload, UPLOAD_STATUS } from '../hooks/useVideoUpload';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
@@ -46,12 +49,7 @@ function formatDuration(seconds) {
 
 /**
  * =============================================================================
- * COMPONENT: UploadVideo (Mô hình upload video bài học 100% Backend Spring Boot & R2)
- * =============================================================================
- * - 100% dữ liệu thực từ Backend API: courses, chapters, lessons
- * - Cấu trúc phân cấp: Khóa học -> Chương/Phần (Chapter) -> Video bài giảng
- * - Upload trực tiếp lên Cloudflare R2 qua Presigned URL và mã hóa HLS qua Backend
- * - Cây cấu trúc khóa học (Curriculum Tree) cập nhật trực quan thời gian thực
+ * COMPONENT: UploadVideo (Pure Tailwind CSS)
  * =============================================================================
  */
 export default function UploadVideo() {
@@ -59,224 +57,188 @@ export default function UploadVideo() {
   const { lang } = useParams();
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const { showToast } = useToast();
 
-  // State danh sách khóa học (lấy từ Backend)
-  const [allCourses, setAllCourses] = useState([]);
+  const fileInputRef = useRef(null);
 
-  // Dữ liệu: Lấy danh sách khóa học do giảng viên này phụ trách (hoặc tất cả nếu chưa lọc)
-  const instructorCourses = useMemo(() => {
-    if (!allCourses || allCourses.length === 0) return [];
-    const owned = allCourses.filter((c) => c.Owner === user?.userId || c.owner === user?.userId || c.instructor === user?.username);
-    return owned.length > 0 ? owned : allCourses;
-  }, [allCourses, user]);
+  // Hook upload chunk và xử lý HLS Cloudflare R2
+  const {
+    status,
+    progress,
+    error: uploadError,
+    uploadStats,
+    chunkStats,
+    segmentStats,
+    startUpload,
+    resetUpload,
+  } = useVideoUpload();
 
-  const location = useLocation();
-
-  // State khóa học đang được chọn
-  const [selectedCourseId, setSelectedCourseId] = useState(() => {
-    return location.state?.courseId || '';
-  });
-
-  // State các chương (nạp từ Backend)
+  // Dữ liệu mềm nạp từ Backend API
+  const [courses, setCourses] = useState([]);
   const [allChapters, setAllChapters] = useState([]);
-
-  // State các video bài giảng lấy động theo Backend API
   const [allVideos, setAllVideos] = useState([]);
+  const [isLoadingCourses, setIsLoadingCourses] = useState(true);
+  const [isLoadingChapters, setIsLoadingChapters] = useState(false);
   const [isLoadingLessons, setIsLoadingLessons] = useState(false);
 
-  // State modal thêm khóa học mới
-  const [showCreateCourseModal, setShowCreateCourseModal] = useState(false);
-
-  const handleCourseCreated = (newCourse) => {
-    setAllCourses((prev) => [newCourse, ...prev]);
-    setSelectedCourseId(newCourse.ID || newCourse.id);
-  };
-
-  // Các chương thuộc khóa học đang chọn
-  const currentCourseChapters = useMemo(() => {
-    return allChapters
-      .filter((ch) => ch.CoursesID === selectedCourseId || ch.course_id === selectedCourseId || ch.courseId === selectedCourseId)
-      .sort((a, b) => (a.ChapterNumber || 1) - (b.ChapterNumber || 1));
-  }, [allChapters, selectedCourseId]);
-
-  // State chương đang chọn để ghép video vào
-  const [selectedChapterId, setSelectedChapterId] = useState(() => {
-    return currentCourseChapters[0]?.ID || currentCourseChapters[0]?.id || '';
-  });
-
-  // Nạp danh sách khóa học từ Backend API
-  React.useEffect(() => {
-    let isMounted = true;
-    getCourses()
-      .then((data) => {
-        if (isMounted && Array.isArray(data)) {
-          setAllCourses(data);
-          if (data.length > 0) {
-            setSelectedCourseId((prev) => {
-              if (prev && data.some((c) => (c.ID === prev || c.id === prev))) {
-                return prev;
-              }
-              return data[0].ID || data[0].id;
-            });
-          }
-        }
-      })
-      .catch((err) => console.warn('[UploadVideo] Lỗi nạp khóa học từ BE:', err));
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  // Nạp danh sách chương của khóa học đang chọn từ Backend API
-  React.useEffect(() => {
-    if (!selectedCourseId) {
-      setAllChapters([]);
-      return;
-    }
-    let isMounted = true;
-    getChapters(selectedCourseId)
-      .then((data) => {
-        if (isMounted && Array.isArray(data)) {
-          setAllChapters(data);
-        }
-      })
-      .catch((err) => console.warn('[UploadVideo] Lỗi nạp chương từ BE:', err));
-    return () => {
-      isMounted = false;
-    };
-  }, [selectedCourseId]);
-
-  // Cập nhật selectedChapterId khi đổi khóa học
-  React.useEffect(() => {
-    if (currentCourseChapters.length > 0) {
-      setSelectedChapterId((prev) => {
-        const exists = currentCourseChapters.some((ch) => (ch.ID === prev || ch.id === prev));
-        return exists ? prev : (currentCourseChapters[0].ID || currentCourseChapters[0].id);
-      });
-    } else {
-      setSelectedChapterId('');
-    }
-  }, [selectedCourseId, currentCourseChapters]);
-
-  // Nạp động danh sách bài học của các chương từ Backend API (GET /api/v1/chapter/{chapterId}/lessons)
-  const refreshLessonsFromBackend = React.useCallback(async (chapters) => {
-    if (!chapters || chapters.length === 0) {
-      setAllVideos([]);
-      return;
-    }
-    setIsLoadingLessons(true);
-    try {
-      const lessonPromises = chapters.map(async (chap) => {
-        const chapId = chap.ID || chap.id;
-        try {
-          const lessons = await getLessons(chapId);
-          if (Array.isArray(lessons) && lessons.length > 0) {
-            return lessons.map((l) => ({
-              ...l,
-              chapterId: chapId,
-              courseId: selectedCourseId,
-            }));
-          }
-          return [];
-        } catch (e) {
-          return [];
-        }
-      });
-
-      const results = await Promise.all(lessonPromises);
-      const flattened = results.flat();
-      setAllVideos(flattened);
-    } catch (err) {
-      console.warn('[UploadVideo] Lỗi nạp bài học từ BE:', err);
-    } finally {
-      setIsLoadingLessons(false);
-    }
-  }, [selectedCourseId]);
-
-  // Tự động kích hoạt nạp bài học khi danh sách chương thay đổi
-  React.useEffect(() => {
-    if (currentCourseChapters.length > 0) {
-      refreshLessonsFromBackend(currentCourseChapters);
-    } else {
-      setAllVideos([]);
-    }
-  }, [currentCourseChapters, refreshLessonsFromBackend]);
-
-  // State Form nhập liệu bài giảng nhỏ
+  // Form State
+  const [selectedCourseId, setSelectedCourseId] = useState('');
+  const [selectedChapterId, setSelectedChapterId] = useState('');
   const [lessonTitle, setLessonTitle] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
-  const [customVideoUrl, setCustomVideoUrl] = useState('');
-  const [uploadMode, setUploadMode] = useState('file'); // 'file' | 'url'
   const [validationError, setValidationError] = useState(null);
-  const [recentUploadedVideoId, setRecentUploadedVideoId] = useState(null);
 
-  // Modal tạo chương mới
+  // Modal tạo nhanh Khóa học & Chương mới
+  const [showCreateCourseModal, setShowCreateCourseModal] = useState(false);
   const [showAddChapterModal, setShowAddChapterModal] = useState(false);
   const [newChapterTitle, setNewChapterTitle] = useState('');
   const [newChapterDesc, setNewChapterDesc] = useState('');
 
-  // Tham chiếu input file
-  const fileInputRef = useRef(null);
+  // Chế độ nạp bài giảng: 'file' (Tải từ máy) hoặc 'url' (Dán URL có sẵn)
+  const [uploadMode, setUploadMode] = useState('file');
+  const [customVideoUrl, setCustomVideoUrl] = useState('');
 
-  // Hook xử lý upload theo từng chunk nhỏ
-  const {
-    status,
-    progress,
-    uploadStats,
-    chunkStats,
-    segmentStats,
-    error: uploadError,
-    startUpload,
-    isBusy,
-  } = useVideoUpload();
+  // ID của video vừa upload thành công để hiển thị nút Xem Trước
+  const [recentUploadedVideoId, setRecentUploadedVideoId] = useState(null);
 
-  // Khóa học hiện tại
+  // Accordion state
+  const [openAccordions, setOpenAccordions] = useState({ 0: true });
+  const toggleAccordion = (idx) => {
+    setOpenAccordions((prev) => ({ ...prev, [idx]: !prev[idx] }));
+  };
+
+  // 1. Nạp danh sách Khóa học từ Backend API
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchCourseList() {
+      setIsLoadingCourses(true);
+      try {
+        const data = await getCourses();
+        if (isMounted && Array.isArray(data)) {
+          setCourses(data);
+          const queryParams = new URLSearchParams(location.search);
+          const initialCourseId = queryParams.get('courseId') || (data[0] && (data[0].ID || data[0].id)) || '';
+          setSelectedCourseId(initialCourseId);
+        }
+      } catch (err) {
+        console.error('Lỗi khi nạp danh sách khóa học:', err);
+      } finally {
+        if (isMounted) setIsLoadingCourses(false);
+      }
+    }
+    fetchCourseList();
+    return () => {
+      isMounted = false;
+    };
+  }, [location.search]);
+
+  // 2. Nạp danh sách Chương khi selectedCourseId thay đổi
+  useEffect(() => {
+    let isMounted = true;
+    if (!selectedCourseId) {
+      setSelectedChapterId('');
+      return;
+    }
+
+    async function fetchChapters() {
+      setIsLoadingChapters(true);
+      try {
+        const data = await getChapters(selectedCourseId);
+        if (isMounted && Array.isArray(data)) {
+          setAllChapters((prev) => {
+            const others = prev.filter(
+              (ch) => ch.CoursesID !== selectedCourseId && ch.course_id !== selectedCourseId && ch.courseId !== selectedCourseId
+            );
+            return [...others, ...data];
+          });
+          if (data.length > 0) {
+            setSelectedChapterId(data[0].ID || data[0].id);
+          } else {
+            setSelectedChapterId('');
+          }
+        }
+      } catch (err) {
+        console.error(`Lỗi nạp chương của khóa học ${selectedCourseId}:`, err);
+      } finally {
+        if (isMounted) setIsLoadingChapters(false);
+      }
+    }
+
+    fetchChapters();
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedCourseId]);
+
+  // Danh sách chương của khóa học hiện tại
+  const currentCourseChapters = useMemo(() => {
+    return allChapters
+      .filter((ch) => ch.CoursesID === selectedCourseId || ch.course_id === selectedCourseId || ch.courseId === selectedCourseId)
+      .sort((a, b) => (a.ChapterNumber || a.chapter_number || 0) - (b.ChapterNumber || b.chapter_number || 0));
+  }, [allChapters, selectedCourseId]);
+
+  // 3. Nạp danh sách Bài học (Lessons)
+  useEffect(() => {
+    let isMounted = true;
+    if (!currentCourseChapters.length) return;
+
+    async function fetchAllLessonsOfChapters() {
+      setIsLoadingLessons(true);
+      try {
+        const promises = currentCourseChapters.map((ch) => {
+          const chapId = ch.ID || ch.id;
+          return getLessons(chapId).catch(() => []);
+        });
+
+        const results = await Promise.all(promises);
+        if (isMounted) {
+          const mergedLessons = results.flat();
+          setAllVideos((prev) => {
+            const currentChapIds = new Set(currentCourseChapters.map((c) => c.ID || c.id));
+            const others = prev.filter((v) => {
+              const vChap = v.chapterId || v.chapter_id || v.chapter;
+              return !currentChapIds.has(vChap);
+            });
+            return [...others, ...mergedLessons];
+          });
+        }
+      } catch (err) {
+        console.error('Lỗi khi nạp danh sách bài học:', err);
+      } finally {
+        if (isMounted) setIsLoadingLessons(false);
+      }
+    }
+
+    fetchAllLessonsOfChapters();
+    return () => {
+      isMounted = false;
+    };
+  }, [currentCourseChapters]);
+
   const currentCourse = useMemo(() => {
-    return allCourses.find((c) => (c.ID === selectedCourseId || c.id === selectedCourseId)) || instructorCourses[0] || null;
-  }, [selectedCourseId, allCourses, instructorCourses]);
+    return courses.find((c) => c.ID === selectedCourseId || c.id === selectedCourseId);
+  }, [courses, selectedCourseId]);
 
-  // Chương hiện tại đang chọn
   const currentChapter = useMemo(() => {
-    return currentCourseChapters.find((ch) => (ch.ID === selectedChapterId || ch.id === selectedChapterId)) || currentCourseChapters[0] || null;
-  }, [selectedChapterId, currentCourseChapters]);
+    return currentCourseChapters.find((ch) => ch.ID === selectedChapterId || ch.id === selectedChapterId);
+  }, [currentCourseChapters, selectedChapterId]);
 
-  // Ghép các video từ BE vào từng chương của khóa học hiện tại (Curriculum View)
+  // Cấu trúc giáo trình
   const courseCurriculum = useMemo(() => {
-    if (currentCourseChapters.length === 0) return [];
-
     return currentCourseChapters.map((chap) => {
       const chapId = chap.ID || chap.id;
-
-      // Lấy video thuộc về chương này dựa trên ID chương từ CSDL
-      const chapVideos = allVideos.filter((v) => {
-        const vChapId = v.chapterId || v.chapter_id || v.chapter;
-        return vChapId && String(vChapId) === String(chapId);
-      });
-
-      // Loại bỏ hoàn toàn trùng lặp ID (ngăn lỗi double bài học)
-      const uniqueChapVideos = [];
-      const seenIds = new Set();
-      for (const v of chapVideos) {
-        const vId = v?.ID || v?.id;
-        if (v && vId && !seenIds.has(vId)) {
-          seenIds.add(vId);
-          uniqueChapVideos.push(v);
-        }
-      }
-
-      // Sắp xếp bài học theo thứ tự thời gian tạo tăng dần
-      uniqueChapVideos.sort((a, b) => new Date(a.UploadTime || a.uploadTime || 0) - new Date(b.UploadTime || b.uploadTime || 0));
-
+      const videosInChap = allVideos.filter(
+        (v) => v.chapterId === chapId || v.chapter_id === chapId || v.chapter === chapId
+      );
       return {
         ...chap,
-        ID: chapId,
-        videos: uniqueChapVideos,
+        videos: videosInChap,
       };
     });
   }, [currentCourseChapters, allVideos]);
 
-  // Kiểm tra tính hợp lệ của file video
+  // Xử lý kiểm tra file hợp lệ
   const handleFileChange = (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) {
@@ -284,9 +246,10 @@ export default function UploadVideo() {
       return;
     }
 
+    const validExtensions = ['.mp4', '.mov'];
     const validMimeTypes = ['video/mp4', 'video/quicktime'];
-    const fileName = file.name.toLowerCase();
-    const hasValidExtension = fileName.endsWith('.mp4') || fileName.endsWith('.mov');
+    const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+    const hasValidExtension = validExtensions.includes(fileExt);
     const hasValidMime = validMimeTypes.includes(file.type);
 
     if (!hasValidMime && !hasValidExtension) {
@@ -303,7 +266,7 @@ export default function UploadVideo() {
     showToast(`${t('upload.selected_lesson')} ${file.name} (${formatBytes(file.size)})`, 'info', t('upload.valid_file'));
   };
 
-  // Tạo thêm Chương / Phần mới trong Khóa học trên Backend (POST /api/v1/chapter)
+  // Tạo thêm Chương mới
   const handleCreateNewChapter = async (e) => {
     e.preventDefault();
     if (!newChapterTitle.trim()) return;
@@ -318,7 +281,6 @@ export default function UploadVideo() {
         description: newChapterDesc.trim() || `${t('upload.chapter_content')} ${nextChapNum}`,
       });
 
-      // Nạp lại danh sách chương từ BE để nhận đúng UUID tạo từ CSDL
       const updatedChapters = await getChapters(selectedCourseId);
       if (Array.isArray(updatedChapters) && updatedChapters.length > 0) {
         setAllChapters((prev) => {
@@ -338,39 +300,69 @@ export default function UploadVideo() {
       setNewChapterDesc('');
       showToast(`${t('upload.created_chapter')} ${nextChapNum} - ${newChapterTitle.trim()}`, 'success', t('upload.success'));
     } catch (err) {
-      showToast(`Lỗi tạo chương: ${err.message}`, 'danger', 'Lỗi');
+      showToast(`${t('upload.cannot_create_chapter')} ${err.message}`, 'danger', t('upload.error'));
     }
   };
 
-  // Xử lý gửi Form tải lên bài giảng nhỏ (Đồng bộ trực tiếp lên Backend Spring Boot: POST /api/v1/lesson)
+  // Callback sau khi tạo Khóa học mới
+  const handleCourseCreated = (newCourse) => {
+    setCourses((prev) => [newCourse, ...prev]);
+    setSelectedCourseId(newCourse.ID);
+  };
+
+  // Reset form để upload bài tiếp theo
+  const handleContinueNextLesson = () => {
+    resetUpload();
+    setLessonTitle('');
+    setSelectedFile(null);
+    setCustomVideoUrl('');
+    setValidationError(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  // Bắt đầu upload
   const handleSubmitUpload = async (e) => {
     e.preventDefault();
-    if (!lessonTitle.trim() || !selectedChapterId) return;
 
-    if (uploadMode === 'file' && !selectedFile) return;
-    if (uploadMode === 'url' && !customVideoUrl.trim()) return;
+    if (!lessonTitle.trim()) {
+      setValidationError(t('upload.please_enter_title'));
+      return;
+    }
+    if (!selectedCourseId) {
+      setValidationError(t('upload.please_choose_course'));
+      return;
+    }
+    if (!selectedChapterId) {
+      setValidationError(t('upload.please_choose_chapter'));
+      return;
+    }
 
-    const targetChapterId = selectedChapterId;
+    if (uploadMode === 'file' && !selectedFile) {
+      setValidationError(t('upload.please_choose_file'));
+      return;
+    }
+    if (uploadMode === 'url' && !customVideoUrl.trim()) {
+      setValidationError(t('upload.please_enter_url'));
+      return;
+    }
+
+    setValidationError(null);
     const targetCourseId = selectedCourseId;
+    const targetChapterId = selectedChapterId;
 
-    // Chế độ 1: Nhập trực tiếp Video URL từ Backend / CDN / S3
     if (uploadMode === 'url') {
-      const targetVideoUrl = customVideoUrl.trim();
-
       try {
-        // Gửi lên Backend Spring Boot: POST /api/v1/lesson
         await createLesson({
           courseId: targetCourseId,
           course_id: targetCourseId,
           chapter: targetChapterId,
           chapter_id: targetChapterId,
           title: lessonTitle.trim(),
-          description: currentChapter?.Title ? `Bài học thuộc chương ${currentChapter.Title}` : '',
-          url: targetVideoUrl,
-          videoURL: targetVideoUrl,
+          description: currentChapter?.Title ? `${t('upload.lesson_in_chapter')} ${currentChapter.Title}` : '',
+          url: customVideoUrl.trim(),
+          videoURL: customVideoUrl.trim(),
         });
 
-        // Nạp lại bài học từ Backend để lấy bản ghi thật
         const updatedLessons = await getLessons(targetChapterId);
         if (Array.isArray(updatedLessons) && updatedLessons.length > 0) {
           setAllVideos((prev) => {
@@ -384,27 +376,10 @@ export default function UploadVideo() {
           if (lastLesson) setRecentUploadedVideoId(lastLesson.ID || lastLesson.id);
         }
 
-        showToast(
-          `Đã lưu bài học "${lessonTitle.trim()}" vào Backend thành công!`,
-          'success',
-          'Lưu Bài Học Thành Công'
-        );
+        showToast(`${t('upload.lesson_saved_success')} "${lessonTitle.trim()}"!`, 'success', t('upload.save_success_title'));
         handleContinueNextLesson();
       } catch (err) {
         console.warn('Lỗi đồng bộ bài học lên Backend:', err.message);
-        const updatedLessons = await getLessons(targetChapterId);
-        setAllVideos((prev) => {
-          const others = prev.filter((v) => {
-            const vChap = v.chapterId || v.chapter_id || v.chapter;
-            return vChap !== targetChapterId;
-          });
-          return [...others, ...updatedLessons];
-        });
-        showToast(
-          `Không thể kết nối Backend (http://localhost:8080). Bài học "${lessonTitle.trim()}" đã được lưu tạm an toàn trên máy của bạn và KHÔNG bị mất khi tải lại trang!`,
-          'warning',
-          'Lưu ý: Backend Chưa Kết Nối'
-        );
         handleContinueNextLesson();
       }
       return;
@@ -424,7 +399,6 @@ export default function UploadVideo() {
       const effectiveVideoUrl = newVideoRecord.videoUrl || `https://stream.securelearn.edu/videos/${targetCourseId}/${newVideoRecord.ID}.m3u8`;
 
       try {
-        // Nếu bài học chưa được tự động tạo bởi quy trình /api/v1/upload/process thì gọi createLesson
         if (!newVideoRecord?.fromBackendProcess) {
           await createLesson({
             courseId: targetCourseId,
@@ -432,13 +406,12 @@ export default function UploadVideo() {
             chapter: targetChapterId,
             chapter_id: targetChapterId,
             title: lessonTitle.trim(),
-            description: currentChapter?.Title ? `Bài học thuộc chương ${currentChapter.Title}` : '',
+            description: currentChapter?.Title ? `${t('upload.lesson_in_chapter')} ${currentChapter.Title}` : '',
             url: effectiveVideoUrl,
             videoURL: effectiveVideoUrl,
           });
         }
 
-        // Đồng bộ lại danh sách bài học từ Backend API
         const updatedLessons = await getLessons(targetChapterId);
         if (Array.isArray(updatedLessons) && updatedLessons.length > 0) {
           setAllVideos((prev) => {
@@ -448,80 +421,56 @@ export default function UploadVideo() {
             });
             return [...others, ...updatedLessons];
           });
-          const lastLesson = updatedLessons[updatedLessons.length - 1];
-          setRecentUploadedVideoId(lastLesson?.ID || lastLesson?.id || newVideoRecord.ID);
-        } else {
-          setAllVideos((prev) => [...prev, newVideoRecord]);
-          setRecentUploadedVideoId(newVideoRecord.ID);
         }
-
-        showToast(
-          `Đã tải lên và lưu bài học "${lessonTitle.trim()}" vào Backend thành công!`,
-          'success',
-          'Lưu Bài Học Thành Công'
-        );
       } catch (err) {
-        console.warn('Lỗi đồng bộ bài học lên Backend:', err.message);
-        // Đồng bộ danh sách bài học từ bộ nhớ đệm bền vững
-        const updatedLessons = await getLessons(targetChapterId);
-        setAllVideos((prev) => {
-          const others = prev.filter((v) => {
-            const vChap = v.chapterId || v.chapter_id || v.chapter;
-            return vChap !== targetChapterId;
-          });
-          return [...others, ...updatedLessons];
-        });
-        setRecentUploadedVideoId(newVideoRecord.ID);
-
-        showToast(
-          `Không thể kết nối Backend (http://localhost:8080). Video "${lessonTitle.trim()}" đã được lưu tạm an toàn trên máy và KHÔNG bị mất khi tải lại trang!`,
-          'warning',
-          'Lưu ý: Backend Chưa Kết Nối'
-        );
+        console.warn('Lỗi khi nạp lại bài học sau khi upload:', err.message);
       }
+
+      setRecentUploadedVideoId(newVideoRecord.ID);
+      showToast(
+        `${t('upload.lesson_uploaded_success')} "${lessonTitle.trim()}" ${t('upload.matched_to_chapter')} ${currentChapter?.ChapterNumber || 1}!`,
+        'success',
+        t('upload.success')
+      );
     });
   };
 
-  // Reset form để tải bài nhỏ tiếp theo
-  const handleContinueNextLesson = () => {
-    setLessonTitle('');
-    setSelectedFile(null);
-    setCustomVideoUrl('');
-    setValidationError(null);
-    setRecentUploadedVideoId(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
+  const isBusy = status === UPLOAD_STATUS.UPLOADING || status === UPLOAD_STATUS.PROCESSING;
   const isUploadDisabled =
-    !lessonTitle.trim() ||
-    (uploadMode === 'file' ? !selectedFile : !customVideoUrl.trim()) ||
+    isBusy ||
+    !selectedCourseId ||
     !selectedChapterId ||
-    Boolean(validationError) ||
-    isBusy;
+    !lessonTitle.trim() ||
+    (uploadMode === 'file' && !selectedFile) ||
+    (uploadMode === 'url' && !customVideoUrl.trim());
 
   return (
-    <div className="py-4 bg-light min-vh-100">
-      <Container fluid="xl">
+    <div className="py-8 bg-transparent">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* ===================================================================
-         * 1. TOP HEADER BANNER
+         * 1. HEADER SECTION
          * =================================================================== */}
-        <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4 pb-3 border-bottom">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
-            <div className="badge-pill-soft mb-2">
-              <i className="bi bi-diagram-3-fill text-primary"></i>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50/90 dark:bg-blue-950/60 border border-blue-200/60 dark:border-blue-800/60 text-blue-700 dark:text-blue-300 text-xs font-semibold mb-2 shadow-xs">
+              <Layers className="h-3.5 w-3.5" />
               <span>{t('upload.modular_curriculum')}</span>
             </div>
-            <h2 className="fw-bold text-dark mb-1">
-              {t('upload.upload_video')} <span className="text-primary">{t('upload.parts')}</span>
-            </h2>
-            <p className="text-secondary small mb-0">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+              {t('upload.upload_video')}{' '}
+              <span className="text-blue-600 dark:text-blue-400">{t('upload.parts')}</span>
+            </h1>
+            <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm mt-1">
               {t('upload.upload_desc')}
             </p>
           </div>
 
-          <div className="d-flex align-items-center gap-2">
-            <Link to={`/${lang}/instructor/videos`} className="btn-secondary-pill text-decoration-none d-flex align-items-center gap-2">
-              <i className="bi bi-collection-play"></i>
+          <div className="flex items-center gap-2">
+            <Link
+              to={`/${lang}/instructor/videos`}
+              className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white dark:bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-xs hover:bg-slate-50 dark:hover:bg-slate-700 transition-all no-underline"
+            >
+              <PlayCircle className="h-4 w-4" />
               <span>{t('upload.uploaded_videos_list')}</span>
             </Link>
           </div>
@@ -530,24 +479,30 @@ export default function UploadVideo() {
         {/* ===================================================================
          * 2. BỐ CỤC 2 CỘT (7:5) - FORM UPLOAD & CÂY CẤU TRÚC KHÓA HỌC
          * =================================================================== */}
-        <Row className="g-4">
-          {/* CỘT TRÁI (COL-7): FORM CHỌN KHÓA HỌC, CHỌN CHƯƠNG & UPLOAD BÀI NHỎ */}
-          <Col lg={7}>
-            <Card className="card-clean border-0 shadow-sm p-4 bg-white mb-4">
-              <div className="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
-                <h5 className="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
-                  <i className="bi bi-cloud-arrow-up-fill text-primary"></i>
-                  <span>{t('upload.part_info')}</span>
-                </h5>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* CỘT TRÁI (COL-7): FORM UPLOAD */}
+          <div className="lg:col-span-7">
+            <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 sm:p-7 shadow-xl space-y-6">
+              <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400">
+                    <UploadCloud className="h-4 w-4" />
+                  </div>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base">
+                    {t('upload.part_info')}
+                  </h3>
+                </div>
+
                 <span
-                  className={`badge rounded-pill px-3 py-2 text-uppercase fs-6 fw-semibold ${status === UPLOAD_STATUS.READY
-                    ? 'badge-status-ready'
-                    : status === UPLOAD_STATUS.PROCESSING
-                      ? 'badge-pill-cyan'
+                  className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase ${
+                    status === UPLOAD_STATUS.READY
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      : status === UPLOAD_STATUS.PROCESSING
+                      ? 'bg-cyan-50 text-cyan-700 border border-cyan-200'
                       : status === UPLOAD_STATUS.UPLOADING
-                        ? 'badge-status-processing'
-                        : 'bg-light text-secondary border'
-                    }`}
+                      ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                      : 'bg-slate-100 text-slate-600'
+                  }`}
                 >
                   {status === UPLOAD_STATUS.UPLOADING && t('upload.uploading_chunk')}
                   {status === UPLOAD_STATUS.PROCESSING && t('upload.hls_processing')}
@@ -557,76 +512,89 @@ export default function UploadVideo() {
                 </span>
               </div>
 
-              {/* BƯỚC 1: CHỌN KHÓA HỌC (DỮ LIỆU MỀM TỪ CSDL) */}
-              <div className="mb-3">
-                <div className="d-flex justify-content-between align-items-center mb-1">
-                  <label className="form-label fw-bold small text-dark mb-0">
-                    {t('upload.step_1_choose_course')}
+              {/* BƯỚC 1: CHỌN KHÓA HỌC */}
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    {t('upload.step_1_choose_course')} <span className="text-rose-500">*</span>
                   </label>
-                  <Button
-                    variant="outline-primary"
-                    size="sm"
-                    className="rounded-pill py-0 px-2 small"
+                  <button
+                    type="button"
                     onClick={() => setShowCreateCourseModal(true)}
                     disabled={isBusy}
+                    className="inline-flex items-center gap-1 rounded-full border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/40 px-2.5 py-0.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-100"
                   >
-                    <i className="bi bi-plus-circle me-1"></i>{t('upload.add_new_course')}
-                  </Button>
+                    <Plus className="h-3.5 w-3.5" />
+                    {t('upload.add_new_course')}
+                  </button>
                 </div>
-                <Form.Select
+                <select
                   value={selectedCourseId}
                   onChange={(e) => setSelectedCourseId(e.target.value)}
                   disabled={isBusy}
-                  className="form-control-clean fw-medium"
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3.5 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
                 >
-                  {instructorCourses.length === 0 ? (
-                    <option value="">-- Chưa có khóa học nào (Bấm Thêm khóa học mới) --</option>
+                  {isLoadingCourses ? (
+                    <option value="">{t('upload.loading_courses_backend')}</option>
+                  ) : courses.length === 0 ? (
+                    <option value="">{t('upload.no_courses_available')}</option>
                   ) : (
-                    instructorCourses.map((c) => {
-                      const cId = c.ID || c.id;
-                      const title = c.Title || c.title || c.name || 'Khóa học';
-                      const price = c.Price ?? c.price;
+                    courses.map((course) => {
+                      const cId = course.ID || course.id;
+                      const cTitle = course.Title || course.title || '';
                       return (
                         <option key={cId} value={cId}>
-                          {title} {price !== undefined ? `(${price === 0 ? t('upload.free') : `${price?.toLocaleString('vi-VN')} đ`})` : ''}
+                          {cTitle} ({cId})
                         </option>
                       );
                     })
                   )}
-                </Form.Select>
+                </select>
               </div>
 
-              {/* BƯỚC 2: CHỌN CHƯƠNG / PHẦN BÀI HỌC (CHAPTER) */}
-              <div className="mb-4 p-3 bg-light rounded-3 border">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                  <label className="form-label fw-bold small text-dark mb-0">
-                    {t('upload.step_2_choose_chapter')}
+              {/* BƯỚC 2: CHỌN CHƯƠNG */}
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    {t('upload.step_2_choose_chapter')} <span className="text-rose-500">*</span>
                   </label>
-                  <Button
-                    variant="outline-primary"
-                    size="sm"
-                    className="rounded-pill py-0 px-2 small"
+                  <button
+                    type="button"
                     onClick={() => setShowAddChapterModal(true)}
-                    disabled={isBusy}
+                    disabled={isBusy || !selectedCourseId}
+                    className="inline-flex items-center gap-1 rounded-full border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/40 px-2.5 py-0.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-100"
                   >
-                    <i className="bi bi-plus-circle me-1"></i>{t('upload.add_new_chapter')}
-                  </Button>
+                    <Plus className="h-3.5 w-3.5" />
+                    {t('upload.add_chapter')}
+                  </button>
                 </div>
 
-                {currentCourseChapters.length === 0 ? (
-                  <div className="text-center py-3 text-muted small">
-                    {t('upload.no_chapters_prompt_3')} <strong>{t('upload.add_new_chapter')}</strong> {t('upload.to_start')}
+                {isLoadingChapters ? (
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl text-xs text-slate-500 flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                    {t('upload.loading_chapters')}
+                  </div>
+                ) : currentCourseChapters.length === 0 ? (
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-700 dark:text-amber-300 flex items-center justify-between">
+                    <span>{t('upload.course_has_no_chapters')}</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddChapterModal(true)}
+                      className="font-bold underline"
+                    >
+                      {t('upload.create_chapter_1_now')}
+                    </button>
                   </div>
                 ) : (
-                  <Form.Select
+                  <select
                     value={selectedChapterId}
                     onChange={(e) => setSelectedChapterId(e.target.value)}
                     disabled={isBusy}
-                    className="form-control-clean bg-white"
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3.5 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
                   >
                     {currentCourseChapters.map((ch) => {
                       const chId = ch.ID || ch.id;
-                      const chNum = ch.ChapterNumber || ch.chapterNumber || ch.chapter_number || 1;
+                      const chNum = ch.ChapterNumber || ch.chapter_number || 1;
                       const title = ch.Title || ch.title || '';
                       return (
                         <option key={chId} value={chId}>
@@ -634,407 +602,437 @@ export default function UploadVideo() {
                         </option>
                       );
                     })}
-                  </Form.Select>
-                )}
-
-                {currentChapter && (
-                  <div className="mt-2 text-secondary small">
-                    <i className="bi bi-info-circle me-1 text-primary"></i>
-                    {currentChapter.Description || currentChapter.description}
-                  </div>
+                  </select>
                 )}
               </div>
 
               {/* BƯỚC 3: NHẬP THÔNG TIN BÀI HỌC NHỎ & FILE VIDEO */}
-              <Form onSubmit={handleSubmitUpload}>
-                <fieldset disabled={isBusy}>
-                  {/* Tiêu đề bài giảng nhỏ */}
-                  <FloatingLabel
-                    controlId="lessonTitleInput"
-                    label={t('upload.step_3_lesson_title')}
-                    className="mb-3 text-secondary"
-                  >
-                    <Form.Control
+              <form onSubmit={handleSubmitUpload} className="space-y-4 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <fieldset disabled={isBusy} className="space-y-4">
+                  {/* Tiêu đề bài giảng */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1.5">
+                      {t('upload.step_3_lesson_title')} <span className="text-rose-500">*</span>
+                    </label>
+                    <input
                       type="text"
                       placeholder={t('upload.lesson_title_placeholder')}
                       value={lessonTitle}
                       onChange={(e) => setLessonTitle(e.target.value)}
                       required
-                      className="form-control-clean"
+                      className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3.5 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
                     />
-                  </FloatingLabel>
+                  </div>
 
-                  {/* TAB CHUYỂN ĐỔI PHƯƠNG THỨC: TẢI FILE HOẶC DÁN URL */}
-                  <div className="mb-4">
-                    <label className="form-label fw-bold small text-dark mb-2">
-                      Phương Thức Nạp Video:
+                  {/* Chuyển đổi phương thức: File hoặc URL */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-2">
+                      {t('upload.video_source_method')}
                     </label>
-                    <div className="d-flex p-1 bg-light rounded-pill border" role="group">
-                      <Button
+                    <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-full border border-slate-200/80 dark:border-slate-700">
+                      <button
                         type="button"
-                        variant={uploadMode === 'file' ? 'primary' : 'light'}
-                        size="sm"
-                        className={`w-50 rounded-pill py-2 fw-semibold d-flex align-items-center justify-content-center gap-2 border-0 ${uploadMode === 'file' ? 'shadow-sm' : 'text-secondary bg-transparent'
-                          }`}
                         onClick={() => {
                           setUploadMode('file');
                           setValidationError(null);
                         }}
-                        disabled={isBusy}
+                        className={`flex-1 rounded-full py-2 text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
+                          uploadMode === 'file'
+                            ? 'bg-blue-600 text-white shadow-xs'
+                            : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+                        }`}
                       >
-                        <i className="bi bi-file-earmark-play-fill"></i>
-                        <span>Tải Tệp Từ Máy Tính</span>
-                      </Button>
-
-                      <Button
+                        <FileVideo className="h-4 w-4" />
+                        <span>{t('upload.upload_from_computer')}</span>
+                      </button>
+                      <button
                         type="button"
-                        variant={uploadMode === 'url' ? 'primary' : 'light'}
-                        size="sm"
-                        className={`w-50 rounded-pill py-2 fw-semibold d-flex align-items-center justify-content-center gap-2 border-0 ${uploadMode === 'url' ? 'shadow-sm' : 'text-secondary bg-transparent'
-                          }`}
                         onClick={() => {
                           setUploadMode('url');
                           setValidationError(null);
                         }}
-                        disabled={isBusy}
+                        className={`flex-1 rounded-full py-2 text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
+                          uploadMode === 'url'
+                            ? 'bg-blue-600 text-white shadow-xs'
+                            : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+                        }`}
                       >
-                        <i className="bi bi-link-45deg fs-6"></i>
-                        <span>Dán Đường Dẫn URL</span>
-                      </Button>
+                        <Link2 className="h-4 w-4" />
+                        <span>{t('upload.paste_url')}</span>
+                      </button>
                     </div>
                   </div>
 
-                  {/* TAB 1: CHỌN FILE VIDEO TỪ MÁY TÍNH */}
+                  {/* Tab File */}
                   {uploadMode === 'file' && (
-                    <Form.Group controlId="lessonFileInput" className="mb-4">
-                      <Form.Label className="fw-semibold text-dark small d-flex justify-content-between">
-                        <span>
-                          {t('upload.video_file_label')} <span className="text-danger">*</span>
-                        </span>
+                    <div>
+                      <div className="flex justify-between items-center mb-1.5">
+                        <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                          {t('upload.video_file_label')} <span className="text-rose-500">*</span>
+                        </label>
                         {selectedFile && (
-                          <span className="text-primary fw-bold">
+                          <span className="text-xs font-bold text-blue-600 dark:text-blue-400">
                             {formatBytes(selectedFile.size)}
                           </span>
                         )}
-                      </Form.Label>
-                      <Form.Control
+                      </div>
+                      <input
                         ref={fileInputRef}
                         type="file"
                         accept="video/mp4, video/quicktime, .mp4, .mov"
                         onChange={handleFileChange}
-                        className="form-control-clean"
+                        className="w-full text-xs text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-950 dark:file:text-blue-300 cursor-pointer"
                       />
-                      <Form.Text className="text-muted small">
+                      <p className="mt-1 text-[11px] text-slate-400">
                         {t('upload.upload_recommendation')}
-                      </Form.Text>
-                    </Form.Group>
-                  )}
-
-                  {/* TAB 2: NHẬP TRỰC TIẾP URL VIDEO TỪ BACKEND / CDN / S3 */}
-                  {uploadMode === 'url' && (
-                    <Form.Group className="mb-4">
-                      <Form.Label className="fw-semibold text-dark small">
-                        <i className="bi bi-link-45deg me-1 text-primary"></i>
-                        Đường Dẫn Video Trực Tiếp (CDN / S3 / HLS .m3u8 hoặc .mp4): <span className="text-danger">*</span>
-                      </Form.Label>
-                      <Form.Control
-                        type="url"
-                        placeholder="https://example.com/stream/lesson.m3u8 hoặc https://example.com/video.mp4"
-                        value={customVideoUrl}
-                        onChange={(e) => setCustomVideoUrl(e.target.value)}
-                        className="form-control-clean"
-                      />
-                      <Form.Text className="text-muted small">
-                        Lưu trực tiếp link phát này vào CSDL Backend qua endpoint <code>POST /api/v1/lesson</code>.
-                      </Form.Text>
-                    </Form.Group>
-                  )}
-
-                  {/* THÔNG BÁO LỖI NẾU CÓ */}
-                  {validationError && (
-                    <Alert variant="danger" className="py-2 small mb-3 rounded-3">
-                      <i className="bi bi-exclamation-triangle-fill me-2"></i>
-                      {validationError}
-                    </Alert>
-                  )}
-                  {uploadError && (
-                    <Alert variant="danger" className="py-2 small mb-3 rounded-3">
-                      <i className="bi bi-x-circle-fill me-2"></i>
-                      {uploadError}
-                    </Alert>
-                  )}
-
-                  {/* TIẾN TRÌNH UPLOAD TỪNG CHUNK NHỎ */}
-                  {status === UPLOAD_STATUS.UPLOADING && (
-                    <div className="mb-4 p-3 rounded-3 bg-light border border-primary-subtle">
-                      <div className="d-flex justify-content-between align-items-center mb-1">
-                        <span className="fw-semibold text-primary small">
-                          <i className="bi bi-cloud-arrow-up me-2"></i>
-                          {t('upload.uploading_chunk_progress')} {chunkStats.current}/{chunkStats.total}...
-                        </span>
-                        <span className="fw-bold text-primary">{progress}%</span>
-                      </div>
-                      <ProgressBar
-                        animated
-                        striped
-                        variant="primary"
-                        now={progress}
-                        style={{ height: '14px' }}
-                        className="rounded-pill mb-2"
-                      />
-                      <div className="d-flex justify-content-between text-muted small" style={{ fontSize: '0.8rem' }}>
-                        <span>{t('upload.loaded')} {formatBytes(uploadStats.loaded)} / {formatBytes(uploadStats.total)}</span>
-                        <span className="text-success"><i className="bi bi-lightning-charge me-1"></i>Multipart Chunk Ingest</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* TIẾN TRÌNH MÃ HÓA HLS PHÂN ĐOẠN AES-128 */}
-                  {status === UPLOAD_STATUS.PROCESSING && (
-                    <div className="mb-4 p-3 rounded-3 bg-primary-subtle border border-primary-subtle text-center">
-                      <Spinner animation="border" variant="primary" size="sm" className="me-2" />
-                      <span className="fw-bold text-primary small">
-                        {t('upload.hls_segmenting')} {segmentStats.current}/{segmentStats.total}...
-                      </span>
-                      <p className="text-muted small mb-0 mt-1" style={{ fontSize: '0.78rem' }}>
-                        {t('upload.hls_description')}
                       </p>
                     </div>
                   )}
 
-                  {/* TRẠNG THÁI HOÀN THÀNH */}
-                  {status === UPLOAD_STATUS.READY && recentUploadedVideoId && (
-                    <Alert variant="success" className="p-3 mb-4 rounded-3 border-success shadow-sm">
-                      <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
-                        <div>
-                          <h6 className="fw-bold mb-1 text-success">
-                            <i className="bi bi-check-circle-fill me-2"></i>
-                            {t('upload.upload_success_title')}
-                          </h6>
-                          <small className="text-secondary">
-                            {t('upload.lesson_added_to')} <strong>{t('upload.chapter')} {currentChapter?.ChapterNumber}: {currentChapter?.Title}</strong>.
-                          </small>
-                        </div>
-                        <div className="d-flex gap-2">
-                          <Button
-                            variant="success"
-                            size="sm"
-                            className="rounded-pill px-3"
-                            onClick={() => navigate(`/${lang}/instructor/preview/${recentUploadedVideoId}`)}
-                          >
-                            <i className="bi bi-play-circle me-1"></i>{t('upload.preview')}
-                          </Button>
-                          <Button
-                            variant="outline-secondary"
-                            size="sm"
-                            className="rounded-pill px-3"
-                            onClick={handleContinueNextLesson}
-                          >
-                            <i className="bi bi-plus-lg me-1"></i>{t('upload.upload_another')}
-                          </Button>
-                        </div>
-                      </div>
-                    </Alert>
+                  {/* Tab URL */}
+                  {uploadMode === 'url' && (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1.5">
+                        {t('upload.direct_video_url')} <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="url"
+                        placeholder={t('upload.direct_video_url_placeholder')}
+                        value={customVideoUrl}
+                        onChange={(e) => setCustomVideoUrl(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3.5 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                      />
+                    </div>
                   )}
 
-                  {/* NÚT SUBMIT */}
+                  {/* Lỗi xác thực */}
+                  {validationError && (
+                    <div className="flex items-center gap-2 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 p-3 text-xs text-rose-700 dark:text-rose-300">
+                      <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                      <span>{validationError}</span>
+                    </div>
+                  )}
+
+                  {uploadError && (
+                    <div className="flex items-center gap-2 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 p-3 text-xs text-rose-700 dark:text-rose-300">
+                      <XCircle className="h-4 w-4 flex-shrink-0" />
+                      <span>{uploadError}</span>
+                    </div>
+                  )}
+
+                  {/* Tiến trình Upload Chunk */}
+                  {status === UPLOAD_STATUS.UPLOADING && (
+                    <div className="rounded-2xl border border-blue-200 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/30 p-4 space-y-2">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-semibold text-blue-700 dark:text-blue-300 flex items-center gap-1.5">
+                          <UploadCloud className="h-4 w-4" />
+                          {t('upload.uploading_chunk_progress')} {chunkStats.current}/{chunkStats.total}...
+                        </span>
+                        <span className="font-bold text-blue-700 dark:text-blue-300">{progress}%</span>
+                      </div>
+                      <div className="w-full bg-slate-200 dark:bg-slate-700 h-2.5 rounded-full overflow-hidden">
+                        <div
+                          className="bg-blue-600 h-full rounded-full transition-all duration-300"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-[11px] text-slate-500">
+                        <span>
+                          {t('upload.loaded')} {formatBytes(uploadStats.loaded)} / {formatBytes(uploadStats.total)}
+                        </span>
+                        <span className="text-emerald-600 font-semibold">Multipart Chunk Ingest</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tiến trình mã hóa HLS */}
+                  {status === UPLOAD_STATUS.PROCESSING && (
+                    <div className="rounded-2xl border border-cyan-200 dark:border-cyan-900 bg-cyan-50/50 dark:bg-cyan-950/30 p-4 text-center space-y-1">
+                      <div className="flex items-center justify-center gap-2 text-xs font-bold text-cyan-700 dark:text-cyan-300">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>
+                          {t('upload.hls_segmenting')} {segmentStats.current}/{segmentStats.total}...
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500">{t('upload.hls_description')}</p>
+                    </div>
+                  )}
+
+                  {/* Trạng thái hoàn thành */}
+                  {status === UPLOAD_STATUS.READY && recentUploadedVideoId && (
+                    <div className="rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-950/40 p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+                      <div>
+                        <h4 className="text-sm font-bold text-emerald-800 dark:text-emerald-200 flex items-center gap-1.5">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                          {t('upload.upload_success_title')}
+                        </h4>
+                        <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
+                          {t('upload.lesson_added_to')}{' '}
+                          <strong>
+                            {t('upload.chapter')} {currentChapter?.ChapterNumber}: {currentChapter?.Title}
+                          </strong>
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/${lang}/instructor/preview/${recentUploadedVideoId}`)}
+                          className="inline-flex items-center gap-1 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 text-xs font-semibold shadow-xs"
+                        >
+                          <PlayCircle className="h-3.5 w-3.5" />
+                          {t('upload.preview')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleContinueNextLesson}
+                          className="rounded-full border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50"
+                        >
+                          {t('upload.upload_another')}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Nút Submit */}
                   {status !== UPLOAD_STATUS.READY && (
-                    <Button
+                    <button
                       type="submit"
                       disabled={isUploadDisabled}
-                      className="btn-primary-pill w-100 py-3 fw-bold d-flex align-items-center justify-content-center gap-2 shadow-sm"
+                      className="w-full rounded-full bg-blue-600 hover:bg-blue-700 py-3 text-sm font-bold text-white shadow-md shadow-blue-500/20 hover:shadow-lg disabled:opacity-50 transition-all flex items-center justify-center gap-2"
                     >
                       {isBusy ? (
                         <>
-                          <Spinner animation="border" size="sm" />
+                          <Loader2 className="h-4 w-4 animate-spin" />
                           <span>{t('upload.processing_lesson')}</span>
                         </>
                       ) : uploadMode === 'file' ? (
                         <>
-                          <i className="bi bi-cloud-arrow-up-fill fs-5"></i>
-                          <span>{t('upload.upload_and_match_to_chapter')} {currentChapter?.ChapterNumber || 1}</span>
+                          <UploadCloud className="h-4 w-4" />
+                          <span>
+                            {t('upload.upload_and_match_to_chapter')} {currentChapter?.ChapterNumber || 1}
+                          </span>
                         </>
                       ) : (
                         <>
-                          <i className="bi bi-check-circle-fill fs-5"></i>
-                          <span>Lưu Bài Giảng Vào Chương {currentChapter?.ChapterNumber || 1}</span>
+                          <CheckCircle2 className="h-4 w-4" />
+                          <span>
+                            {t('upload.save_lesson_to_chapter')} {currentChapter?.ChapterNumber || 1}
+                          </span>
                         </>
                       )}
-                    </Button>
+                    </button>
                   )}
                 </fieldset>
-              </Form>
-            </Card>
-          </Col>
+              </form>
+            </div>
+          </div>
 
           {/* CỘT PHẢI (COL-5): CÂY CẤU TRÚC KHÓA HỌC THỜI GIAN THỰC (CURRICULUM TREE) */}
-          <Col lg={5}>
-            <div className="card-clean border-0 shadow-sm p-4 bg-white sticky-top" style={{ top: '80px' }}>
-              <div className="d-flex justify-content-between align-items-start mb-3 pb-2 border-bottom">
+          <div className="lg:col-span-5 sticky top-20">
+            <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xl space-y-4">
+              <div className="flex justify-between items-start pb-3 border-b border-slate-100 dark:border-slate-800">
                 <div>
-                  <h6 className="fw-bold text-dark mb-1 d-flex align-items-center gap-2">
-                    <i className="bi bi-list-task text-primary"></i>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base flex items-center gap-2">
+                    <Layers className="h-4 w-4 text-blue-600" />
                     <span>{t('upload.curriculum_tree')}</span>
-                  </h6>
-                  <small className="text-secondary text-truncate d-block" style={{ maxWidth: '280px' }}>
+                  </h3>
+                  <small className="text-xs text-slate-500 dark:text-slate-400 block truncate max-w-[220px]">
                     {currentCourse?.Title}
                   </small>
                 </div>
-                <Badge bg="primary" className="rounded-pill px-2 py-1 d-flex align-items-center gap-1">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                   {isLoadingLessons ? (
                     <>
-                      <Spinner animation="border" size="sm" style={{ width: '0.75rem', height: '0.75rem' }} />
-                      <span style={{ fontSize: '0.75rem' }}>Đang nạp từ BE...</span>
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <span>{t('common.loading', 'Loading...')}</span>
                     </>
                   ) : (
-                    <span>{currentCourseChapters.length} {t('upload.chapter')}</span>
+                    <span>
+                      {currentCourseChapters.length} {t('upload.chapter')}
+                    </span>
                   )}
-                </Badge>
+                </span>
               </div>
 
-              {/* Danh sách chương & các video nhỏ đã khớp */}
+              {/* Danh sách chương & Accordion thuần Tailwind */}
               {courseCurriculum.length === 0 ? (
-                <div className="text-center py-4 text-muted small">
+                <div className="text-center py-8 text-xs text-slate-400">
                   {t('upload.no_curriculum_data')}
                 </div>
               ) : (
-                <Accordion defaultActiveKey="0" className="accordion-clean">
+                <div className="space-y-2.5">
                   {courseCurriculum.map((chap, idx) => {
                     const isSelectedChapter = chap.ID === selectedChapterId;
+                    const isOpen = Boolean(openAccordions[idx]);
 
                     return (
-                      <Accordion.Item
+                      <div
                         key={chap.ID}
-                        eventKey={String(idx)}
-                        className={`mb-2 border rounded-3 overflow-hidden ${isSelectedChapter ? 'border-primary bg-primary bg-opacity-10' : ''
-                          }`}
+                        className={`rounded-2xl border transition-all overflow-hidden ${
+                          isSelectedChapter
+                            ? 'border-blue-400 bg-blue-50/30 dark:border-blue-700 dark:bg-blue-950/20'
+                            : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40'
+                        }`}
                       >
-                        <Accordion.Header>
-                          <div className="d-flex justify-content-between align-items-center w-100 pe-3">
-                            <span className="fw-bold small text-dark text-truncate" style={{ maxWidth: '230px' }}>
+                        {/* Header Accordion */}
+                        <button
+                          type="button"
+                          onClick={() => toggleAccordion(idx)}
+                          className="w-full flex items-center justify-between p-3.5 text-left transition-colors"
+                        >
+                          <div className="flex items-center gap-2 truncate pr-2">
+                            <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
                               {t('upload.part')} {chap.ChapterNumber}: {chap.Title}
                             </span>
-                            <Badge bg="secondary" className="bg-opacity-25 text-dark fw-normal small">
+                            <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[10px] font-medium bg-slate-200/70 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
                               {chap.videos.length} {t('upload.lessons_count')}
-                            </Badge>
+                            </span>
                           </div>
-                        </Accordion.Header>
-                        <Accordion.Body className="p-2 bg-white">
-                          {chap.videos.length === 0 ? (
-                            <div className="text-muted small p-2 text-center">
-                              {t('upload.no_videos_in_part')}
-                            </div>
-                          ) : (
-                            <div className="d-flex flex-column gap-1">
-                              {chap.videos.map((vid, vIdx) => {
-                                const isJustUploaded = vid.ID === recentUploadedVideoId;
+                          {isOpen ? <ChevronUp className="h-4 w-4 text-slate-400 flex-shrink-0" /> : <ChevronDown className="h-4 w-4 text-slate-400 flex-shrink-0" />}
+                        </button>
 
-                                return (
-                                  <div
-                                    key={vid.ID}
-                                    className={`p-2 rounded-2 d-flex justify-content-between align-items-center small ${isJustUploaded
-                                      ? 'bg-success bg-opacity-10 border border-success'
-                                      : 'bg-light hover-bg-light'
+                        {/* Body Accordion */}
+                        {isOpen && (
+                          <div className="p-3 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                            {chap.videos.length === 0 ? (
+                              <p className="text-[11px] text-slate-400 text-center py-2">
+                                {t('upload.no_videos_in_part')}
+                              </p>
+                            ) : (
+                              <div className="space-y-1.5">
+                                {chap.videos.map((vid, vIdx) => {
+                                  const isJustUploaded = vid.ID === recentUploadedVideoId;
+
+                                  return (
+                                    <div
+                                      key={vid.ID}
+                                      className={`p-2.5 rounded-xl flex items-center justify-between text-xs transition-all ${
+                                        isJustUploaded
+                                          ? 'bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200'
+                                          : 'bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300'
                                       }`}
-                                  >
-                                    <div className="d-flex align-items-center gap-2 text-truncate" style={{ maxWidth: '240px' }}>
-                                      <i className={`bi ${isJustUploaded ? 'bi-check-circle-fill text-success' : 'bi-play-circle text-primary'}`}></i>
-                                      <span className="text-dark fw-medium text-truncate" title={vid.Title}>
-                                        {vIdx + 1}. {vid.Title}
-                                      </span>
-                                    </div>
-                                    <div className="d-flex align-items-center gap-2">
-                                      {isJustUploaded && (
-                                        <Badge bg="success" className="px-2 py-1" style={{ fontSize: '0.65rem' }}>
-                                          {t('upload.just_matched')}
-                                        </Badge>
-                                      )}
-                                      <span className="text-muted font-monospace" style={{ fontSize: '0.75rem' }}>
+                                    >
+                                      <div className="flex items-center gap-2 truncate pr-2">
+                                        <PlayCircle className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+                                        <span className="font-medium truncate" title={vid.Title}>
+                                          {vIdx + 1}. {vid.Title}
+                                        </span>
+                                      </div>
+                                      <span className="font-mono text-[10px] text-slate-400 flex-shrink-0">
                                         {formatDuration(vid.Length)}
                                       </span>
                                     </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
+                                  );
+                                })}
+                              </div>
+                            )}
 
-                          {/* Nút chọn nhanh chương này để upload */}
-                          <div className="mt-2 pt-2 border-top text-end">
-                            <Button
-                              variant={isSelectedChapter ? 'primary' : 'outline-secondary'}
-                              size="sm"
-                              className="rounded-pill py-0 px-2 small"
-                              style={{ fontSize: '0.75rem' }}
-                              onClick={() => setSelectedChapterId(chap.ID)}
-                            >
-                              {isSelectedChapter ? t('upload.currently_selected_chapter') : t('upload.select_to_upload_here')}
-                            </Button>
+                            {/* Nút chọn nhanh chương */}
+                            <div className="pt-2 text-right">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedChapterId(chap.ID)}
+                                className={`rounded-full px-3 py-1 text-[11px] font-semibold transition-all ${
+                                  isSelectedChapter
+                                    ? 'bg-blue-600 text-white'
+                                    : 'border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50'
+                                }`}
+                              >
+                                {isSelectedChapter ? t('upload.currently_selected_chapter') : t('upload.select_to_upload_here')}
+                              </button>
+                            </div>
                           </div>
-                        </Accordion.Body>
-                      </Accordion.Item>
+                        )}
+                      </div>
                     );
                   })}
-                </Accordion>
+                </div>
               )}
             </div>
-          </Col>
-        </Row>
-      </Container>
+          </div>
+        </div>
+      </div>
 
       {/* ===================================================================
        * MODAL TẠO CHƯƠNG / PHẦN MỚI
        * =================================================================== */}
-      <Modal show={showAddChapterModal} onHide={() => setShowAddChapterModal(false)} centered>
-        <Modal.Header closeButton>
-          <Modal.Title className="fs-6 fw-bold">
-            <i className="bi bi-folder-plus text-primary me-2"></i>
-            {t('upload.add_new_chapter_modal')}
-          </Modal.Title>
-        </Modal.Header>
-        <Form onSubmit={handleCreateNewChapter}>
-          <Modal.Body>
-            <div className="mb-3">
-              <label className="form-label small fw-bold text-dark">{t('upload.belongs_to_course')}</label>
-              <div className="p-2 bg-light rounded text-dark small fw-semibold">
-                {currentCourse?.Title} (<code>{currentCourse?.ID}</code>)
+      {showAddChapterModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md overflow-hidden rounded-3xl bg-white dark:bg-slate-900 p-6 shadow-2xl border border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <FolderPlus className="h-5 w-5 text-blue-600" />
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  {t('upload.add_new_chapter_modal')}
+                </h3>
               </div>
+              <button
+                type="button"
+                onClick={() => setShowAddChapterModal(false)}
+                className="rounded-full p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
 
-            <div className="mb-3">
-              <label className="form-label small fw-bold text-dark">{t('upload.chapter_title_required')}</label>
-              <Form.Control
-                type="text"
-                placeholder={t('upload.chapter_title_placeholder')}
-                value={newChapterTitle}
-                onChange={(e) => setNewChapterTitle(e.target.value)}
-                required
-                className="form-control-clean"
-              />
-            </div>
+            <form onSubmit={handleCreateNewChapter} className="mt-4 space-y-3.5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
+                  {t('upload.belongs_to_course')}
+                </label>
+                <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-200">
+                  {currentCourse?.Title} ({currentCourse?.ID})
+                </div>
+              </div>
 
-            <div className="mb-3">
-              <label className="form-label small fw-bold text-dark">{t('instructor.short_description')}</label>
-              <Form.Control
-                as="textarea"
-                rows={3}
-                placeholder={t('upload.chapter_desc_placeholder')}
-                value={newChapterDesc}
-                onChange={(e) => setNewChapterDesc(e.target.value)}
-                className="form-control-clean"
-              />
-            </div>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="light" onClick={() => setShowAddChapterModal(false)} className="rounded-pill px-3">
-              {t('common.cancel')}
-            </Button>
-            <Button type="submit" variant="primary" className="btn-primary-pill px-3">
-              {t('upload.create_chapter')}
-            </Button>
-          </Modal.Footer>
-        </Form>
-      </Modal>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1">
+                  {t('upload.chapter_title_required')} <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder={t('upload.chapter_title_placeholder')}
+                  value={newChapterTitle}
+                  onChange={(e) => setNewChapterTitle(e.target.value)}
+                  required
+                  autoFocus
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3.5 py-2 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1">
+                  {t('instructor.short_description')}
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder={t('upload.chapter_desc_placeholder')}
+                  value={newChapterDesc}
+                  onChange={(e) => setNewChapterDesc(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3.5 py-2 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40 resize-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowAddChapterModal(false)}
+                  className="rounded-full border border-slate-200 dark:border-slate-700 px-4 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50"
+                >
+                  {t('common.cancel')}
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-full bg-blue-600 hover:bg-blue-700 px-5 py-1.5 text-xs font-semibold text-white shadow-xs"
+                >
+                  {t('upload.create_chapter')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* MODAL TẠO KHÓA HỌC MỚI */}
       <CreateCourseModal
         show={showCreateCourseModal}

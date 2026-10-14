@@ -1,14 +1,5 @@
 import React, { useState } from 'react';
-import {
-  Container,
-  Row,
-  Col,
-  Card,
-  Form,
-  FloatingLabel,
-  Button,
-  Badge,
-} from 'react-bootstrap';
+import { UserCircle, Edit3, Key, AlertCircle, Loader2, Shield, Mail, Hash, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useTranslation } from 'react-i18next';
@@ -46,7 +37,6 @@ export default function UserProfile() {
     setTimeout(() => {
       setIsSavingInfo(false);
 
-      // Cập nhật lại AuthContext và LocalStorage
       const updatedUser = {
         ...user,
         name: nameInput.trim(),
@@ -112,254 +102,298 @@ export default function UserProfile() {
   };
 
   return (
-    <Container fluid="lg" className="py-4 user-profile-page">
+    <div className="py-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
       {/* Header Banner */}
-      <div className="mb-4 pb-3 border-bottom">
-        <div className="badge-pill-soft mb-2">
-          <i className="bi bi-person-circle text-primary"></i>
+      <div className="mb-8 pb-4 border-b border-slate-200/80 dark:border-slate-800">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 text-xs font-semibold mb-2">
+          <UserCircle className="h-4 w-4" />
           <span>{t('profile.user_account')}</span>
         </div>
-        <h2 className="fw-bold text-dark mb-1">
+        <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-1">
           {t('profile.user_profile')}
         </h2>
-        <p className="text-secondary mb-0 small">
+        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
           {t('profile.profile_desc')}
         </p>
       </div>
 
-      <Row className="g-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* =========================================================================
          * PHẦN 1: USER INFO CARD
          * ========================================================================= */}
-        <Col xs={12} lg={6}>
-          <Card className="h-100 card-clean shadow-sm border rounded-4 overflow-hidden bg-white">
-            <Card.Header className="bg-white border-bottom py-3 px-4 d-flex justify-content-between align-items-center">
-              <h5 className="mb-0 fw-bold text-dark">
-                {t('profile.account_info')}
-              </h5>
-              <span
-                className={`badge rounded-pill px-3 py-1 ${
-                  user?.role === 'Administrator'
-                    ? 'bg-danger text-white'
-                    : user?.role === 'Instructor'
-                    ? 'bg-warning text-dark'
-                    : 'bg-primary text-white'
-                }`}
-              >
-                {user?.role || t('profile.user_default')}
-              </span>
-            </Card.Header>
+        <div className="flex flex-col bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
+          <div className="bg-slate-50/60 dark:bg-slate-850 border-b border-slate-100 dark:border-slate-800 py-4 px-6 flex items-center justify-between">
+            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-0">
+              {t('profile.account_info')}
+            </h3>
+            <span
+              className={`inline-flex items-center px-3 py-1 text-xs font-bold rounded-full ${
+                user?.role === 'Administrator'
+                  ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300'
+                  : user?.role === 'Instructor'
+                  ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300'
+                  : 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300'
+              }`}
+            >
+              {user?.role || t('profile.user_default')}
+            </span>
+          </div>
 
-            <Card.Body className="p-4 bg-white">
-              {/* Avatar và Thông tin nhanh */}
-              <div className="d-flex align-items-center gap-3 mb-4 pb-3 border-bottom">
-                <div
-                  className="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold fs-2 shadow-sm"
-                  style={{
-                    width: '80px',
-                    height: '80px',
-                    flexShrink: 0,
-                    background: 'linear-gradient(135deg, #2563eb, #06b6d4)',
-                  }}
-                >
-                  {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+          <div className="p-6 flex-1 flex flex-col justify-between">
+            {/* Avatar và Thông tin nhanh */}
+            <div className="flex items-center gap-4 pb-6 border-b border-slate-100 dark:border-slate-800 mb-6">
+              <div
+                className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center text-white font-extrabold text-2xl sm:text-3xl shadow-md shrink-0 bg-gradient-to-tr from-blue-600 to-cyan-500"
+              >
+                {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+              </div>
+
+              <div>
+                <h4 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
+                  {user?.name || t('profile.name_not_updated')}
+                </h4>
+                <div className="text-xs text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1">
+                  <Mail className="h-3 w-3" />
+                  <span>{user?.email}</span>
+                </div>
+                <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[11px] font-mono text-slate-600 dark:text-slate-300">
+                  <Hash className="h-3 w-3" />
+                  <span>{user?.userId || 'N/A'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Form Xem / Sửa Họ Tên */}
+            {!isEditingInfo ? (
+              <div className="space-y-3 flex-1 flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                    <span className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold block mb-0.5">
+                      {t('profile.display_name')}
+                    </span>
+                    <span className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white">
+                      {user?.name}
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                    <span className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold block mb-0.5">
+                      {t('profile.linked_email')}
+                    </span>
+                    <span className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white">
+                      {user?.email}
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                    <span className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold block mb-0.5">
+                      {t('profile.system_role')}
+                    </span>
+                    <span className="text-xs sm:text-sm font-bold text-blue-600 dark:text-blue-400">
+                      {user?.role}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingInfo(true)}
+                    className="inline-flex items-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 px-5 py-2.5 text-xs font-semibold text-white shadow-xs transition-all cursor-pointer"
+                  >
+                    <Edit3 className="h-4 w-4" />
+                    <span>{t('profile.edit_profile')}</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleSaveProfile} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                    {t('profile.full_name_req')}
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={t('profile.enter_full_name')}
+                    value={nameInput}
+                    onChange={(e) => setNameInput(e.target.value)}
+                    required
+                    className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60 px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                  />
                 </div>
 
                 <div>
-                  <h4 className="fw-bold text-dark mb-1">{user?.name || t('profile.name_not_updated')}</h4>
-                  <div className="text-secondary small mb-1">{user?.email}</div>
-                  <span className="badge-pill-cyan small">
-                    {t('profile.id_code')} <code>{user?.userId || 'N/A'}</code>
-                  </span>
+                  <label className="block text-xs font-semibold text-slate-400 dark:text-slate-500 mb-1.5">
+                    {t('profile.email_readonly')}
+                  </label>
+                  <input
+                    type="email"
+                    value={user?.email || ''}
+                    disabled
+                    className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-4 py-2.5 text-xs text-slate-400 cursor-not-allowed"
+                  />
                 </div>
-              </div>
 
-              {/* Form Xem / Sửa Họ Tên */}
-              {!isEditingInfo ? (
-                <div className="d-flex flex-column gap-3">
-                  <div className="p-3 rounded-3 bg-light border">
-                    <span className="text-muted small d-block mb-1">{t('profile.display_name')}</span>
-                    <strong className="text-dark fs-6">{user?.name}</strong>
-                  </div>
-
-                  <div className="p-3 rounded-3 bg-light border">
-                    <span className="text-muted small d-block mb-1">{t('profile.linked_email')}</span>
-                    <strong className="text-dark fs-6">{user?.email}</strong>
-                  </div>
-
-                  <div className="p-3 rounded-3 bg-light border">
-                    <span className="text-muted small d-block mb-1">{t('profile.system_role')}</span>
-                    <strong className="text-primary fs-6">{user?.role}</strong>
-                  </div>
-
-                  <div className="mt-3">
-                    <Button
-                      onClick={() => setIsEditingInfo(true)}
-                      className="btn-primary-pill d-flex align-items-center gap-2"
-                    >
-                      <i className="bi bi-pencil-square"></i>
-                      <span>{t('profile.edit_profile')}</span>
-                    </Button>
-                  </div>
+                <div className="flex items-center gap-2 pt-2">
+                  <button
+                    type="submit"
+                    disabled={isSavingInfo}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 px-5 py-2.5 text-xs font-semibold text-white shadow-xs transition-all cursor-pointer"
+                  >
+                    {isSavingInfo ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        <span>{t('profile.saving')}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="h-3.5 w-3.5" />
+                        <span>{t('profile.save_changes')}</span>
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    disabled={isSavingInfo}
+                    className="rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-750 transition-all cursor-pointer"
+                  >
+                    {t('profile.cancel')}
+                  </button>
                 </div>
-              ) : (
-                <Form onSubmit={handleSaveProfile}>
-                  <FloatingLabel controlId="editProfileName" label={t('profile.full_name_req')} className="mb-3 text-secondary">
-                    <Form.Control
-                      type="text"
-                      placeholder={t('profile.enter_full_name')}
-                      value={nameInput}
-                      onChange={(e) => setNameInput(e.target.value)}
-                      required
-                      className="form-control-clean"
-                    />
-                  </FloatingLabel>
-
-                  <FloatingLabel controlId="editProfileEmailReadOnly" label={t('profile.email_readonly')} className="mb-4 text-secondary">
-                    <Form.Control
-                      type="email"
-                      value={user?.email || ''}
-                      disabled
-                      className="bg-light text-muted form-control-clean"
-                    />
-                  </FloatingLabel>
-
-                  <div className="d-flex gap-2">
-                    <Button
-                      type="submit"
-                      disabled={isSavingInfo}
-                      className="btn-primary-pill px-4"
-                    >
-                      {isSavingInfo ? t('profile.saving') : t('profile.save_changes')}
-                    </Button>
-                    <Button
-                      variant="outline-secondary"
-                      onClick={handleCancelEdit}
-                      disabled={isSavingInfo}
-                      className="rounded-pill px-3"
-                    >
-                      {t('profile.cancel')}
-                    </Button>
-                  </div>
-                </Form>
-              )}
-            </Card.Body>
-          </Card>
-        </Col>
+              </form>
+            )}
+          </div>
+        </div>
 
         {/* =========================================================================
          * PHẦN 2: CHANGE PASSWORD CARD
          * ========================================================================= */}
-        <Col xs={12} lg={6}>
-          <Card className="h-100 card-clean shadow-sm border rounded-4 overflow-hidden bg-white">
-            <Card.Header className="bg-white border-bottom py-3 px-4">
-              <h5 className="mb-0 fw-bold text-dark">
-                {t('profile.change_pwd')}
-              </h5>
-            </Card.Header>
+        <div className="flex flex-col bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
+          <div className="bg-slate-50/60 dark:bg-slate-850 border-b border-slate-100 dark:border-slate-800 py-4 px-6 flex items-center justify-between">
+            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-0">
+              {t('profile.change_pwd')}
+            </h3>
+            <Key className="h-4 w-4 text-slate-400" />
+          </div>
 
-            <Card.Body className="p-4 bg-white">
-              <p className="text-secondary small mb-4">
-                {t('profile.pwd_desc')}
-              </p>
+          <div className="p-6 flex-1 flex flex-col justify-between">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">
+              {t('profile.pwd_desc')}
+            </p>
 
-              <Form onSubmit={handleChangePassword} noValidate>
-                {/* Mật Khẩu Hiện Tại */}
-                <div className="mb-3">
-                  <FloatingLabel controlId="pwdCurrent" label={t('profile.current_pwd_req')} className="text-secondary">
-                    <Form.Control
-                      type="password"
-                      placeholder={t('profile.current_pwd_placeholder')}
-                      value={currentPassword}
-                      onChange={(e) => {
-                        setCurrentPassword(e.target.value);
-                        if (passwordErrors.currentPassword) {
-                          setPasswordErrors({ ...passwordErrors, currentPassword: null });
-                        }
-                      }}
-                      isInvalid={Boolean(passwordErrors.currentPassword)}
-                      className="form-control-clean"
-                    />
-                  </FloatingLabel>
-                  {passwordErrors.currentPassword && (
-                    <Form.Text className="text-danger small mt-1 d-block">
-                      <i className="bi bi-exclamation-circle me-1"></i>{passwordErrors.currentPassword}
-                    </Form.Text>
+            <form onSubmit={handleChangePassword} noValidate className="space-y-4">
+              {/* Mật Khẩu Hiện Tại */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  {t('profile.current_pwd_req')}
+                </label>
+                <input
+                  type="password"
+                  placeholder={t('profile.current_pwd_placeholder')}
+                  value={currentPassword}
+                  onChange={(e) => {
+                    setCurrentPassword(e.target.value);
+                    if (passwordErrors.currentPassword) {
+                      setPasswordErrors({ ...passwordErrors, currentPassword: null });
+                    }
+                  }}
+                  className={`w-full rounded-2xl border ${
+                    passwordErrors.currentPassword ? 'border-rose-500 bg-rose-50/20' : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60'
+                  } px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 ${
+                    passwordErrors.currentPassword ? 'focus:ring-rose-500/20 focus:border-rose-500' : 'focus:ring-blue-500/20 focus:border-blue-500'
+                  } transition-all`}
+                />
+                {passwordErrors.currentPassword && (
+                  <div className="flex items-center gap-1.5 text-rose-500 text-xs mt-1.5">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span>{passwordErrors.currentPassword}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Mật Khẩu Mới (> 6 ký tự) */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  {t('profile.new_pwd_req')}
+                </label>
+                <input
+                  type="password"
+                  placeholder={t('profile.new_pwd_placeholder')}
+                  value={newPassword}
+                  onChange={(e) => {
+                    setNewPassword(e.target.value);
+                    if (passwordErrors.newPassword) {
+                      setPasswordErrors({ ...passwordErrors, newPassword: null });
+                    }
+                  }}
+                  className={`w-full rounded-2xl border ${
+                    passwordErrors.newPassword ? 'border-rose-500 bg-rose-50/20' : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60'
+                  } px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 ${
+                    passwordErrors.newPassword ? 'focus:ring-rose-500/20 focus:border-rose-500' : 'focus:ring-blue-500/20 focus:border-blue-500'
+                  } transition-all`}
+                />
+                {passwordErrors.newPassword && (
+                  <div className="flex items-center gap-1.5 text-rose-500 text-xs mt-1.5">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span>{passwordErrors.newPassword}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Xác Nhận Mật Khẩu Mới */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  {t('profile.confirm_pwd_req')}
+                </label>
+                <input
+                  type="password"
+                  placeholder={t('profile.confirm_pwd_placeholder')}
+                  value={confirmPassword}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    if (passwordErrors.confirmPassword) {
+                      setPasswordErrors({ ...passwordErrors, confirmPassword: null });
+                    }
+                  }}
+                  className={`w-full rounded-2xl border ${
+                    passwordErrors.confirmPassword ? 'border-rose-500 bg-rose-50/20' : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60'
+                  } px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 ${
+                    passwordErrors.confirmPassword ? 'focus:ring-rose-500/20 focus:border-rose-500' : 'focus:ring-blue-500/20 focus:border-blue-500'
+                  } transition-all`}
+                />
+                {passwordErrors.confirmPassword && (
+                  <div className="flex items-center gap-1.5 text-rose-500 text-xs mt-1.5">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    <span>{passwordErrors.confirmPassword}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Nút Submit Đổi Mật Khẩu */}
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={isSavingPassword}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 px-5 py-3 text-xs font-bold text-white shadow-md shadow-blue-500/25 transition-all cursor-pointer"
+                >
+                  {isSavingPassword ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>{t('profile.saving_pwd')}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Key className="h-4 w-4" />
+                      <span>{t('profile.update_pwd')}</span>
+                    </>
                   )}
-                </div>
-
-                {/* Mật Khẩu Mới (> 6 ký tự) */}
-                <div className="mb-3">
-                  <FloatingLabel controlId="pwdNew" label={t('profile.new_pwd_req')} className="text-secondary">
-                    <Form.Control
-                      type="password"
-                      placeholder={t('profile.new_pwd_placeholder')}
-                      value={newPassword}
-                      onChange={(e) => {
-                        setNewPassword(e.target.value);
-                        if (passwordErrors.newPassword) {
-                          setPasswordErrors({ ...passwordErrors, newPassword: null });
-                        }
-                      }}
-                      isInvalid={Boolean(passwordErrors.newPassword)}
-                      className="form-control-clean"
-                    />
-                  </FloatingLabel>
-                  {passwordErrors.newPassword && (
-                    <Form.Text className="text-danger small mt-1 d-block">
-                      <i className="bi bi-exclamation-circle me-1"></i>{passwordErrors.newPassword}
-                    </Form.Text>
-                  )}
-                </div>
-
-                {/* Xác Nhận Mật Khẩu Mới */}
-                <div className="mb-4">
-                  <FloatingLabel controlId="pwdConfirm" label={t('profile.confirm_pwd_req')} className="text-secondary">
-                    <Form.Control
-                      type="password"
-                      placeholder={t('profile.confirm_pwd_placeholder')}
-                      value={confirmPassword}
-                      onChange={(e) => {
-                        setConfirmPassword(e.target.value);
-                        if (passwordErrors.confirmPassword) {
-                          setPasswordErrors({ ...passwordErrors, confirmPassword: null });
-                        }
-                      }}
-                      isInvalid={Boolean(passwordErrors.confirmPassword)}
-                      className="form-control-clean"
-                    />
-                  </FloatingLabel>
-                  {passwordErrors.confirmPassword && (
-                    <Form.Text className="text-danger small mt-1 d-block">
-                      <i className="bi bi-exclamation-circle me-1"></i>{passwordErrors.confirmPassword}
-                    </Form.Text>
-                  )}
-                </div>
-
-                {/* Nút Submit Đổi Mật Khẩu */}
-                <div className="d-grid">
-                  <Button
-                    type="submit"
-                    disabled={isSavingPassword}
-                    className="btn-primary-pill py-3 fw-bold"
-                  >
-                    {isSavingPassword ? (
-                      <>
-                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                        {t('profile.saving_pwd')}
-                      </>
-                    ) : (
-                      <>
-                        <i className="bi bi-key-fill me-2"></i>{t('profile.update_pwd')}
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </Form>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-    </Container>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

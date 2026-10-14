@@ -1,29 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import {
-  Container,
-  Row,
-  Col,
-  Card,
-  Button,
-  Spinner,
-  Alert,
-  Badge,
-  ProgressBar,
-} from 'react-bootstrap';
 import { motion } from 'framer-motion';
-import axiosClient from '../api/axiosClient';
-
+import {
+  GraduationCap,
+  BookOpen,
+  Calendar,
+  User,
+  Play,
+  AlertOctagon,
+  RotateCw,
+  Loader2,
+  Sparkles,
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getCourses } from '../services/courseService';
 
 /**
  * Component: MyCourses
- * 
  * Trang hiển thị danh sách khóa học của Học viên (Student Dashboard)
- * - Nạp trực tiếp từ Backend API (GET /allcourses)
- * - Không sử dụng bất kỳ dữ liệu mẫu coursera nào.
+ * Pure Tailwind CSS & Lucide Icons
  */
 export default function MyCourses() {
   const { user } = useAuth();
@@ -43,7 +39,6 @@ export default function MyCourses() {
     try {
       const allCourses = await getCourses();
       if (Array.isArray(allCourses) && allCourses.length > 0) {
-        // Temporary fallback until the backend provides per-user entitlements.
         const formatted = allCourses.map((course) => ({
           id: course.ID || course.id,
           title: course.Title || course.title,
@@ -71,49 +66,43 @@ export default function MyCourses() {
     fetchStudentCourses();
   }, [user]);
 
-  /**
-   * Điều hướng sang trang xem video bảo mật DRM
-   * @param {string} videoId Mã định danh video
-   */
   const handleWatchVideo = (videoId) => {
     navigate(`/${lang}/student/player/${videoId}`);
   };
 
   return (
-    <Container fluid="lg" className="py-4 my-courses-container">
+    <div className="py-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       {/* Header Banner */}
-      <div className="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4 pb-3 border-bottom">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 pb-4 border-b border-slate-200/80 dark:border-slate-800">
         <div>
-          <div className="badge-pill-soft mb-2">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 text-xs font-semibold mb-2">
+            <GraduationCap className="h-3.5 w-3.5" />
             <span>{t('dashboard.personal_space')}</span>
           </div>
-          <h2 className="fw-bold text-dark mb-1">
-            {t('dashboard.title')}<span className="text-primary">{t('dashboard.title_highlight')}</span>
+          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-1">
+            {t('dashboard.title')}{' '}
+            <span className="text-blue-600 dark:text-blue-400">
+              {t('dashboard.title_highlight')}
+            </span>
           </h2>
-          <p className="text-secondary mb-0 small">
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
             {t('dashboard.description')}
           </p>
         </div>
 
-        <div className="d-flex align-items-center gap-2">
-          <span className="badge-pill-cyan">
-            {courses.length} {t('dashboard.enrolled_courses')}
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-blue-50 dark:bg-blue-950/40 border border-blue-200/60 dark:border-blue-900 text-xs font-bold text-blue-700 dark:text-blue-300">
+            <Sparkles className="h-3.5 w-3.5 text-blue-500" />
+            <span>{courses.length} {t('dashboard.enrolled_courses')}</span>
           </span>
         </div>
       </div>
 
-      {/* 1. UI STATE: Đang tải (Loading Spinner căn giữa) */}
+      {/* 1. UI STATE: Đang tải */}
       {loading && (
-        <div className="d-flex flex-column justify-content-center align-items-center py-5 my-5">
-          <Spinner
-            animation="border"
-            variant="primary"
-            role="status"
-            style={{ width: '3.5rem', height: '3.5rem' }}
-          >
-            <span className="visually-hidden">Loading...</span>
-          </Spinner>
-          <p className="mt-3 text-secondary small">
+        <div className="flex flex-col justify-center items-center py-24">
+          <Loader2 className="h-10 w-10 text-blue-600 animate-spin mb-4" />
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             {t('dashboard.loading')}
           </p>
         </div>
@@ -121,122 +110,146 @@ export default function MyCourses() {
 
       {/* 2. UI STATE: Lỗi gọi API */}
       {error && !loading && (
-        <Alert variant="danger" className="shadow-sm border-danger my-4 p-4 text-center rounded-4">
-          <Alert.Heading className="fs-5 fw-bold mb-2">
-            <i className="bi bi-exclamation-octagon-fill me-2"></i>{t('dashboard.error_title')}
-          </Alert.Heading>
-          <p className="small mb-3">{error}</p>
-          <Button variant="outline-danger" size="sm" onClick={fetchStudentCourses} className="px-3 rounded-pill">
-            <i className="bi bi-arrow-clockwise me-1"></i>{t('dashboard.retry')}
-          </Button>
-        </Alert>
+        <div className="p-6 rounded-3xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-center max-w-lg mx-auto my-8">
+          <AlertOctagon className="h-8 w-8 text-rose-500 mx-auto mb-2" />
+          <h4 className="text-base font-bold text-rose-800 dark:text-rose-200 mb-1">
+            {t('dashboard.error_title')}
+          </h4>
+          <p className="text-xs text-rose-600 dark:text-rose-300 mb-4">{error}</p>
+          <button
+            type="button"
+            onClick={fetchStudentCourses}
+            className="inline-flex items-center gap-1.5 rounded-full border border-rose-300 dark:border-rose-800 px-4 py-1.5 text-xs font-semibold text-rose-700 dark:text-rose-300 hover:bg-rose-100"
+          >
+            <RotateCw className="h-3.5 w-3.5" />
+            <span>{t('dashboard.retry')}</span>
+          </button>
+        </div>
       )}
 
-      {/* 3. UI STATE: Thành công (Hiển thị Grid Danh sách Khóa học) */}
+      {/* 3. UI STATE: Thành công */}
       {!loading && !error && (
         <>
           {courses.length === 0 ? (
-            <div className="text-center py-5 card-clean bg-white p-4">
-              <i className="bi bi-journal-x fs-1 text-muted mb-2 d-block"></i>
-              <h5 className="text-dark">{t('dashboard.no_courses_title')}</h5>
-              <p className="text-secondary small mb-3">{t('dashboard.no_courses_desc')}</p>
-              <Button onClick={() => navigate(`/${lang}/catalog`)} className="btn-primary-pill">
+            <div className="text-center py-16 px-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+              <BookOpen className="h-12 w-12 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+              <h5 className="text-lg font-bold text-slate-900 dark:text-white mb-2">
+                {t('dashboard.no_courses_title')}
+              </h5>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-6">
+                {t('dashboard.no_courses_desc')}
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate(`/${lang}/catalog`)}
+                className="inline-flex items-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 px-6 py-2.5 text-xs font-semibold text-white shadow-xs transition-all"
+              >
                 {t('dashboard.explore_courses')}
-              </Button>
+              </button>
             </div>
           ) : (
             <motion.div
-              className="row g-4"
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
               initial="hidden"
               animate="visible"
               variants={{
                 visible: {
                   transition: {
-                    staggerChildren: 0.1,
-                  }
+                    staggerChildren: 0.08,
+                  },
                 },
-                hidden: {}
+                hidden: {},
               }}
             >
               {courses.map((course) => (
-                <Col key={course.id} xs={12} md={6} lg={4} as={motion.div} variants={{
-                  hidden: { opacity: 0 },
-                  visible: { opacity: 1, transition: { duration: 0.2, ease: 'easeInOut' } }
-                }}>
-                  <div className="h-100">
-                    <Card className="h-100 card-clean card-clean-hover overflow-hidden d-flex flex-column border-0 shadow-sm" style={{ transition: 'opacity 0.2s ease-in-out, background-color 0.2s ease-in-out' }}>
-                    {/* Header Banner thẻ Khóa học */}
-                    <div
-                      className="p-4 bg-primary bg-opacity-10 border-bottom d-flex flex-column justify-content-between position-relative"
-                      style={{ minHeight: '130px' }}
-                    >
-                      <div className="d-flex justify-content-between align-items-center">
-                        <Badge
-                          bg={course.status === 'completed' ? 'success' : 'primary'}
-                          className="px-3 py-2 rounded-pill text-uppercase"
-                          style={{ fontSize: '0.72rem' }}
-                        >
-                          {course.status === 'completed' ? t('dashboard.status_completed') : course.status === 'active' ? t('dashboard.status_active') : course.status || t('dashboard.status_active')}
-                        </Badge>
-                        <span className="small text-muted">
-                          ID: <code>{course.id}</code>
-                        </span>
-                      </div>
-
-                      <div className="mt-3">
-                        <span className="small text-secondary">
-                          <i className="bi bi-calendar3 me-1"></i>
-                          {t('dashboard.joined_date')} {course.joinDate ? course.joinDate.split('T')[0] : t('dashboard.learning')}
-                        </span>
-                      </div>
+                <motion.div
+                  key={course.id}
+                  variants={{
+                    hidden: { opacity: 0, y: 15 },
+                    visible: { opacity: 1, y: 0, transition: { duration: 0.25 } },
+                  }}
+                  className="flex flex-col rounded-3xl overflow-hidden bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200"
+                >
+                  {/* Header Banner thẻ Khóa học */}
+                  <div
+                    className="p-5 bg-blue-50/70 dark:bg-blue-950/30 border-b border-slate-100 dark:border-slate-800 flex flex-col justify-between"
+                    style={{ minHeight: '120px' }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={`inline-flex items-center px-3 py-1 text-xs font-bold rounded-full uppercase tracking-wider ${
+                          course.status === 'completed'
+                            ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
+                            : 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300'
+                        }`}
+                      >
+                        {course.status === 'completed'
+                          ? t('dashboard.status_completed')
+                          : course.status === 'active'
+                          ? t('dashboard.status_active')
+                          : course.status || t('dashboard.status_active')}
+                      </span>
+                      <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500">
+                        ID: {course.id}
+                      </span>
                     </div>
 
-                    <Card.Body className="d-flex flex-column p-4">
-                      {/* Tiêu đề Khóa học */}
-                      <Card.Title className="fw-bold fs-5 text-dark mb-2 text-truncate" title={course.title}>
-                        {course.title}
-                      </Card.Title>
+                    <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 mt-3">
+                      <Calendar className="h-3 w-3" />
+                      <span>
+                        {t('dashboard.joined_date')}{' '}
+                        {course.joinDate ? course.joinDate.split('T')[0] : t('dashboard.learning')}
+                      </span>
+                    </div>
+                  </div>
 
-                      {/* Mô tả tóm tắt */}
-                      <Card.Text className="text-secondary small mb-3 flex-grow-1" style={{ minHeight: '60px' }}>
-                        {course.description}
-                      </Card.Text>
+                  <div className="p-5 flex flex-col flex-1">
+                    {/* Tiêu đề Khóa học */}
+                    <h3
+                      className="font-bold text-base text-slate-900 dark:text-white mb-2 line-clamp-1"
+                      title={course.title}
+                    >
+                      {course.title}
+                    </h3>
 
-                      {/* Thông tin Giảng viên (Owner từ DB) */}
-                      {course.owner && (
-                        <div className="d-flex justify-content-between text-muted small mb-3 border-top pt-2">
-                          <span>
-                            <i className="bi bi-person-fill text-primary me-1"></i>
-                            {course.owner}
+                    {/* Mô tả tóm tắt */}
+                    <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-3 mb-4 flex-1 leading-relaxed">
+                      {course.description}
+                    </p>
+
+                    {/* Thông tin Giảng viên */}
+                    {course.owner && (
+                      <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+                        <span className="flex items-center gap-1.5">
+                          <User className="h-3.5 w-3.5 text-blue-500" />
+                          <span>{course.owner}</span>
+                        </span>
+                        {course.price != null && (
+                          <span className="font-bold text-blue-600 dark:text-blue-400">
+                            {course.price === 0
+                              ? t('dashboard.free_price')
+                              : `${course.price.toLocaleString('vi-VN')} đ`}
                           </span>
-                          {course.price != null && (
-                            <span className="fw-semibold text-primary">
-                              {course.price === 0 ? t('dashboard.free_price') : `${course.price.toLocaleString('vi-VN')} đ`}
-                            </span>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Nút Xem Video (Vào học bài giảng) */}
-                      <div>
-                        <Button
-                          className="btn-primary-pill w-100 py-2 mt-auto d-flex align-items-center justify-content-center gap-2"
-                          onClick={() => handleWatchVideo(course.id)}
-                          style={{ transition: 'background-color 0.2s ease, opacity 0.2s ease' }}
-                        >
-                          <i className="bi bi-play-circle-fill fs-5"></i>
-                          <span>{t('dashboard.start_lecture')}</span>
-                        </Button>
+                        )}
                       </div>
-                    </Card.Body>
-                  </Card>
-                </div>
-              </Col>
-            ))}
-          </motion.div>
+                    )}
+
+                    {/* Nút Xem Video */}
+                    <button
+                      type="button"
+                      onClick={() => handleWatchVideo(course.id)}
+                      className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 px-5 py-2.5 text-xs font-semibold text-white shadow-xs transition-all cursor-pointer"
+                    >
+                      <Play className="h-3.5 w-3.5 fill-white" />
+                      <span>{t('dashboard.start_lecture')}</span>
+                    </button>
+                  </div>
+                </motion.div>
+              ))}
+            </motion.div>
           )}
         </>
       )}
-    </Container>
+    </div>
   );
 }

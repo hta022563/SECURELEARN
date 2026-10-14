@@ -1,18 +1,15 @@
 import React from 'react';
-import { Container, Row, Col, Card, Button } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
+import { Compass, ArrowLeft, Home } from 'lucide-react';
 
 /**
  * Component: NotFound (Trang lỗi 404)
- * 
- * Hiển thị khi người dùng truy cập vào đường dẫn không tồn tại
- * hoặc không đủ quyền truy cập.
+ * Pure Tailwind CSS & Lucide Icons
  */
 export default function NotFound() {
   const navigate = useNavigate();
 
   const handleBack = () => {
-    // Điều hướng về trang trước đó nếu có lịch sử duyệt, hoặc về trang chủ
     if (window.history.length > 2) {
       navigate(-1);
     } else {
@@ -21,49 +18,43 @@ export default function NotFound() {
   };
 
   return (
-    <div className="py-5 flex-grow-1 d-flex align-items-center justify-content-center">
-      <Container>
-        <Row className="justify-content-center text-center">
-          <Col xs={12} sm={10} md={8} lg={6}>
-            <Card className="card-clean shadow-lg border rounded-4 p-4 p-md-5 bg-white">
-              <Card.Body>
-                {/* Số 404 cỡ lớn và Icon */}
-                <div className="display-1 fw-bolder text-primary mb-2">
-                  404
-                </div>
-                <div className="fs-1 mb-3 text-primary">
-                  <i className="bi bi-compass"></i>
-                </div>
+    <div className="min-h-[70vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="w-full max-w-md text-center bg-white dark:bg-slate-900 rounded-3xl p-8 sm:p-10 shadow-xl shadow-slate-200/50 dark:shadow-slate-950/50 border border-slate-200/80 dark:border-slate-800 transition-all">
+        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 mb-6 shadow-sm">
+          <Compass className="h-10 w-10 stroke-[1.75] animate-spin-slow" />
+        </div>
 
-                <h2 className="fw-bold text-dark mb-3">
-                  404 - Page Not Found
-                </h2>
+        <span className="inline-block px-3 py-1 text-xs font-bold tracking-wider uppercase text-blue-600 dark:text-blue-400 bg-blue-100/60 dark:bg-blue-900/40 rounded-full mb-3">
+          Error 404
+        </span>
 
-                <p className="text-secondary mb-4 px-md-3">
-                  The page you are looking for does not exist or you do not have permission to access it.
-                </p>
+        <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white mb-2">
+          Page Not Found
+        </h2>
 
-                <div className="d-flex justify-content-center gap-3 flex-wrap">
-                  <Button
-                    onClick={handleBack}
-                    className="btn-primary-pill d-flex align-items-center gap-2 px-4"
-                  >
-                    <i className="bi bi-arrow-left"></i>
-                    <span>Back to Dashboard</span>
-                  </Button>
+        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
+          Trang bạn đang tìm kiếm không tồn tại, đã bị đổi tên hoặc bạn chưa được phân quyền truy cập.
+        </p>
 
-                  <Button
-                    onClick={() => navigate('/')}
-                    className="btn-secondary-pill px-4"
-                  >
-                    <i className="bi bi-house-door me-1"></i>Trang Chủ
-                  </Button>
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-      </Container>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={handleBack}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 px-5 py-2.5 text-xs font-semibold text-white shadow-md shadow-blue-500/20 transition-all"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span>Quay Lại</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-5 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 shadow-xs transition-all"
+          >
+            <Home className="h-4 w-4 text-slate-400" />
+            <span>Về Trang Chủ</span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

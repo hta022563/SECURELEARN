@@ -2,16 +2,18 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  Container,
-  Row,
-  Col,
-  Card,
-  Button,
-  Badge,
-  InputGroup,
-  Form,
-  Modal,
-} from 'react-bootstrap';
+  Search,
+  X,
+  PlusCircle,
+  Calendar,
+  User,
+  Play,
+  Lock,
+  Info,
+  GraduationCap,
+  LogIn,
+  BookOpen,
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { checkCourseAccess, getEntitledCourseIds } from '../services/entitlementService';
 import { getCourses, searchCourses } from '../services/courseService';
@@ -19,11 +21,7 @@ import CreateCourseModal from '../components/CreateCourseModal';
 
 /**
  * =============================================================================
- * PAGE: CourseCatalog (Danh Mục Khóa Học Toàn Diện - 100% Dữ Liệu Mềm)
- * =============================================================================
- * - Đọc trực tiếp từ Backend API (GET /allcourses, GET /course/search?title=)
- * - Kiểm tra quyền Entitlement: khóa học chưa được cấp quyền KHÔNG THỂ xem video bài giảng
- * - Chỉ khóa học trong "Khóa học của tôi" (đã ghi danh active/completed) mới được phép vào học
+ * PAGE: CourseCatalog (Danh Mục Khóa Học Toàn Diện - Pure Tailwind CSS)
  * =============================================================================
  */
 export default function CourseCatalog() {
@@ -90,15 +88,12 @@ export default function CourseCatalog() {
     const access = checkCourseAccess(user, courseId);
 
     if (access.hasAccess) {
-      // Giảng viên -> Chuyển vào trang Preview bài giảng của Giảng viên
       if (user?.role === 'Instructor') {
         navigate(`/${lang}/instructor/preview/${courseId}`);
       } else {
-        // Học viên & Quản trị viên -> Chuyển vào trình phát video
         navigate(`/${lang}/student/player/${courseId}`);
       }
     } else {
-      // Chưa được cấp quyền xem -> Chặn và hiển thị thông báo chính sách DRM
       setBlockedModalCourse({
         ...course,
         ID: courseId,
@@ -108,290 +103,310 @@ export default function CourseCatalog() {
   };
 
   return (
-    <div className="py-5">
-      <Container>
-        {/* =====================================================================
-         * 1. HEADER BANNER
-         * ===================================================================== */}
-        <div className="text-center mb-5 pb-2">
-          <h1 className="display-5 fw-extrabold text-dark mb-2">
-            {t('catalog.title')}<span className="text-primary">{t('catalog.title_highlight')}</span>
-          </h1>
-          <p className="text-secondary mx-auto" style={{ maxWidth: '650px' }}>
-            {t('catalog.subtitle')}
-          </p>
-        </div>
+    <div className="py-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* 1. HEADER BANNER */}
+      <div className="text-center mb-10">
+        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-3">
+          {t('catalog.title')}{' '}
+          <span className="text-blue-600 dark:text-blue-400">
+            {t('catalog.title_highlight')}
+          </span>
+        </h1>
+        <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed">
+          {t('catalog.subtitle')}
+        </p>
+      </div>
 
-        {/* =====================================================================
-         * 2. BỘ TÌM KIẾM ĐỘNG & BỘ LỌC QUYỀN TRUY CẬP
-         * ===================================================================== */}
-        <div className="card-clean border-0 shadow-sm p-4 mb-4 bg-white">
-          <Row className="g-3 align-items-center">
-            <Col lg={6} md={6}>
-              <InputGroup>
-                <InputGroup.Text className="bg-light border-light-subtle text-muted">
-                  <i className="bi bi-search"></i>
-                </InputGroup.Text>
-                <Form.Control
-                  type="text"
-                  placeholder={t('catalog.search_placeholder')}
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="form-control-clean border-start-0"
-                />
-                {searchTerm && (
-                  <Button
-                    variant="outline-secondary"
-                    onClick={() => setSearchTerm('')}
-                    className="border-light-subtle"
-                  >
-                    <i className="bi bi-x"></i>
-                  </Button>
-                )}
-              </InputGroup>
-            </Col>
+      {/* 2. BỘ TÌM KIẾM ĐỘNG & BỘ LỌC QUYỀN TRUY CẬP */}
+      <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-5 shadow-sm border border-slate-200/80 dark:border-slate-800 mb-8">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+          {/* Ô tìm kiếm */}
+          <div className="relative flex-1">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+              <Search className="h-4 w-4" />
+            </div>
+            <input
+              type="text"
+              placeholder={t('catalog.search_placeholder')}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-10 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
 
-            <Col lg={6} md={6} className="d-flex justify-content-md-end gap-2 flex-wrap align-items-center">
-              {isAuthenticated && (user?.role === 'Instructor' || user?.role === 'Administrator') && (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  className="rounded-pill px-3 py-1 fw-medium me-md-2"
-                  onClick={() => setShowCreateCourseModal(true)}
+          {/* Bộ nút lọc & Thêm khóa học */}
+          <div className="flex flex-wrap items-center gap-2">
+            {isAuthenticated && (user?.role === 'Instructor' || user?.role === 'Administrator') && (
+              <button
+                type="button"
+                onClick={() => setShowCreateCourseModal(true)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 px-4 py-2 text-xs font-semibold text-white shadow-xs transition-all cursor-pointer"
+              >
+                <PlusCircle className="h-3.5 w-3.5" />
+                <span>{t('catalog.add_course')}</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setFilterType('ALL')}
+              className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                filterType === 'ALL'
+                  ? 'bg-slate-900 dark:bg-blue-600 text-white shadow-xs'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+            >
+              {t('catalog.filter_all')} ({courseList.length})
+            </button>
+
+            {isAuthenticated && user?.role === 'Student' && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setFilterType('ENTITLED')}
+                  className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                    filterType === 'ENTITLED'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100'
+                  }`}
                 >
-                  <i className="bi bi-plus-circle me-1"></i>{t('catalog.add_course')}
-                </Button>
-              )}
-              <Button
-                variant={filterType === 'ALL' ? 'primary' : 'outline-secondary'}
-                size="sm"
-                className="rounded-pill px-3"
-                onClick={() => setFilterType('ALL')}
-              >
-                {t('catalog.filter_all')} ({courseList.length})
-              </Button>
-              {isAuthenticated && user?.role === 'Student' && (
-                <>
-                  <Button
-                    variant={filterType === 'ENTITLED' ? 'success' : 'outline-success'}
-                    size="sm"
-                    className="rounded-pill px-3"
-                    onClick={() => setFilterType('ENTITLED')}
-                  >
-                    {t('catalog.filter_entitled')} ({entitledIds.length})
-                  </Button>
-                  <Button
-                    variant={filterType === 'UNENTITLED' ? 'secondary' : 'outline-secondary'}
-                    size="sm"
-                    className="rounded-pill px-3"
-                    onClick={() => setFilterType('UNENTITLED')}
-                  >
-                    {t('catalog.filter_unentitled')} ({courses.length - entitledIds.length})
-                  </Button>
-                </>
-              )}
-            </Col>
-          </Row>
+                  {t('catalog.filter_entitled')} ({entitledIds.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterType('UNENTITLED')}
+                  className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                    filterType === 'UNENTITLED'
+                      ? 'bg-slate-600 text-white shadow-xs'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                  }`}
+                >
+                  {t('catalog.filter_unentitled')} ({Math.max(0, courseList.length - entitledIds.length)})
+                </button>
+              </>
+            )}
+          </div>
         </div>
+      </div>
 
-        {/* =====================================================================
-         * 3. LƯỚI KHÓA HỌC (COURSES GRID - DỮ LIỆU MỀM)
-         * ===================================================================== */}
-        <Row className="g-4 mb-5">
-          {filteredCourses.length === 0 ? (
-            <Col xs={12} className="text-center py-5 my-4 card-clean bg-white p-5 border">
-              <i className="bi bi-search fs-1 d-block mb-3 text-muted opacity-50"></i>
-              <h5 className="text-dark fw-bold mb-2">{t('catalog.no_results')}</h5>
-              <p className="text-secondary small mb-4">
-                {t('catalog.no_results_desc')}
-              </p>
-              <Button
-                variant="primary"
-                onClick={() => {
-                  setSearchTerm('');
-                  setFilterType('ALL');
-                }}
-                className="btn-primary-pill"
+      {/* 3. LƯỚI KHÓA HỌC */}
+      {filteredCourses.length === 0 ? (
+        <div className="text-center py-16 px-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+          <BookOpen className="h-12 w-12 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
+          <h5 className="text-lg font-bold text-slate-900 dark:text-white mb-2">
+            {t('catalog.no_results')}
+          </h5>
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-6">
+            {t('catalog.no_results_desc')}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setSearchTerm('');
+              setFilterType('ALL');
+            }}
+            className="inline-flex items-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 px-5 py-2.5 text-xs font-semibold text-white shadow-xs"
+          >
+            {t('catalog.clear_filter')}
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+          {filteredCourses.map((course) => {
+            const cId = course.ID || course.id;
+            const title = course.Title || course.title || 'Khóa học';
+            const desc = course.Description || course.description || '';
+            const instructorName = course.Instructor || course.instructor || course.Owner || course.owner;
+            const isEntitled = entitledIds.includes(cId);
+
+            return (
+              <div
+                key={cId}
+                onClick={() => handleCourseAction(course)}
+                className="group flex flex-col rounded-3xl overflow-hidden bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 cursor-pointer"
               >
-                {t('catalog.clear_filter')}
-              </Button>
-            </Col>
-          ) : (
-            filteredCourses.map((course) => {
-              const cId = course.ID || course.id;
-              const title = course.Title || course.title || 'Khóa học';
-              const desc = course.Description || course.description || '';
-              const instructorName = course.Instructor || course.instructor || course.Owner || course.owner;
-              const isEntitled = entitledIds.includes(cId);
+                {/* Header Thẻ Khóa học */}
+                <div
+                  className={`p-5 border-b border-slate-100 dark:border-slate-800 flex flex-col justify-between ${
+                    isEntitled
+                      ? 'bg-blue-50/70 dark:bg-blue-950/30'
+                      : 'bg-slate-50/70 dark:bg-slate-850'
+                  }`}
+                  style={{ minHeight: '120px' }}
+                >
+                  <div className="flex items-center justify-between">
+                    {isEntitled ? (
+                      <span className="inline-flex items-center gap-1 px-3 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/60 rounded-full shadow-xs">
+                        {t('catalog.entitled')}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold text-slate-600 dark:text-slate-400 bg-slate-200/70 dark:bg-slate-800 rounded-full">
+                        {t('catalog.not_entitled')}
+                      </span>
+                    )}
+                    <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500">
+                      {cId}
+                    </span>
+                  </div>
 
-              return (
-                <Col key={cId} xs={12} md={6} lg={4}>
-                  <Card
-                    className={`h-100 card-clean card-clean-hover overflow-hidden d-flex flex-column border-0 shadow-sm ${
-                      !isEntitled ? 'border-light' : ''
-                    }`}
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => handleCourseAction(course)}
+                  {(course["Creation Time"] || course.createdAt || course.creation_time) && (
+                    <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 mt-3">
+                      <Calendar className="h-3 w-3" />
+                      <span>
+                        {t('catalog.created_at')}{' '}
+                        {(course["Creation Time"] || course.createdAt || course.creation_time).split('T')[0]}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Nội dung Thẻ */}
+                <div className="p-5 flex flex-col flex-1">
+                  <h3
+                    className="font-bold text-base text-slate-900 dark:text-white mb-2 line-clamp-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors"
+                    title={title}
                   >
-                    {/* Header Khóa học */}
-                    <div
-                      className={`p-4 border-bottom d-flex flex-column justify-content-between ${
-                        isEntitled ? 'bg-primary bg-opacity-10' : 'bg-light'
-                      }`}
-                      style={{ minHeight: '140px' }}
-                    >
-                      <div className="d-flex justify-content-between align-items-center">
-                        {isEntitled ? (
-                          <Badge bg="success" className="px-3 py-2 rounded-pill fw-semibold shadow-sm">
-                            {t('catalog.entitled')}
-                          </Badge>
-                        ) : (
-                          <Badge bg="secondary" className="px-3 py-2 rounded-pill fw-semibold bg-opacity-75">
-                            {t('catalog.not_entitled')}
-                          </Badge>
-                        )}
-                        <span className="small text-muted font-monospace">
-                          <code>{cId}</code>
-                        </span>
-                      </div>
+                    {title}
+                  </h3>
 
-                      {(course["Creation Time"] || course.createdAt || course.creation_time) && (
-                        <small className="text-secondary mt-3">
-                          <i className="bi bi-calendar-event me-1"></i>
-                          {t('catalog.created_at')} {(course["Creation Time"] || course.createdAt || course.creation_time).split('T')[0]}
-                        </small>
-                      )}
+                  <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-3 mb-4 flex-1 leading-relaxed">
+                    {desc}
+                  </p>
+
+                  {/* Giảng viên */}
+                  {instructorName && (
+                    <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mb-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+                      <User className="h-3.5 w-3.5 text-blue-500" />
+                      <span>{instructorName}</span>
+                    </div>
+                  )}
+
+                  {/* Học phí & Nút hành động */}
+                  <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800 mt-auto">
+                    <div>
+                      <span className="block text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
+                        {t('catalog.tuition')}
+                      </span>
+                      <span className="text-base font-extrabold text-blue-600 dark:text-blue-400">
+                        {course.Price === 0
+                          ? t('catalog.free')
+                          : `${course.Price?.toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US')} ${lang === 'vi' ? 'đ' : 'VND'}`}
+                      </span>
                     </div>
 
-                    <Card.Body className="d-flex flex-column p-4">
-                      <Card.Title className="fw-bold fs-5 text-dark mb-2 text-truncate" title={title}>
-                        {title}
-                      </Card.Title>
+                    {isEntitled ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCourseAction(course);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 px-4 py-2 text-xs font-semibold text-white shadow-xs transition-all"
+                      >
+                        <Play className="h-3.5 w-3.5 fill-white" />
+                        <span>{t('catalog.start_learning')}</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCourseAction(course);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 transition-all"
+                      >
+                        <Lock className="h-3.5 w-3.5" />
+                        <span>{t('catalog.not_entitled')}</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
-                      <Card.Text className="text-secondary small mb-3 flex-grow-1" style={{ minHeight: '60px' }}>
-                        {desc}
-                      </Card.Text>
+      {/* 4. MODAL THÔNG BÁO CHƯA ĐƯỢC CẤP QUYỀN XEM KHÓA HỌC */}
+      {Boolean(blockedModalCourse) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md overflow-hidden rounded-3xl bg-white dark:bg-slate-900 p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2 text-amber-500">
+                <Lock className="h-5 w-5" />
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  {t('catalog.modal_denied_title')}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBlockedModalCourse(null)}
+                className="rounded-full p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
 
-                      {/* Giảng viên */}
-                      {instructorName && (
-                        <div className="d-flex justify-content-between text-muted small mb-3 border-top pt-2">
-                          <span>
-                            <i className="bi bi-person-fill text-primary me-1"></i>
-                            {instructorName}
-                          </span>
-                        </div>
-                      )}
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-2xl text-xs">
+              <div className="font-bold text-amber-800 dark:text-amber-200">{blockedModalCourse?.Title}</div>
+              <small className="text-amber-700/70 font-mono">ID: {blockedModalCourse?.ID}</small>
+            </div>
 
-                      {/* Học phí & Nút hành động */}
-                      <div className="d-flex justify-content-between align-items-center mt-auto pt-2 border-top">
-                        <div>
-                          <small className="text-muted d-block">{t('catalog.tuition')}</small>
-                          <span className="fw-bold fs-5 text-primary">
-                            {course.Price === 0 ? t('catalog.free') : `${course.Price?.toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US')} ${lang === 'vi' ? 'đ' : 'VND'}`}
-                          </span>
-                        </div>
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              {t('catalog.modal_denied_desc')}
+            </p>
 
-                        {isEntitled ? (
-                          <Button
-                            variant="primary"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCourseAction(course);
-                            }}
-                            className="btn-primary-pill d-flex align-items-center gap-2 small px-3 py-2"
-                          >
-                            <i className="bi bi-play-circle-fill"></i>
-                            <span>{t('catalog.start_learning')}</span>
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="light"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCourseAction(course);
-                            }}
-                            className="btn-unentitled-pill d-flex align-items-center gap-2 small px-3 py-2"
-                          >
-                            <i className="bi bi-lock-fill"></i>
-                            <span>{t('catalog.not_entitled')}</span>
-                          </Button>
-                        )}
-                      </div>
-                    </Card.Body>
-                  </Card>
-                </Col>
-              );
-            })
-          )}
-        </Row>
-      </Container>
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300 flex items-start gap-2">
+              <Info className="h-4 w-4 text-blue-500 flex-shrink-0 mt-0.5" />
+              <span>{t('catalog.modal_denied_policy')}</span>
+            </div>
 
-      {/* =====================================================================
-       * 4. MODAL THÔNG BÁO CHƯA ĐƯỢC CẤP QUYỀN XEM KHÓA HỌC
-       * ===================================================================== */}
-      <Modal
-        show={Boolean(blockedModalCourse)}
-        onHide={() => setBlockedModalCourse(null)}
-        centered
-        backdrop="static"
-      >
-        <Modal.Header closeButton className="border-bottom-0 pb-0">
-          <Modal.Title className="fs-5 fw-bold text-dark">
-            {t('catalog.modal_denied_title')}
-          </Modal.Title>
-        </Modal.Header>
-
-        <Modal.Body className="pt-3">
-          <div className="alert alert-warning border-0 bg-warning bg-opacity-10 text-dark p-3 rounded-3 mb-3">
-            <div className="fw-bold mb-1">{blockedModalCourse?.Title}</div>
-            <small className="text-muted font-monospace">ID: {blockedModalCourse?.ID}</small>
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setBlockedModalCourse(null)}
+                className="rounded-full border border-slate-200 dark:border-slate-700 px-4 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+              >
+                {t('common.close')}
+              </button>
+              {isAuthenticated && user?.role === 'Student' ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBlockedModalCourse(null);
+                    navigate(`/${lang}/student/courses`);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 px-5 py-1.5 text-xs font-semibold text-white shadow-xs"
+                >
+                  <GraduationCap className="h-4 w-4" />
+                  <span>{t('common.my_courses')}</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBlockedModalCourse(null);
+                    navigate(`/${lang}/login`);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 px-5 py-1.5 text-xs font-semibold text-white shadow-xs"
+                >
+                  <LogIn className="h-4 w-4" />
+                  <span>{t('common.login')}</span>
+                </button>
+              )}
+            </div>
           </div>
-
-          <p className="text-secondary small mb-3 leading-relaxed">
-            {t('catalog.modal_denied_desc')}
-          </p>
-
-          <div className="p-3 bg-light rounded-3 border small mb-2">
-            <i className="bi bi-info-circle-fill text-primary me-2"></i>
-            {t('catalog.modal_denied_policy')}
-          </div>
-        </Modal.Body>
-
-        <Modal.Footer className="border-top-0 pt-0">
-          <Button
-            variant="light"
-            onClick={() => setBlockedModalCourse(null)}
-            className="rounded-pill px-3"
-          >
-            {t('common.close')}
-          </Button>
-
-          {isAuthenticated && user?.role === 'Student' ? (
-            <Button
-              variant="primary"
-              onClick={() => {
-                setBlockedModalCourse(null);
-                navigate(`/${lang}/student/courses`);
-              }}
-              className="btn-primary-pill d-flex align-items-center gap-2 px-3"
-            >
-              <i className="bi bi-mortarboard-fill"></i>
-              <span>{t('common.my_courses')}</span>
-            </Button>
-          ) : (
-            <Button
-              variant="primary"
-              onClick={() => {
-                setBlockedModalCourse(null);
-                navigate(`/${lang}/login`);
-              }}
-              className="btn-primary-pill px-3"
-            >
-              {t('common.login')}
-            </Button>
-          )}
-        </Modal.Footer>
-      </Modal>
+        </div>
+      )}
 
       {/* MODAL TẠO KHÓA HỌC MỚI */}
       <CreateCourseModal
