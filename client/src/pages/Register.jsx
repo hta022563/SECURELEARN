@@ -39,11 +39,11 @@ export default function Register() {
       newErrors.email = 'Địa chỉ email không đúng định dạng (Ví dụ: user@domain.com).';
     }
 
-    // 3. Password phải lớn hơn 6 ký tự
+    // 3. Password phải từ 8 ký tự trở lên (chuẩn AWS Cognito)
     if (!password) {
       newErrors.password = 'Vui lòng nhập mật khẩu.';
-    } else if (password.length <= 6) {
-      newErrors.password = 'Mật khẩu phải có độ dài lớn hơn 6 ký tự.';
+    } else if (password.length < 8) {
+      newErrors.password = 'Mật khẩu phải có độ dài tối thiểu 8 ký tự theo chuẩn AWS Cognito.';
     }
 
     // 4. Confirm Password phải khớp với Password
@@ -165,10 +165,10 @@ export default function Register() {
               )}
             </div>
 
-            {/* Mật Khẩu (> 6 ký tự) */}
+            {/* Mật Khẩu (>= 8 ký tự) */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                Mật khẩu (&gt; 6 ký tự) <span className="text-rose-500">*</span>
+                Mật khẩu (tối thiểu 8 ký tự) <span className="text-rose-500">*</span>
               </label>
               <input
                 type="password"

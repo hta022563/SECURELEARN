@@ -7,6 +7,9 @@ export default {
   darkMode: ['selector', '[data-bs-theme="dark"]'],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['"Be Vietnam Pro"', '"Inter"', 'sans-serif'],
+      },
       colors: {
         slate: {
           750: '#293548',

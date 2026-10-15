@@ -63,11 +63,8 @@ export default function Login() {
       // 1. Authenticate with Cognito via backend
       const tokens = await apiLogin({ email: cleanEmail, password });
 
-      // 2. Fetch the user's profile / role from the JWT claims
-      const tempUser = { token: tokens.accessToken };
-      sessionStorage.setItem('securelearn_auth_user', JSON.stringify(tempUser));
-
-      const profile = await apiMe();
+      // 2. Fetch the user's profile / role from the JWT claims using the freshly received accessToken
+      const profile = await apiMe(tokens.accessToken);
 
       // 3. Build the userData shape AuthContext + axiosClient expect
       const displayRole = mapCognitoRoleToDisplayRole(profile.roles || []);
