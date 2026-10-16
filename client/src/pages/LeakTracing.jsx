@@ -1,17 +1,13 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
-  Container,
-  Row,
-  Col,
-  Card,
-  InputGroup,
-  Form,
-  Button,
-  Alert,
-  Badge,
-  Modal,
-  Table,
-} from 'react-bootstrap';
+  Shield,
+  Search,
+  Scan,
+  AlertTriangle,
+  Lock,
+  X,
+} from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useToast } from '../context/ToastContext';
 import {
   users as dbUsers,
@@ -23,14 +19,11 @@ import {
 
 /**
  * =============================================================================
- * PAGE: LeakTracing (100% Dữ Liệu Mềm Từ CSDL Chuẩn ERD)
- * =============================================================================
- * Công cụ chuyên sâu phục vụ đối soát dấu vân tay Watermark từ video rò rỉ:
- * - Tra cứu động trực tiếp từ bảng users, entitlements, courses, sessions
- * - Đối soát lịch sử cảnh báo rò rỉ từ bảng anomalyAlerts
+ * PAGE: LeakTracing (Pure Tailwind CSS, Lucide Icons & 100% i18n Localization)
  * =============================================================================
  */
 export default function LeakTracing() {
+  const { t } = useTranslation();
   const { showToast } = useToast();
 
   const [searchWatermarkId, setSearchWatermarkId] = useState('');
@@ -39,41 +32,79 @@ export default function LeakTracing() {
   const [isSearching, setIsSearching] = useState(false);
   const [showBanModal, setShowBanModal] = useState(false);
 
-  // Lịch sử đối soát rò rỉ sinh động từ bảng anomalyAlerts
+  // Lịch sử đối soát rò rỉ sinh động từ bảng anomalyAlerts với Canonical Keys
   const [recentTraces, setRecentTraces] = useState(() => {
     return dbAlerts.map((alert, idx) => {
       const students = dbUsers.filter((u) => (u.Role || '').toLowerCase() === 'student');
       const student = students[idx % students.length] || dbUsers[3];
       const riskScore = Math.round(alert.Score * 100);
 
-      let status = 'Đang Điều Tra';
-      let actionTaken = 'Đã Phát Cảnh Báo';
-      if (alert.Status === 'resolved') {
-        status = 'Đã Giải Quyết';
-        actionTaken = 'Khôi Phục Quyền';
+      let statusKey = 'under_investigation';
+      let actionKey = 'warning_issued';
+      if ((alert.Status || '').toLowerCase() === 'resolved') {
+        statusKey = 'resolved';
+        actionKey = 'rights_restored';
       } else if (riskScore > 80) {
-        status = 'Xác Nhận Rò Rỉ';
-        actionTaken = 'Đình Chỉ Tài Khoản';
+        statusKey = 'leak_confirmed';
+        actionKey = 'account_suspended';
       }
 
       return {
         id: `TRC-${alert.ID.replace('aa-', '9')}`,
         watermarkId: student?.ID || '',
-        studentName: student?.Username || 'Học viên',
-        status,
-        actionTaken,
+        studentName: student?.Username || 'Student',
+        statusKey,
+        actionKey,
         tracedAt: alert.Timestamp ? alert.Timestamp.replace('T', ' ').replace('Z', '') : '2025-03-20 17:45',
         score: riskScore,
       };
     });
   });
 
+  const renderStatusBadge = (statusKey) => {
+    switch (statusKey) {
+      case 'leak_confirmed':
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 whitespace-nowrap">
+            {t('watermark_trace.status_leak_confirmed')}
+          </span>
+        );
+      case 'resolved':
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
+            {t('watermark_trace.status_resolved')}
+          </span>
+        );
+      case 'under_investigation':
+      default:
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 whitespace-nowrap">
+            {t('watermark_trace.status_under_investigation')}
+          </span>
+        );
+    }
+  };
+
+  const renderActionText = (actionKey) => {
+    switch (actionKey) {
+      case 'rights_restored':
+        return t('watermark_trace.action_rights_restored');
+      case 'account_suspended':
+        return t('watermark_trace.action_account_suspended');
+      case 'access_revoked':
+        return t('watermark_trace.action_access_revoked');
+      case 'warning_issued':
+      default:
+        return t('watermark_trace.action_warning_issued');
+    }
+  };
+
   const handleTraceLeak = (e) => {
     e.preventDefault();
     const query = searchWatermarkId.trim().toLowerCase();
 
     if (!query) {
-      setTraceError('Vui lòng nhập Mã Watermark (User ID hoặc Email) để tiến hành truy vết.');
+      setTraceError(t('watermark_trace.error_empty_input'));
       setTracedStudent(null);
       return;
     }
@@ -84,7 +115,6 @@ export default function LeakTracing() {
     setTimeout(() => {
       setIsSearching(false);
 
-      // Tra cứu trực tiếp từ bảng dbUsers
       const matchedUser = dbUsers.find(
         (u) =>
           u.ID.toLowerCase() === query ||
@@ -106,17 +136,16 @@ export default function LeakTracing() {
           name: matchedUser.Username.split('@')[0],
           email: matchedUser.Username,
           role: matchedUser.Role,
-          course: enrolledCourses.length > 0 ? enrolledCourses.join(', ') : 'Chưa ghi danh khóa học',
-          ip: '14.241.120.45 (Viettel - Hà Nội)',
+          course: enrolledCourses.length > 0 ? enrolledCourses.join(', ') : t('watermark_trace.not_enrolled'),
+          ip: '14.241.120.45 (Viettel - Hanoi)',
           device: 'Chrome / Windows 11',
           sessionJoinTime: session?.JoinTime ? session.JoinTime.replace('T', ' ').replace('Z', '') : '2025-01-10 07:55',
-          leakSource: 'Phát hiện dấu vân tay số từ thuật toán Dynamic Watermark',
-          riskLevel: matchedUser.Role === 'admin' ? 'An toàn (Admin)' : 'Cực kỳ nguy hiểm (High Risk)',
+          riskLevel: matchedUser.Role === 'admin' ? t('watermark_trace.risk_safe_admin') : t('watermark_trace.risk_high_danger'),
         });
         setTraceError(null);
       } else {
         setTraceError(
-          `Không tìm thấy dữ liệu khớp với mã "${searchWatermarkId}". Vui lòng thử các mã mẫu trong CSDL: u-004, u-005, u-006 hoặc email sinh viên.`
+          `${t('watermark_trace.error_not_found_part1')}${searchWatermarkId}${t('watermark_trace.error_not_found_part2')}`
         );
         setTracedStudent(null);
       }
@@ -126,21 +155,19 @@ export default function LeakTracing() {
   const handleConfirmBan = () => {
     if (!tracedStudent) return;
 
-    // Cập nhật CSDL mềm: Thu hồi quyền các khóa học
     dbEntitlements.forEach((e) => {
       if (e.UserID === tracedStudent.id) {
         e.Status = 'expired';
       }
     });
 
-    // Cập nhật lịch sử đối soát
     setRecentTraces((prev) => [
       {
         id: `TRC-${Date.now().toString().slice(-4)}`,
         watermarkId: tracedStudent.id,
         studentName: tracedStudent.email,
-        status: 'Xác Nhận Rò Rỉ',
-        actionTaken: 'Đã Thu Hồi Quyền',
+        statusKey: 'leak_confirmed',
+        actionKey: 'access_revoked',
         tracedAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
         score: 95,
       },
@@ -149,223 +176,272 @@ export default function LeakTracing() {
 
     setShowBanModal(false);
     showToast(
-      `Đã thu hồi toàn bộ quyền truy cập bài giảng của học viên ${tracedStudent.id} (${tracedStudent.email})!`,
+      t('watermark_trace.toast_revoked_success', { id: tracedStudent.id, email: tracedStudent.email }),
       'success',
-      'Đã Thu Hồi Quyền'
+      t('watermark_trace.toast_revoked_title')
     );
   };
 
   return (
-    <Container fluid className="px-3 px-xl-5 py-4 leak-tracing-page">
+    <div className="py-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       {/* Header */}
-      <div className="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4 pb-3 border-bottom">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 pb-4 border-b border-slate-200/80 dark:border-slate-800">
         <div>
-          <div className="badge-pill-soft mb-2">
-            <span>Bảo Mật DRM Bản Quyền</span>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 text-xs font-semibold mb-2 whitespace-nowrap">
+            <Shield className="h-3.5 w-3.5 shrink-0" />
+            <span>{t('watermark_trace.badge_drm_security')}</span>
           </div>
-          <h2 className="fw-bold text-dark mb-1">
-            Đối Soát Dấu Vân Tay &amp; <span className="text-primary">Truy Vết Rò Rỉ Video</span>
+          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-1">
+            {t('watermark_trace.title_part1')}
+            <span className="text-blue-600 dark:text-blue-400">{t('watermark_trace.title_part2')}</span>
           </h2>
-          <p className="text-secondary mb-0 small">
-            Tra cứu và xác thực danh tính người phát tán video bài giảng trái phép từ mã Watermark động trong CSDL.
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+            {t('watermark_trace.subtitle')}
           </p>
         </div>
       </div>
 
-      <Row className="g-4 mb-4">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
         {/* Khung Nhập Mã Watermark */}
-        <Col lg={7}>
-          <Card className="card-clean shadow-sm border rounded-4 p-4 bg-white h-100">
-            <h5 className="fw-bold text-dark mb-3 d-flex align-items-center gap-2">
-              <i className="bi bi-search text-primary"></i>
-              <span>Tra Cứu Mã Định Danh Watermark</span>
-            </h5>
-            <p className="text-secondary small mb-4">
-              Nhập mã định danh học viên (Ví dụ: <code>u-004</code>, <code>u-005</code>, <code>u-006</code> hoặc email) hiển thị mờ trên video bị quay lén:
-            </p>
+        <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-7 shadow-sm border border-slate-200/80 dark:border-slate-800">
+          <h3 className="text-base font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+            <Search className="h-4 w-4 text-blue-600 shrink-0" />
+            <span>{t('watermark_trace.lookup_card_title')}</span>
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-5 leading-relaxed">
+            {t('watermark_trace.lookup_card_desc_part1')}
+            <code className="text-blue-600 font-mono">u-004</code>,{' '}
+            <code className="text-blue-600 font-mono">u-005</code>,{' '}
+            <code className="text-blue-600 font-mono">u-006</code>
+            {t('watermark_trace.lookup_card_desc_part2')}
+          </p>
 
-            <Form onSubmit={handleTraceLeak}>
-              <InputGroup className="mb-3">
-                <InputGroup.Text className="bg-light border-end-0">
-                  <i className="bi bi-upc-scan text-muted"></i>
-                </InputGroup.Text>
-                <Form.Control
+          <form onSubmit={handleTraceLeak} className="mb-4">
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                  <Scan className="h-4 w-4" />
+                </div>
+                <input
                   type="text"
-                  placeholder="Nhập mã sinh viên / email (Ví dụ: u-004, charlie.stu)..."
+                  placeholder={t('watermark_trace.input_placeholder')}
                   value={searchWatermarkId}
                   onChange={(e) => setSearchWatermarkId(e.target.value)}
-                  className="border-start-0 form-control-clean"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                 />
-                <Button type="submit" disabled={isSearching} className="btn-primary-pill px-4">
-                  {isSearching ? 'Đang tra...' : 'Truy Vết'}
-                </Button>
-              </InputGroup>
-            </Form>
+              </div>
+              <button
+                type="submit"
+                disabled={isSearching}
+                className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 px-5 py-2.5 text-xs font-semibold text-white shadow-xs transition-all cursor-pointer whitespace-nowrap shrink-0"
+              >
+                {isSearching ? t('watermark_trace.btn_tracing') : t('watermark_trace.btn_trace')}
+              </button>
+            </div>
+          </form>
 
-            {traceError && (
-              <Alert variant="danger" className="py-2 small">
-                <i className="bi bi-exclamation-triangle-fill me-2"></i>
-                {traceError}
-              </Alert>
-            )}
+          {traceError && (
+            <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2 mb-4">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-rose-500" />
+              <span>{traceError}</span>
+            </div>
+          )}
 
-            {/* Chi tiết học viên khớp Watermark */}
-            {tracedStudent && (
-              <div className="p-4 rounded-4 bg-light border border-primary border-opacity-25 mt-3">
-                <div className="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
-                  <div>
-                    <Badge bg="danger" className="px-3 py-1 mb-2">
-                      Trùng Khớp Watermark
-                    </Badge>
-                    <h5 className="fw-bold text-dark mb-0">
-                      {tracedStudent.name} (Mã: <code>{tracedStudent.id}</code>)
-                    </h5>
-                    <div className="text-secondary small">{tracedStudent.email}</div>
-                  </div>
-
-                  <Button
-                    variant="outline-danger"
-                    size="sm"
-                    className="rounded-pill px-3"
-                    onClick={() => setShowBanModal(true)}
-                  >
-                    <i className="bi bi-lock-fill me-1"></i>Thu Hồi Quyền
-                  </Button>
+          {/* Chi tiết học viên khớp Watermark */}
+          {tracedStudent && (
+            <div className="p-5 rounded-3xl bg-slate-50 dark:bg-slate-850 border border-rose-200 dark:border-rose-900/60 mt-4 space-y-4">
+              <div className="flex justify-between items-start flex-wrap gap-2 pb-3 border-b border-slate-200 dark:border-slate-800">
+                <div>
+                  <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 mb-2 whitespace-nowrap">
+                    {t('watermark_trace.badge_matched')}
+                  </span>
+                  <h4 className="text-base font-bold text-slate-900 dark:text-white">
+                    {tracedStudent.name} ({t('watermark_trace.code_prefix')}
+                    <code className="text-blue-600 font-mono">{tracedStudent.id}</code>)
+                  </h4>
+                  <div className="text-xs text-slate-500">{tracedStudent.email}</div>
                 </div>
 
-                <div className="d-flex flex-column gap-2 small">
-                  <div className="d-flex justify-content-between border-bottom pb-1">
-                    <span className="text-muted">Khóa học đã ghi danh:</span>
-                    <strong className="text-dark">{tracedStudent.course}</strong>
-                  </div>
-                  <div className="d-flex justify-content-between border-bottom pb-1">
-                    <span className="text-muted">Địa chỉ IP &amp; Thiết bị:</span>
-                    <strong className="text-dark">{tracedStudent.ip} • {tracedStudent.device}</strong>
-                  </div>
-                  <div className="d-flex justify-content-between border-bottom pb-1">
-                    <span className="text-muted">Thời điểm tham gia phiên:</span>
-                    <span className="text-secondary">{tracedStudent.sessionJoinTime}</span>
-                  </div>
-                  <div className="d-flex justify-content-between">
-                    <span className="text-muted">Mức độ rủi ro:</span>
-                    <strong className="text-danger">{tracedStudent.riskLevel}</strong>
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowBanModal(true)}
+                  className="inline-flex items-center gap-1 rounded-full border border-rose-300 dark:border-rose-800 px-3 py-1.5 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 whitespace-nowrap shrink-0"
+                >
+                  <Lock className="h-3 w-3 shrink-0" />
+                  <span>{t('watermark_trace.btn_revoke_access')}</span>
+                </button>
               </div>
-            )}
-          </Card>
-        </Col>
 
-        {/* Hướng Dẫn Kỹ Thuật Watermark */}
-        <Col lg={5}>
-          <Card className="card-clean shadow-sm border rounded-4 p-4 bg-white h-100">
-            <h5 className="fw-bold text-dark mb-3">
-              Cơ Chế Dynamic Watermarking
-            </h5>
-            <div className="d-flex flex-column gap-3 small text-secondary">
-              <div className="p-3 bg-light rounded-3 border">
-                <strong className="text-dark d-block mb-1">1. Tọa độ ngẫu nhiên không lặp</strong>
-                Watermark di chuyển liên tục theo chu kỳ, khiến người quay lén không thể dùng bộ lọc cắt ghép hay làm mờ cố định.
-              </div>
-              <div className="p-3 bg-light rounded-3 border">
-                <strong className="text-dark d-block mb-1">2. Mã hóa danh tính theo phiên</strong>
-                Mã sinh viên được gắn kèm thời gian phát thực tế và chữ ký số HMAC-SHA256 để chống giả mạo danh tính học viên khác.
-              </div>
-              <div className="p-3 bg-light rounded-3 border">
-                <strong className="text-dark d-block mb-1">3. Đối soát CSDL thời gian thực</strong>
-                Mọi hành vi trích xuất đều được đối soát lập tức với bảng <code>users</code> và <code>sessions</code>.
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between py-1 border-b border-slate-200/60 dark:border-slate-800/60">
+                  <span className="text-slate-400">{t('watermark_trace.label_enrolled_courses')}</span>
+                  <strong className="text-slate-800 dark:text-slate-200">{tracedStudent.course}</strong>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-200/60 dark:border-slate-800/60">
+                  <span className="text-slate-400">{t('watermark_trace.label_ip_device')}</span>
+                  <strong className="text-slate-800 dark:text-slate-200">
+                    {tracedStudent.ip} • {tracedStudent.device}
+                  </strong>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-200/60 dark:border-slate-800/60">
+                  <span className="text-slate-400">{t('watermark_trace.label_session_join')}</span>
+                  <span className="text-slate-600 dark:text-slate-300">{tracedStudent.sessionJoinTime}</span>
+                </div>
+                <div className="flex justify-between py-1">
+                  <span className="text-slate-400">{t('watermark_trace.label_risk_level')}</span>
+                  <strong className="text-rose-600 dark:text-rose-400 font-bold">
+                    {tracedStudent.riskLevel}
+                  </strong>
+                </div>
               </div>
             </div>
-          </Card>
-        </Col>
-      </Row>
+          )}
+        </div>
+
+        {/* Hướng Dẫn Kỹ Thuật Watermark */}
+        <div className="lg:col-span-5 bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-7 shadow-sm border border-slate-200/80 dark:border-slate-800">
+          <h3 className="text-base font-bold text-slate-900 dark:text-white mb-4">
+            {t('watermark_trace.mechanism_title')}
+          </h3>
+          <div className="space-y-3 text-xs text-slate-600 dark:text-slate-300">
+            <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+              <strong className="text-slate-900 dark:text-white block mb-1">
+                {t('watermark_trace.step1_title')}
+              </strong>
+              {t('watermark_trace.step1_desc')}
+            </div>
+            <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+              <strong className="text-slate-900 dark:text-white block mb-1">
+                {t('watermark_trace.step2_title')}
+              </strong>
+              {t('watermark_trace.step2_desc')}
+            </div>
+            <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+              <strong className="text-slate-900 dark:text-white block mb-1">
+                {t('watermark_trace.step3_title')}
+              </strong>
+              {t('watermark_trace.step3_desc_part1')}
+              <code className="text-blue-600 font-mono">users</code>
+              {t('watermark_trace.step3_desc_part2')}
+              <code className="text-blue-600 font-mono">sessions</code>
+              {t('watermark_trace.step3_desc_part3')}
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Lịch Sử Các Đợt Đối Soát Rò Rỉ */}
-      <Card className="card-clean shadow-sm border rounded-4 overflow-hidden bg-white">
-        <Card.Header className="bg-white border-bottom py-3 px-4 d-flex justify-content-between align-items-center">
-          <h5 className="mb-0 fw-bold text-dark">Lịch Sử Đối Soát Rò Rỉ Bản Quyền Gần Đây</h5>
-          <span className="badge-pill-cyan">ERD Table: anomalyAlerts</span>
-        </Card.Header>
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
+        <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/60 dark:bg-slate-850">
+          <h4 className="font-bold text-sm text-slate-900 dark:text-white mb-0">
+            {t('watermark_trace.history_card_title')}
+          </h4>
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-900 whitespace-nowrap">
+            ERD Table: anomalyAlerts
+          </span>
+        </div>
 
-        <Card.Body className="p-0">
-          <div className="table-responsive">
-            <Table hover className="table-clean mb-0 align-middle text-nowrap">
-              <thead>
-                <tr>
-                  <th style={{ width: '100px' }}>Mã Đối Soát</th>
-                  <th>Mã Watermark (User ID)</th>
-                  <th>Tài Khoản / Email</th>
-                  <th>Trạng Thái</th>
-                  <th>Biện Pháp Xử Lý</th>
-                  <th>Thời Gian Đối Soát</th>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs whitespace-nowrap">
+            <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-400 font-semibold border-b border-slate-100 dark:border-slate-800">
+              <tr>
+                <th className="py-3 px-5 whitespace-nowrap">{t('watermark_trace.col_trace_id')}</th>
+                <th className="py-3 px-5 whitespace-nowrap">{t('watermark_trace.col_watermark_id')}</th>
+                <th className="py-3 px-5 whitespace-nowrap">{t('watermark_trace.col_account_email')}</th>
+                <th className="py-3 px-5 whitespace-nowrap text-center">{t('watermark_trace.col_status')}</th>
+                <th className="py-3 px-5 whitespace-nowrap">{t('watermark_trace.col_action_taken')}</th>
+                <th className="py-3 px-5 whitespace-nowrap">{t('watermark_trace.col_trace_time')}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {recentTraces.map((trace) => (
+                <tr key={trace.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                  <td className="py-3.5 px-5 font-mono text-slate-500 whitespace-nowrap">
+                    <code>{trace.id}</code>
+                  </td>
+                  <td className="py-3.5 px-5 whitespace-nowrap">
+                    <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 font-mono text-[11px] text-slate-700 dark:text-slate-300">
+                      {trace.watermarkId}
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-5 font-semibold text-slate-900 dark:text-white whitespace-nowrap">
+                    {trace.studentName}
+                  </td>
+                  <td className="py-3.5 px-5 text-center whitespace-nowrap">
+                    {renderStatusBadge(trace.statusKey)}
+                  </td>
+                  <td className="py-3.5 px-5 text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                    {renderActionText(trace.actionKey)}
+                  </td>
+                  <td className="py-3.5 px-5 text-slate-400 whitespace-nowrap">
+                    {trace.tracedAt}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {recentTraces.map((trace) => (
-                  <tr key={trace.id}>
-                    <td>
-                      <code>{trace.id}</code>
-                    </td>
-                    <td>
-                      <Badge bg="secondary" className="px-2 py-1 font-monospace">
-                        {trace.watermarkId}
-                      </Badge>
-                    </td>
-                    <td className="fw-semibold text-dark">{trace.studentName}</td>
-                    <td>
-                      <span
-                        className={
-                          trace.status === 'Xác Nhận Rò Rỉ'
-                            ? 'badge-status-failed'
-                            : trace.status === 'Đã Giải Quyết'
-                            ? 'badge-status-ready'
-                            : 'badge-status-processing'
-                        }
-                      >
-                        {trace.status}
-                      </span>
-                    </td>
-                    <td className="text-secondary small">{trace.actionTaken}</td>
-                    <td className="text-muted small">{trace.tracedAt}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          </div>
-        </Card.Body>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-        <Card.Footer className="bg-light border-top py-3 px-4 text-muted small">
-          Hiển thị <strong>{recentTraces.length}</strong> nhật ký đối soát từ CSDL mềm.
-        </Card.Footer>
-      </Card>
+        <div className="p-4 bg-slate-50/50 dark:bg-slate-850 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-400">
+          {t('watermark_trace.showing_history_part1')}
+          <strong className="text-slate-700 dark:text-slate-200">{recentTraces.length}</strong>
+          {t('watermark_trace.showing_history_part2')}
+        </div>
+      </div>
 
       {/* MODAL THU HỒI QUYỀN */}
-      <Modal show={showBanModal} onHide={() => setShowBanModal(false)} centered backdrop="static">
-        <Modal.Header closeButton className="bg-light">
-          <Modal.Title className="fs-6 fw-bold text-danger">
-            <i className="bi bi-exclamation-triangle-fill me-2"></i>Xác Nhận Thu Hồi Quyền Học Viên
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body className="py-4">
-          <p className="mb-2">
-            Bạn có chắc chắn muốn thu hồi toàn bộ quyền xem video bài giảng của học viên này do vi phạm bản quyền:
-          </p>
-          <div className="p-3 bg-light rounded-3 border">
-            <strong>{tracedStudent?.email}</strong> (Mã: <code>{tracedStudent?.id}</code>)
+      {showBanModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <h4 className="text-base font-bold text-rose-600 flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 shrink-0" />
+                <span>{t('watermark_trace.modal_revoke_title')}</span>
+              </h4>
+              <button
+                type="button"
+                onClick={() => setShowBanModal(false)}
+                className="p-1 rounded-full text-slate-400 hover:bg-slate-100"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300">
+              {t('watermark_trace.modal_revoke_msg')}
+            </p>
+
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-xs">
+              <strong className="text-slate-900 dark:text-white block">{tracedStudent?.email}</strong>
+              <span className="text-slate-400 font-mono">
+                {t('watermark_trace.modal_code_prefix')}
+                {tracedStudent?.id}
+              </span>
+            </div>
+
+            <p className="text-[11px] text-rose-500">
+              {t('watermark_trace.modal_revoke_warning')}
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setShowBanModal(false)}
+                className="rounded-full border border-slate-200 dark:border-slate-700 px-4 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50"
+              >
+                {t('watermark_trace.modal_btn_cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmBan}
+                className="rounded-full bg-rose-600 hover:bg-rose-700 px-5 py-1.5 text-xs font-semibold text-white shadow-xs"
+              >
+                {t('watermark_trace.modal_btn_confirm')}
+              </button>
+            </div>
           </div>
-          <small className="text-danger mt-2 d-block">
-            * Hành động này sẽ cập nhật các khóa học của học viên sang trạng thái <code>expired</code> trong bảng <code>entitlements</code>.
-          </small>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="light" size="sm" onClick={() => setShowBanModal(false)} className="rounded-pill px-3">
-            Hủy
-          </Button>
-          <Button variant="danger" size="sm" onClick={handleConfirmBan} className="rounded-pill px-3">
-            Xác Nhận Thu Hồi
-          </Button>
-        </Modal.Footer>
-      </Modal>
-    </Container>
+        </div>
+      )}
+    </div>
   );
 }

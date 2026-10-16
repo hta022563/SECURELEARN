@@ -31,16 +31,18 @@ import apiClient from '../api/axiosClient.js';
  * =============================================================================
  */
 
+import { logout as apiLogout } from './authService.js';
+
 // Đường dẫn OAuth2 Cognito Backend
 export const COGNITO_LOGIN_URL = 'http://localhost:8080/oauth2/authorization/cognito';
 export const COGNITO_LOGOUT_URL = 'http://localhost:8080/logout';
 
 /**
- * Đăng xuất phiên làm việc phía Backend (Cognito Session)
+ * Đăng xuất phiên làm việc phía Backend (Cognito GlobalSignOut qua /api/v1/auth/logout)
  */
 export async function logoutBackendSession() {
   try {
-    await apiClient.post('/logout', {}, { baseURL: 'http://localhost:8080' });
+    await apiLogout();
   } catch (err) {
     console.warn('[courseService] Backend logout call notice:', err.message);
   }

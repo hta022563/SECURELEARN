@@ -1,14 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import {
-  Container,
-  Row,
-  Col,
-  Card,
-  Form,
-  FloatingLabel,
-  Button,
-} from 'react-bootstrap';
+import { AlertCircle, User, Mail, Lock, ShieldCheck, GraduationCap, Briefcase, Loader2, LogIn } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import Logo from '../components/Logo';
 import { register as apiRegister } from '../services/authService';
@@ -47,11 +39,11 @@ export default function Register() {
       newErrors.email = 'Địa chỉ email không đúng định dạng (Ví dụ: user@domain.com).';
     }
 
-    // 3. Password phải lớn hơn 6 ký tự
+    // 3. Password phải từ 8 ký tự trở lên (chuẩn AWS Cognito)
     if (!password) {
       newErrors.password = 'Vui lòng nhập mật khẩu.';
-    } else if (password.length <= 6) {
-      newErrors.password = 'Mật khẩu phải có độ dài lớn hơn 6 ký tự.';
+    } else if (password.length < 8) {
+      newErrors.password = 'Mật khẩu phải có độ dài tối thiểu 8 ký tự theo chuẩn AWS Cognito.';
     }
 
     // 4. Confirm Password phải khớp với Password
@@ -78,12 +70,11 @@ export default function Register() {
     setIsSubmitting(true);
 
     try {
-      // Call real backend — POST /api/v1/auth/register
       await apiRegister({
         fullName,
         email: email.trim().toLowerCase(),
         password,
-        role: role.toLowerCase(), // backend expects 'student' | 'instructor'
+        role: role.toLowerCase(),
       });
 
       showToast(
@@ -105,170 +96,193 @@ export default function Register() {
   };
 
   return (
-    <div className="py-5 flex-grow-1 d-flex align-items-center">
-      <Container>
-        <Row className="justify-content-center">
-          <Col xs={12} sm={10} md={8} lg={6} xl={5}>
-            <Card className="card-clean shadow-lg overflow-hidden border">
-              {/* Header Card Trắng Xanh */}
-              <Card.Header className="bg-white border-bottom text-center py-4">
-                <div className="mb-3 d-flex justify-content-center">
-                  <Logo size="lg" showBadge={true} badgeText="JOIN PLATFORM" />
+    <div className="min-h-[85vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl shadow-xl shadow-slate-200/50 dark:shadow-slate-950/50 border border-slate-200/80 dark:border-slate-800 overflow-hidden transition-all">
+        {/* Header Card */}
+        <div className="bg-slate-50/50 dark:bg-slate-850 border-b border-slate-100 dark:border-slate-800 text-center py-6 px-6">
+          <div className="mb-3 flex justify-center">
+            <Logo size="lg" showBadge={true} badgeText="JOIN PLATFORM" />
+          </div>
+          <h4 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white mb-1">
+            Đăng Ký Tài Khoản Mới
+          </h4>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Tham gia nền tảng video học tập trực tuyến SecureLearn
+          </p>
+        </div>
+
+        <div className="p-6 sm:p-8">
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
+            {/* Họ và Tên */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Họ và Tên <span className="text-rose-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Nguyễn Văn A"
+                  value={fullName}
+                  onChange={(e) => {
+                    setFullName(e.target.value);
+                    if (errors.fullName) setErrors({ ...errors, fullName: null });
+                  }}
+                  className={`w-full rounded-2xl border ${errors.fullName ? 'border-rose-500 bg-rose-50/20' : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60'
+                    } px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 ${errors.fullName ? 'focus:ring-rose-500/20 focus:border-rose-500' : 'focus:ring-blue-500/20 focus:border-blue-500'
+                    } transition-all`}
+                />
+              </div>
+              {errors.fullName && (
+                <div className="flex items-center gap-1.5 text-rose-500 text-xs mt-1.5">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  <span>{errors.fullName}</span>
                 </div>
-                <h4 className="fw-bold mb-1 text-dark">
-                  Đăng Ký Tài Khoản Mới
-                </h4>
-                <p className="text-muted small mb-0">
-                  Tham gia nền tảng video học tập trực tuyến SecureLearn DRM
-                </p>
-              </Card.Header>
+              )}
+            </div>
 
-              <Card.Body className="p-4 p-md-5 bg-white">
-                <Form onSubmit={handleSubmit} noValidate>
-                  {/* Họ và Tên */}
-                  <div className="mb-3">
-                    <FloatingLabel controlId="regFullName" label="Họ và Tên *" className="text-secondary">
-                      <Form.Control
-                        type="text"
-                        placeholder="Nguyễn Văn A"
-                        value={fullName}
-                        onChange={(e) => {
-                          setFullName(e.target.value);
-                          if (errors.fullName) setErrors({ ...errors, fullName: null });
-                        }}
-                        isInvalid={Boolean(errors.fullName)}
-                        className="form-control-clean"
-                      />
-                    </FloatingLabel>
-                    {errors.fullName && (
-                      <Form.Text className="text-danger small mt-1 d-block">
-                        <i className="bi bi-exclamation-circle me-1"></i>{errors.fullName}
-                      </Form.Text>
-                    )}
-                  </div>
-
-                  {/* Địa chỉ Email */}
-                  <div className="mb-3">
-                    <FloatingLabel controlId="regEmail" label="Địa chỉ Email *" className="text-secondary">
-                      <Form.Control
-                        type="email"
-                        placeholder="name@example.com"
-                        value={email}
-                        onChange={(e) => {
-                          setEmail(e.target.value);
-                          if (errors.email) setErrors({ ...errors, email: null });
-                        }}
-                        isInvalid={Boolean(errors.email)}
-                        className="form-control-clean"
-                      />
-                    </FloatingLabel>
-                    {errors.email && (
-                      <Form.Text className="text-danger small mt-1 d-block">
-                        <i className="bi bi-exclamation-circle me-1"></i>{errors.email}
-                      </Form.Text>
-                    )}
-                  </div>
-
-                  {/* Mật Khẩu (> 6 ký tự) */}
-                  <div className="mb-3">
-                    <FloatingLabel controlId="regPassword" label="Mật khẩu (> 6 ký tự) *" className="text-secondary">
-                      <Form.Control
-                        type="password"
-                        placeholder="Mật khẩu..."
-                        value={password}
-                        onChange={(e) => {
-                          setPassword(e.target.value);
-                          if (errors.password) setErrors({ ...errors, password: null });
-                        }}
-                        isInvalid={Boolean(errors.password)}
-                        className="form-control-clean"
-                      />
-                    </FloatingLabel>
-                    {errors.password && (
-                      <Form.Text className="text-danger small mt-1 d-block">
-                        <i className="bi bi-exclamation-circle me-1"></i>{errors.password}
-                      </Form.Text>
-                    )}
-                  </div>
-
-                  {/* Nhập Lại Mật Khẩu */}
-                  <div className="mb-4">
-                    <FloatingLabel controlId="regConfirmPassword" label="Xác nhận mật khẩu *" className="text-secondary">
-                      <Form.Control
-                        type="password"
-                        placeholder="Nhập lại mật khẩu..."
-                        value={confirmPassword}
-                        onChange={(e) => {
-                          setConfirmPassword(e.target.value);
-                          if (errors.confirmPassword) setErrors({ ...errors, confirmPassword: null });
-                        }}
-                        isInvalid={Boolean(errors.confirmPassword)}
-                        className="form-control-clean"
-                      />
-                    </FloatingLabel>
-                    {errors.confirmPassword && (
-                      <Form.Text className="text-danger small mt-1 d-block">
-                        <i className="bi bi-exclamation-circle me-1"></i>{errors.confirmPassword}
-                      </Form.Text>
-                    )}
-                  </div>
-
-                  {/* Chọn Vai Trò (Role: Student / Instructor) */}
-                  <div className="mb-4 p-3 rounded-3 bg-light border border-light-subtle">
-                    <Form.Label className="text-secondary small fw-bold d-block mb-2">
-                      Vai trò tài khoản bạn muốn đăng ký:
-                    </Form.Label>
-                    <div className="d-flex gap-4">
-                      <Form.Check
-                        type="radio"
-                        id="role-student"
-                        name="regRole"
-                        label={<span className="text-dark fw-semibold">Học Viên (Student)</span>}
-                        checked={role === 'Student'}
-                        onChange={() => setRole('Student')}
-                      />
-                      <Form.Check
-                        type="radio"
-                        id="role-instructor"
-                        name="regRole"
-                        label={<span className="text-dark fw-semibold">Giảng Viên (Instructor)</span>}
-                        checked={role === 'Instructor'}
-                        onChange={() => setRole('Instructor')}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Nút Submit */}
-                  <div className="d-grid mb-3">
-                    <Button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="btn-primary-pill py-3 fw-bold"
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                          Đang tạo tài khoản...
-                        </>
-                      ) : (
-                        'Đăng Ký Ngay'
-                      )}
-                    </Button>
-                  </div>
-                </Form>
-
-                {/* Chuyển hướng sang Login nếu đã có tài khoản */}
-                <div className="text-center pt-3 border-top">
-                  <span className="text-muted small me-1">Bạn đã có tài khoản?</span>
-                  <Link to="/login" className="text-primary fw-semibold small text-decoration-none">
-                    Đăng nhập tại đây
-                  </Link>
+            {/* Địa chỉ Email */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Địa chỉ Email <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="email"
+                placeholder="name@example.com"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (errors.email) setErrors({ ...errors, email: null });
+                }}
+                className={`w-full rounded-2xl border ${errors.email ? 'border-rose-500 bg-rose-50/20' : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60'
+                  } px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 ${errors.email ? 'focus:ring-rose-500/20 focus:border-rose-500' : 'focus:ring-blue-500/20 focus:border-blue-500'
+                  } transition-all`}
+              />
+              {errors.email && (
+                <div className="flex items-center gap-1.5 text-rose-500 text-xs mt-1.5">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  <span>{errors.email}</span>
                 </div>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-      </Container>
+              )}
+            </div>
+
+            {/* Mật Khẩu (>= 8 ký tự) */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Mật khẩu (tối thiểu 8 ký tự) <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="password"
+                placeholder="Mật khẩu..."
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (errors.password) setErrors({ ...errors, password: null });
+                }}
+                className={`w-full rounded-2xl border ${errors.password ? 'border-rose-500 bg-rose-50/20' : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60'
+                  } px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 ${errors.password ? 'focus:ring-rose-500/20 focus:border-rose-500' : 'focus:ring-blue-500/20 focus:border-blue-500'
+                  } transition-all`}
+              />
+              {errors.password && (
+                <div className="flex items-center gap-1.5 text-rose-500 text-xs mt-1.5">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  <span>{errors.password}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Nhập Lại Mật Khẩu */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Xác nhận mật khẩu <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="password"
+                placeholder="Nhập lại mật khẩu..."
+                value={confirmPassword}
+                onChange={(e) => {
+                  setConfirmPassword(e.target.value);
+                  if (errors.confirmPassword) setErrors({ ...errors, confirmPassword: null });
+                }}
+                className={`w-full rounded-2xl border ${errors.confirmPassword ? 'border-rose-500 bg-rose-50/20' : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60'
+                  } px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 ${errors.confirmPassword ? 'focus:ring-rose-500/20 focus:border-rose-500' : 'focus:ring-blue-500/20 focus:border-blue-500'
+                  } transition-all`}
+              />
+              {errors.confirmPassword && (
+                <div className="flex items-center gap-1.5 text-rose-500 text-xs mt-1.5">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  <span>{errors.confirmPassword}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Chọn Vai Trò (Role: Student / Instructor) */}
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80 space-y-2">
+              <span className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Vai trò tài khoản bạn muốn đăng ký:
+              </span>
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setRole('Student')}
+                  className={`flex items-center gap-2.5 p-3 rounded-xl border text-left text-xs transition-all ${role === 'Student'
+                    ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-500 text-blue-700 dark:text-blue-300 font-bold shadow-xs'
+                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300'
+                    }`}
+                >
+                  <GraduationCap className={`h-4 w-4 ${role === 'Student' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`} />
+                  <div>
+                    <div>Học Viên</div>
+                    <div className="text-[10px] font-normal text-slate-500 dark:text-slate-400">Student</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setRole('Instructor')}
+                  className={`flex items-center gap-2.5 p-3 rounded-xl border text-left text-xs transition-all ${role === 'Instructor'
+                    ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-500 text-blue-700 dark:text-blue-300 font-bold shadow-xs'
+                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300'
+                    }`}
+                >
+                  <Briefcase className={`h-4 w-4 ${role === 'Instructor' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`} />
+                  <div>
+                    <div>Giảng Viên</div>
+                    <div className="text-[10px] font-normal text-slate-500 dark:text-slate-400">Instructor</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* Nút Submit */}
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 px-5 py-3 text-xs font-bold text-white shadow-md shadow-blue-500/25 transition-all mt-3 cursor-pointer"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Đang tạo tài khoản...</span>
+                </>
+              ) : (
+                <span>Đăng Ký Ngay</span>
+              )}
+            </button>
+          </form>
+
+          {/* Chuyển hướng sang Login nếu đã có tài khoản */}
+          <div className="text-center pt-5 mt-5 border-t border-slate-100 dark:border-slate-800 text-xs">
+            <span className="text-slate-500 dark:text-slate-400 mr-1.5">Bạn đã có tài khoản?</span>
+            <Link
+              to="/login"
+              className="inline-flex items-center gap-1 font-semibold text-blue-600 dark:text-blue-400 hover:underline no-underline"
+            >
+              <LogIn className="h-3.5 w-3.5" />
+              <span>Đăng nhập tại đây</span>
+            </Link>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,11 +1,30 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Container, Row, Col, Card, Button, Badge, Modal } from 'react-bootstrap';
+import {
+  Lock,
+  Play,
+  PlayCircle,
+  GraduationCap,
+  Film,
+  Calendar,
+  User,
+  ShieldCheck,
+  Fingerprint,
+  Cpu,
+  Cloud,
+  ChevronDown,
+  ChevronUp,
+  ArrowRight,
+  X,
+  AlertTriangle,
+  Info,
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { checkCourseAccess, getEntitledCourseIds } from '../services/entitlementService';
 import { getCourses } from '../services/courseService';
 import LearningTimeline from '../components/LearningTimeline';
+import HeroStatsCard from '../components/home/HeroStatsCard';
 
 // Danh sách câu hỏi thường gặp về SecureLearn (Bản quyền số, DRM, Mã hóa HLS & Hệ thống AI)
 const FAQ_ITEMS = [
@@ -140,126 +159,91 @@ export default function Home() {
   };
 
   return (
-    <div className="position-relative py-5">
-      <Container className="position-relative">
+    <div className="relative py-8 sm:py-12">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 relative">
         {/* =====================================================================
          * 1. HERO SECTION (SECURELEARN EXCLUSIVE - BẢN QUYỀN SỐ & E-LEARNING)
          * ===================================================================== */}
-        <Row className="align-items-center mb-5 pb-5 g-5">
-          <Col lg={7}>
-            <div className="badge-pill-soft mb-3">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center mb-16 pb-6">
+          <div className="lg:col-span-7">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50/90 dark:bg-blue-950/60 border border-blue-200/60 dark:border-blue-800/60 text-blue-700 dark:text-blue-300 text-xs sm:text-sm font-semibold mb-4 shadow-xs">
               <span>{t('home.hero_badge')}</span>
             </div>
 
-            <h1 className="display-4 fw-extrabold mb-3 text-dark">
-              {t('home.hero_title')}<span className="text-primary">{t('home.hero_title_highlight')}</span>
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-4 leading-tight">
+              {t('home.hero_title')}
+              <span className="text-blue-600 dark:text-blue-400">{t('home.hero_title_highlight')}</span>
             </h1>
 
-            <p className="text-secondary fs-5 mb-4" style={{ lineHeight: '1.7' }}>
+            <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 mb-8 max-w-2xl leading-relaxed">
               {t('home.hero_desc')}
             </p>
 
-            <div className="d-flex flex-wrap gap-3">
+            <div className="flex flex-wrap items-center gap-3.5">
               {!isAuthenticated ? (
                 <>
-                  <Link to={`/${lang}/register`} className="btn-primary-pill text-decoration-none">
+                  <Link
+                    to={`/${lang}/register`}
+                    className="inline-flex items-center justify-center px-6 py-3 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-0.5 transition-all duration-200 no-underline"
+                  >
                     {t('common.register')}
                   </Link>
-                  <Link to={`/${lang}/catalog`} className="btn-secondary-pill text-decoration-none d-flex align-items-center gap-2">
+                  <Link
+                    to={`/${lang}/catalog`}
+                    className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-sm border border-slate-200 dark:border-slate-700 shadow-xs hover:border-slate-300 dark:hover:border-slate-600 hover:-translate-y-0.5 transition-all duration-200 no-underline"
+                  >
                     <span>{t('common.explore_courses')}</span>
-                    <i className="bi bi-arrow-right"></i>
+                    <ArrowRight className="h-4 w-4" />
                   </Link>
                 </>
               ) : (
                 <>
                   {user?.role === 'Student' && (
-                    <Link to={`/${lang}/student/courses`} className="btn-primary-pill text-decoration-none d-flex align-items-center gap-2">
-                      <i className="bi bi-mortarboard-fill"></i>
+                    <Link
+                      to={`/${lang}/student/courses`}
+                      className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-0.5 transition-all duration-200 no-underline"
+                    >
+                      <GraduationCap className="h-4 w-4" />
                       <span>{t('common.my_courses')}</span>
                     </Link>
                   )}
                   {user?.role === 'Instructor' && (
-                    <Link to={`/${lang}/instructor/videos`} className="btn-primary-pill text-decoration-none d-flex align-items-center gap-2">
-                      <i className="bi bi-film"></i>
+                    <Link
+                      to={`/${lang}/instructor/videos`}
+                      className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-0.5 transition-all duration-200 no-underline"
+                    >
+                      <Film className="h-4 w-4" />
                       <span>{t('common.video_management')}</span>
                     </Link>
                   )}
                   {user?.role === 'Administrator' && (
-                    <Link to={`/${lang}/admin/alerts`} className="btn-primary-pill text-decoration-none d-flex align-items-center gap-2">
+                    <Link
+                      to={`/${lang}/admin/alerts`}
+                      className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-0.5 transition-all duration-200 no-underline"
+                    >
                       <span>{t('common.ai_dashboard')}</span>
                     </Link>
                   )}
-                  <Link to={`/${lang}/catalog`} className="btn-secondary-pill text-decoration-none d-flex align-items-center gap-2">
+                  <Link
+                    to={`/${lang}/catalog`}
+                    className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-sm border border-slate-200 dark:border-slate-700 shadow-xs hover:border-slate-300 dark:hover:border-slate-600 hover:-translate-y-0.5 transition-all duration-200 no-underline"
+                  >
                     <span>{t('common.explore_more')}</span>
                   </Link>
                 </>
               )}
             </div>
-          </Col>
+          </div>
 
-          {/* Cột phải: Thẻ Thống Kê Nền Tảng (Thiết kế phẳng tinh tế, sạch sẽ, chuẩn Dark & Light Mode) */}
-          <Col lg={5} className="d-flex align-items-center justify-content-center">
-            <div className="card-clean rounded-4 p-4 p-md-5 border shadow-sm position-relative w-100">
-              {/* Hàng trên: 2 Cột chỉ số số to, không icon, cực kỳ gọn gàng và sắc nét */}
-              <div className="row g-0 align-items-center text-center">
-                {/* Chỉ số 1: Khóa học */}
-                <div className="col-6 px-3">
-                  <div
-                    className="display-4 fw-extrabold text-dark mb-1"
-                    style={{
-                      letterSpacing: '-0.03em',
-                      fontWeight: 800,
-                    }}
-                  >
-                    {totalCourses.toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US')}
-                  </div>
-                  <div className="text-secondary fw-semibold">
-                    {lang === 'vi' ? 'Khóa học' : 'Courses'}
-                  </div>
-                </div>
-
-                {/* Chỉ số 2: Lượt đăng ký học (ngăn cách bởi vạch dọc) */}
-                <div className="col-6 px-3 border-start border-light-subtle">
-                  <div
-                    className="display-4 fw-extrabold text-dark mb-1"
-                    style={{
-                      letterSpacing: '-0.03em',
-                      fontWeight: 800,
-                    }}
-                  >
-                    {totalEnrollments.toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US')}
-                  </div>
-                  <div className="text-secondary fw-semibold">
-                    {lang === 'vi' ? 'Học viên' : 'Students'}
-                  </div>
-                </div>
-              </div>
-
-              {/* Vạch ngăn cách ngang */}
-              <div className="border-top border-light-subtle my-4" />
-
-              {/* Hàng dưới: Giới thiệu nền tảng thân thiện & Huy hiệu trực tuyến rõ nét trên mọi nền */}
-              <div className="d-flex align-items-center justify-content-between gap-3">
-                <span className="text-secondary fw-medium small mb-0">
-                  {lang === 'vi' ? 'Nền tảng học trực tuyến chất lượng cao' : 'High quality online learning platform'}
-                </span>
-
-                <span className="badge-pill-soft small text-nowrap flex-shrink-0">
-                  <span
-                    style={{
-                      width: '7px',
-                      height: '7px',
-                      borderRadius: '50%',
-                      backgroundColor: 'currentColor',
-                      display: 'inline-block',
-                    }}
-                  />
-                  <span>{lang === 'vi' ? 'Học trực tuyến' : 'Live Online'}</span>
-                </span>
-              </div>
-            </div>
-          </Col>
-        </Row>
+          {/* Cột phải: Thẻ Thống Kê Nền Tảng (Pure Tailwind CSS + Lucide Icons) */}
+          <div className="lg:col-span-5 flex items-center justify-center">
+            <HeroStatsCard
+              totalCourses={totalCourses}
+              totalEnrollments={totalEnrollments}
+              lang={lang}
+            />
+          </div>
+        </div>
 
         {/* =====================================================================
          * LỘ TRÌNH HỌC TẬP TIMELINE
@@ -269,48 +253,49 @@ export default function Home() {
         {/* =====================================================================
          * 2. SECTION: VIDEO & BÀI GIẢNG MỚI NHẤT (CHỈ HIỂN THỊ TOP 3 MỚI NHẤT)
          * ===================================================================== */}
-        <section className="mb-5 pb-4">
-          <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-end gap-3 mb-4">
+        <section className="mb-16 pb-4">
+          <div className="flex flex-col md:flex-row justify-between md:items-end gap-3 mb-8">
             <div>
-              <h2 className="fw-bold text-dark mb-1">
-                {t('home.latest_videos')}<span className="text-primary">{t('home.latest_videos_highlight')}</span>
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                {t('home.latest_videos')}
+                <span className="text-blue-600 dark:text-blue-400">{t('home.latest_videos_highlight')}</span>
               </h2>
-              <p className="text-secondary small mb-0">
+              <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm mt-1">
                 {t('home.latest_videos_desc')}
               </p>
             </div>
 
             <Link
               to={`/${lang}/catalog`}
-              className="btn-secondary-pill text-decoration-none d-inline-flex align-items-center gap-2 small px-3 py-2"
+              className="inline-flex items-center gap-2 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-xs hover:bg-slate-50 dark:hover:bg-slate-700 transition-all no-underline"
             >
-              <span>{t('home.view_all')} ({coursesList.length})</span>
-              <i className="bi bi-arrow-right"></i>
+              <span>
+                {t('home.view_all')} ({coursesList.length})
+              </span>
+              <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
 
-          <Row className="g-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {latestCourses.length === 0 ? (
-              <Col xs={12}>
-                <div className="card-clean border-0 shadow-sm p-5 text-center bg-white rounded-4">
-                  <div className="text-muted mb-3" style={{ fontSize: '2.5rem' }}>
-                    <i className="bi bi-mortarboard"></i>
-                  </div>
-                  <h5 className="fw-bold text-dark mb-2">{t('home.no_courses_title')}</h5>
-                  <p className="text-secondary small mb-3">
-                    {t('home.no_courses_desc')}
-                  </p>
-                  {isAuthenticated && user?.role === 'Instructor' && (
-                    <Button
-                      variant="primary"
-                      onClick={() => navigate(`/${lang}/instructor/upload`)}
-                      className="btn-primary-pill"
-                    >
-                      <i className="bi bi-cloud-arrow-up me-1"></i> {t('home.upload_course_now')}
-                    </Button>
-                  )}
-                </div>
-              </Col>
+              <div className="col-span-full rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-10 text-center shadow-sm">
+                <GraduationCap className="h-12 w-12 text-slate-400 mx-auto mb-3" />
+                <h4 className="font-bold text-slate-900 dark:text-white text-lg mb-1">
+                  {t('home.no_courses_title')}
+                </h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+                  {t('home.no_courses_desc')}
+                </p>
+                {isAuthenticated && user?.role === 'Instructor' && (
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/${lang}/instructor/upload`)}
+                    className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-5 py-2.5 text-xs font-semibold text-white shadow-md hover:bg-blue-700 transition-all"
+                  >
+                    {t('home.upload_course_now')}
+                  </button>
+                )}
+              </div>
             ) : (
               latestCourses.map((course) => {
                 const cId = course.ID || course.id;
@@ -321,358 +306,359 @@ export default function Home() {
                 const isEntitled = entitledIds.includes(cId);
 
                 return (
-                  <Col key={cId} xs={12} md={6} lg={4}>
-                    <Card
-                      className={`h-100 card-clean card-clean-hover overflow-hidden d-flex flex-column border-0 shadow-sm ${!isEntitled ? 'border-light' : ''
-                        }`}
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => handleCourseAction(course)}
+                  <div
+                    key={cId}
+                    onClick={() => handleCourseAction(course)}
+                    className="group relative flex flex-col overflow-hidden rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer"
+                  >
+                    {/* Header Khóa học */}
+                    <div
+                      className={`p-5 border-b border-slate-100 dark:border-slate-800 flex flex-col justify-between ${
+                        isEntitled ? 'bg-blue-50/70 dark:bg-blue-950/40' : 'bg-slate-50/70 dark:bg-slate-800/40'
+                      }`}
+                      style={{ minHeight: '120px' }}
                     >
-                      {/* Header Khóa học */}
-                      <div
-                        className={`p-4 border-bottom d-flex flex-column justify-content-between ${isEntitled ? 'bg-primary bg-opacity-10' : 'bg-light'
-                          }`}
-                        style={{ minHeight: '130px' }}
+                      <div className="flex items-center justify-between">
+                        {isEntitled ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                            <ShieldCheck className="h-3.5 w-3.5" />
+                            {t('home.entitled')}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-slate-200/70 dark:bg-slate-700 px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                            <Lock className="h-3.5 w-3.5" />
+                            {t('home.not_entitled')}
+                          </span>
+                        )}
+                        <span className="font-mono text-xs text-slate-400">{cId}</span>
+                      </div>
+
+                      {(course['Creation Time'] || course.createdAt) && (
+                        <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 mt-2">
+                          <Calendar className="h-3 w-3" />
+                          <span>
+                            {t('home.created_at')} {(course['Creation Time'] || course.createdAt).split('T')[0]}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Card Body */}
+                    <div className="flex flex-1 flex-col p-5">
+                      <h3
+                        className="text-base font-bold text-slate-900 dark:text-white line-clamp-1 mb-1.5"
+                        title={title}
                       >
-                        <div className="d-flex justify-content-between align-items-center">
-                          {isEntitled ? (
-                            <Badge bg="success" className="px-3 py-2 rounded-pill fw-semibold shadow-sm">
-                              {t('home.entitled')}
-                            </Badge>
-                          ) : (
-                            <Badge bg="secondary" className="px-3 py-2 rounded-pill fw-semibold bg-opacity-75">
-                              {t('home.not_entitled')}
-                            </Badge>
-                          )}
-                          <span className="small text-muted font-monospace">
-                            <code>{cId}</code>
+                        {title}
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed flex-1 mb-4">
+                        {desc}
+                      </p>
+
+                      {instructorName && (
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800 pt-3 mb-3">
+                          <User className="h-3.5 w-3.5 text-blue-500" />
+                          <span>{instructorName}</span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800 mt-auto">
+                        <div>
+                          <span className="text-[10px] text-slate-400 block uppercase font-medium">
+                            {lang === 'vi' ? 'Học phí' : 'Tuition'}
+                          </span>
+                          <span className="text-base font-extrabold text-blue-600 dark:text-blue-400">
+                            {price === 0
+                              ? t('home.free')
+                              : `${price?.toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US') ?? '?'} ${
+                                  lang === 'vi' ? 'đ' : 'VND'
+                                }`}
                           </span>
                         </div>
 
-                        {(course["Creation Time"] || course.createdAt) && (
-                          <small className="text-secondary mt-3">
-                            <i className="bi bi-calendar-event me-1"></i>
-                            {t('home.created_at')} {(course["Creation Time"] || course.createdAt).split('T')[0]}
-                          </small>
+                        {isEntitled ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCourseAction(course);
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 px-4 py-2 text-xs font-semibold text-white shadow-xs transition-colors"
+                          >
+                            <Play className="h-3 w-3 fill-current" />
+                            <span>{t('home.start_learning')}</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCourseAction(course);
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 transition-colors"
+                          >
+                            <Lock className="h-3 w-3" />
+                            <span>{t('home.not_entitled')}</span>
+                          </button>
                         )}
                       </div>
-
-                      <Card.Body className="d-flex flex-column p-4">
-                        <Card.Title className="fw-bold fs-5 text-dark mb-2 text-truncate" title={title}>
-                          {title}
-                        </Card.Title>
-
-                        <Card.Text className="text-secondary small mb-3 flex-grow-1" style={{ minHeight: '55px' }}>
-                          {desc}
-                        </Card.Text>
-
-                        {/* Giảng viên */}
-                        {instructorName && (
-                          <div className="d-flex justify-content-between text-muted small mb-3 border-top pt-2">
-                            <span>
-                              <i className="bi bi-person-fill text-primary me-1"></i>
-                              {instructorName}
-                            </span>
-                          </div>
-                        )}
-
-                        <div className="d-flex justify-content-between align-items-center mt-auto pt-2 border-top">
-                          <div>
-                            <small className="text-muted d-block">{lang === 'vi' ? 'Học phí:' : 'Tuition:'}</small>
-                            <span className="fw-bold fs-5 text-primary">
-                              {price === 0 ? t('home.free') : `${price?.toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US') ?? '?'} ${lang === 'vi' ? 'đ' : 'VND'}`}
-                            </span>
-                          </div>
-
-                          {isEntitled ? (
-                            <Button
-                              variant="primary"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleCourseAction(course);
-                              }}
-                              className="btn-primary-pill d-flex align-items-center gap-2 small px-3 py-2"
-                            >
-                              <i className="bi bi-play-circle-fill"></i>
-                              <span>{t('home.start_learning')}</span>
-                            </Button>
-                          ) : (
-                            <Button
-                              variant="light"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleCourseAction(course);
-                              }}
-                              className="btn-unentitled-pill d-flex align-items-center gap-2 small px-3 py-2"
-                            >
-                              <i className="bi bi-lock-fill"></i>
-                              <span>{t('home.not_entitled')}</span>
-                            </Button>
-                          )}
-                        </div>
-                      </Card.Body>
-                    </Card>
-                  </Col>
+                    </div>
+                  </div>
                 );
               })
             )}
-          </Row>
+          </div>
         </section>
 
         {/* =====================================================================
          * 3. SECTION: CÔNG NGHỆ BẢO VỆ BẢN QUYỀN ĐỘC QUYỀN
          * ===================================================================== */}
-        <section className="mb-5 pb-4">
-          <div className="text-center mb-5">
-            <div className="badge-pill-soft mb-2">
+        <section className="mb-16 pb-4">
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 text-xs font-semibold mb-2">
               <span>{t('home.architecture_badge')}</span>
             </div>
-            <h2 className="fw-bold text-dark">
-              {t('home.architecture_title')}<span className="text-primary">SecureLearn</span>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+              {t('home.architecture_title')}{' '}
+              <span className="text-blue-600 dark:text-blue-400">SecureLearn</span>
             </h2>
-            <p className="text-secondary mx-auto" style={{ maxWidth: '650px' }}>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-xl mx-auto mt-1">
               {t('home.architecture_desc')}
             </p>
           </div>
 
-          <Row className="g-4">
-            <Col md={6} lg={3}>
-              <Card className="h-100 card-clean border-0 p-4 text-center">
-                <div
-                  className="rounded-circle bg-primary-subtle text-primary mx-auto mb-3 d-flex align-items-center justify-content-center"
-                  style={{ width: '56px', height: '56px', fontSize: '1.6rem' }}
-                >
-                  <i className="bi bi-file-lock2"></i>
-                </div>
-                <h5 className="fw-bold text-dark mb-2">{t('home.hls_title')}</h5>
-                <p className="text-secondary small mb-0">
-                  {t('home.hls_desc')}
-                </p>
-              </Card>
-            </Col>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 text-center shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 mx-auto mb-4">
+                <Lock className="h-7 w-7" />
+              </div>
+              <h3 className="font-bold text-slate-900 dark:text-white text-base mb-1.5">{t('home.hls_title')}</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{t('home.hls_desc')}</p>
+            </div>
 
-            <Col md={6} lg={3}>
-              <Card className="h-100 card-clean border-0 p-4 text-center">
-                <div
-                  className="rounded-circle bg-info-subtle text-info mx-auto mb-3 d-flex align-items-center justify-content-center"
-                  style={{ width: '56px', height: '56px', fontSize: '1.6rem' }}
-                >
-                  <i className="bi bi-fingerprint"></i>
-                </div>
-                <h5 className="fw-bold text-dark mb-2">{t('home.watermark_title')}</h5>
-                <p className="text-secondary small mb-0">
-                  {t('home.watermark_desc')}
-                </p>
-              </Card>
-            </Col>
+            <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 text-center shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-50 dark:bg-cyan-950 text-cyan-600 dark:text-cyan-400 mx-auto mb-4">
+                <Fingerprint className="h-7 w-7" />
+              </div>
+              <h3 className="font-bold text-slate-900 dark:text-white text-base mb-1.5">{t('home.watermark_title')}</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{t('home.watermark_desc')}</p>
+            </div>
 
-            <Col md={6} lg={3}>
-              <Card className="h-100 card-clean border-0 p-4 text-center">
-                <div
-                  className="rounded-circle bg-warning-subtle text-warning mx-auto mb-3 d-flex align-items-center justify-content-center"
-                  style={{ width: '56px', height: '56px', fontSize: '1.6rem' }}
-                >
-                  <i className="bi bi-cpu"></i>
-                </div>
-                <h5 className="fw-bold text-dark mb-2">{t('home.ai_title')}</h5>
-                <p className="text-secondary small mb-0">
-                  {t('home.ai_desc')}
-                </p>
-              </Card>
-            </Col>
+            <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 text-center shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 mx-auto mb-4">
+                <Cpu className="h-7 w-7" />
+              </div>
+              <h3 className="font-bold text-slate-900 dark:text-white text-base mb-1.5">{t('home.ai_title')}</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{t('home.ai_desc')}</p>
+            </div>
 
-            <Col md={6} lg={3}>
-              <Card className="h-100 card-clean border-0 p-4 text-center">
-                <div
-                  className="rounded-circle bg-success-subtle text-success mx-auto mb-3 d-flex align-items-center justify-content-center"
-                  style={{ width: '56px', height: '56px', fontSize: '1.6rem' }}
-                >
-                  <i className="bi bi-cloud-check"></i>
-                </div>
-                <h5 className="fw-bold text-dark mb-2">{t('home.cdn_title')}</h5>
-                <p className="text-secondary small mb-0">
-                  {t('home.cdn_desc')}
-                </p>
-              </Card>
-            </Col>
-          </Row>
+            <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 text-center shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 mx-auto mb-4">
+                <Cloud className="h-7 w-7" />
+              </div>
+              <h3 className="font-bold text-slate-900 dark:text-white text-base mb-1.5">{t('home.cdn_title')}</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{t('home.cdn_desc')}</p>
+            </div>
+          </div>
         </section>
 
         {/* =====================================================================
          * 4. SECTION: CÂU HỎI THƯỜNG GẶP (FAQ VỀ SECURELEARN)
          * ===================================================================== */}
-        <section className="mb-5 pb-4">
-          <div className="text-center mb-4">
-            <span className="text-secondary small fw-medium d-block mb-1">
+        <section className="mb-16 pb-4">
+          <div className="text-center mb-8">
+            <span className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider block mb-1">
               {t('home.faq_badge')}
             </span>
-            <h2 className="fw-bold text-dark mb-0">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
               {t('home.faq_title')}
             </h2>
           </div>
 
-          <div
-            className="card-clean bg-white rounded-4 shadow-sm border px-3 py-3 px-md-4 py-md-4 mx-auto"
-            style={{ maxWidth: '700px' }}
-          >
-            <div>
-              {visibleFaqs.map((faq, index) => {
-                const isOpen = openFaqIndex === index;
-                return (
-                  <div key={index} className="faq-item">
-                    <button
-                      type="button"
-                      className="faq-question-btn"
-                      onClick={() => setOpenFaqIndex(isOpen ? null : index)}
-                      aria-expanded={isOpen}
-                    >
-                      <span>{faq.question}</span>
-                      <i
-                        className={`bi bi-chevron-down faq-chevron ${isOpen ? 'open' : ''
-                          }`}
-                      ></i>
-                    </button>
-                    {isOpen && (
-                      <div className="faq-answer">
-                        {faq.answer}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+          <div className="mx-auto max-w-2xl rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 sm:p-8 shadow-xl space-y-3">
+            {visibleFaqs.map((faq, index) => {
+              const isOpen = openFaqIndex === index;
+              return (
+                <div
+                  key={index}
+                  className="rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setOpenFaqIndex(isOpen ? null : index)}
+                    className="w-full flex items-center justify-between p-4 text-left font-bold text-xs sm:text-sm text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                  >
+                    <span>{faq.question}</span>
+                    {isOpen ? <ChevronUp className="h-4 w-4 text-slate-400 flex-shrink-0" /> : <ChevronDown className="h-4 w-4 text-slate-400 flex-shrink-0" />}
+                  </button>
+                  {isOpen && (
+                    <div className="px-4 pb-4 pt-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed border-t border-slate-50 dark:border-slate-800/50">
+                      {faq.answer}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
 
-            <div className="text-center mt-4 pt-2">
+            <div className="text-center pt-3">
               <button
                 type="button"
-                className="btn-secondary-pill border d-inline-flex align-items-center gap-2 small px-4 py-2"
                 onClick={() => setShowAllFaq(!showAllFaq)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100"
               >
                 <span>{showAllFaq ? t('home.show_less_faq') : t('home.show_more_faq')}</span>
-                <i className={`bi bi-chevron-${showAllFaq ? 'up' : 'down'}`}></i>
+                {showAllFaq ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
               </button>
             </div>
           </div>
         </section>
 
         {/* =====================================================================
-         * 5. BANNER KÊU GỌI HÀNH ĐỘNG (CTA) - TỰ ĐỘNG THAY ĐỔI KHI ĐÃ ĐĂNG NHẬP
+         * 5. BANNER KÊU GỌI HÀNH ĐỘNG (CTA)
          * ===================================================================== */}
         {!isAuthenticated ? (
-          <div className="p-5 rounded-4 text-center card-clean bg-white shadow-sm border">
-            <h3 className="fw-bold text-dark mb-2">{t('home.cta_guest_title')}</h3>
-            <p className="text-secondary mx-auto mb-4" style={{ maxWidth: '600px' }}>
+          <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md p-8 sm:p-12 text-center shadow-xl">
+            <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white mb-2">
+              {t('home.cta_guest_title')}
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-lg mx-auto mb-6">
               {t('home.cta_guest_desc')}
             </p>
-            <div className="d-flex justify-content-center gap-3">
-              <Link to={`/${lang}/register`} className="btn-primary-pill text-decoration-none px-4">
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <Link
+                to={`/${lang}/register`}
+                className="rounded-full bg-blue-600 hover:bg-blue-700 px-6 py-2.5 text-xs font-semibold text-white shadow-md shadow-blue-500/20 no-underline"
+              >
                 {t('common.register')}
               </Link>
-              <Link to={`/${lang}/catalog`} className="btn-secondary-pill text-decoration-none px-4">
+              <Link
+                to={`/${lang}/catalog`}
+                className="rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-6 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-xs hover:bg-slate-50 no-underline"
+              >
                 {t('common.explore_courses')}
               </Link>
             </div>
           </div>
         ) : (
-          <div className="p-5 rounded-4 text-center card-clean bg-white shadow-sm border">
-            <div className="badge-pill-cyan mb-2">
+          <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md p-8 sm:p-12 text-center shadow-xl">
+            <div className="inline-flex items-center gap-1 rounded-full bg-blue-50 dark:bg-blue-950 px-3 py-1 text-xs font-bold text-blue-700 dark:text-blue-300 mb-3 border border-blue-200">
               {t('home.cta_user_badge')} {user?.name} ({user?.role})
             </div>
-            <h3 className="fw-bold text-dark mb-2">{t('home.cta_user_title')}</h3>
-            <p className="text-secondary mx-auto mb-4" style={{ maxWidth: '600px' }}>
+            <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white mb-2">
+              {t('home.cta_user_title')}
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-lg mx-auto mb-6">
               {t('home.cta_user_desc')}
             </p>
-            <div className="d-flex justify-content-center gap-3">
+            <div className="flex flex-wrap items-center justify-center gap-3">
               {user?.role === 'Student' && (
-                <Link to={`/${lang}/student/courses`} className="btn-primary-pill text-decoration-none px-4 d-inline-flex align-items-center gap-2">
-                  <i className="bi bi-mortarboard-fill"></i>
+                <Link
+                  to={`/${lang}/student/courses`}
+                  className="inline-flex items-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 px-6 py-2.5 text-xs font-semibold text-white shadow-md shadow-blue-500/20 no-underline"
+                >
+                  <GraduationCap className="h-4 w-4" />
                   <span>{t('common.my_courses')}</span>
                 </Link>
               )}
               {user?.role === 'Instructor' && (
-                <Link to={`/${lang}/instructor/videos`} className="btn-primary-pill text-decoration-none px-4 d-inline-flex align-items-center gap-2">
-                  <i className="bi bi-film"></i>
+                <Link
+                  to={`/${lang}/instructor/videos`}
+                  className="inline-flex items-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 px-6 py-2.5 text-xs font-semibold text-white shadow-md shadow-blue-500/20 no-underline"
+                >
+                  <Film className="h-4 w-4" />
                   <span>{t('common.video_management')}</span>
                 </Link>
               )}
               {user?.role === 'Administrator' && (
-                <Link to={`/${lang}/admin/alerts`} className="btn-primary-pill text-decoration-none px-4 d-inline-flex align-items-center gap-2">
+                <Link
+                  to={`/${lang}/admin/alerts`}
+                  className="inline-flex items-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 px-6 py-2.5 text-xs font-semibold text-white shadow-md shadow-blue-500/20 no-underline"
+                >
                   <span>{t('common.ai_dashboard')}</span>
                 </Link>
               )}
-              <Link to={`/${lang}/catalog`} className="btn-secondary-pill text-decoration-none px-4">
+              <Link
+                to={`/${lang}/catalog`}
+                className="rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-6 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-xs hover:bg-slate-50 no-underline"
+              >
                 {t('common.explore_more')}
               </Link>
             </div>
           </div>
         )}
-      </Container>
+      </div>
 
       {/* MODAL THÔNG BÁO CHƯA ĐƯỢC CẤP QUYỀN XEM */}
-      <Modal
-        show={Boolean(blockedModalCourse)}
-        onHide={() => setBlockedModalCourse(null)}
-        centered
-        backdrop="static"
-      >
-        <Modal.Header closeButton className="border-bottom-0 pb-0">
-          <Modal.Title className="fs-5 fw-bold text-dark d-flex align-items-center gap-2">
-            <i className="bi bi-shield-lock-fill text-warning fs-4"></i>
-            <span>Chưa Được Cấp Quyền Xem</span>
-          </Modal.Title>
-        </Modal.Header>
+      {Boolean(blockedModalCourse) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md overflow-hidden rounded-3xl bg-white dark:bg-slate-900 p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2 text-amber-500">
+                <Lock className="h-5 w-5" />
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  Chưa Được Cấp Quyền Xem
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBlockedModalCourse(null)}
+                className="rounded-full p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
 
-        <Modal.Body className="pt-3">
-          <div className="alert alert-warning border-0 bg-warning bg-opacity-10 text-dark p-3 rounded-3 mb-3">
-            <div className="fw-bold mb-1">{blockedModalCourse?.Title}</div>
-            <small className="text-muted font-monospace">Mã khóa học: {blockedModalCourse?.ID}</small>
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-2xl text-xs">
+              <div className="font-bold text-amber-800 dark:text-amber-200">{blockedModalCourse?.Title}</div>
+              <small className="text-amber-700/70 font-mono">Mã khóa học: {blockedModalCourse?.ID}</small>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              Khóa học này hiện tại <strong>chưa được cấp quyền xem</strong> cho tài khoản của bạn.
+            </p>
+
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300 flex items-start gap-2">
+              <Info className="h-4 w-4 text-blue-500 flex-shrink-0 mt-0.5" />
+              <span>
+                <strong>Quy định bảo mật SecureLearn:</strong> Khóa học trong danh mục chưa được cấp quyền thì chưa thể xem video. Chỉ các khóa học đã được ghi danh trong <strong>"Khóa học của tôi"</strong> mới có thể phát nội dung.
+              </span>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setBlockedModalCourse(null)}
+                className="rounded-full border border-slate-200 dark:border-slate-700 px-4 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50"
+              >
+                Đóng
+              </button>
+              {isAuthenticated && user?.role === 'Student' ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBlockedModalCourse(null);
+                    navigate(`/${lang}/student/courses`);
+                  }}
+                  className="rounded-full bg-blue-600 hover:bg-blue-700 px-5 py-1.5 text-xs font-semibold text-white shadow-xs"
+                >
+                  Vào Khóa Học Của Tôi
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBlockedModalCourse(null);
+                    navigate(`/${lang}/login`);
+                  }}
+                  className="rounded-full bg-blue-600 hover:bg-blue-700 px-5 py-1.5 text-xs font-semibold text-white shadow-xs"
+                >
+                  Đăng Nhập
+                </button>
+              )}
+            </div>
           </div>
-
-          <p className="text-secondary small mb-3 leading-relaxed">
-            Khóa học này hiện tại <strong>chưa được cấp quyền xem</strong> cho tài khoản của bạn.
-          </p>
-
-          <div className="p-3 bg-light rounded-3 border small mb-2">
-            <i className="bi bi-info-circle-fill text-primary me-2"></i>
-            <strong>Quy định bảo mật SecureLearn:</strong> Khóa học trong danh mục khóa học chưa được cấp quyền xem thì chưa thể xem được. Chỉ các khóa học đã được ghi danh trong <strong>"Khóa học của tôi"</strong> mới có thể xem video bài giảng.
-          </div>
-        </Modal.Body>
-
-        <Modal.Footer className="border-top-0 pt-0">
-          <Button
-            variant="light"
-            onClick={() => setBlockedModalCourse(null)}
-            className="rounded-pill px-3"
-          >
-            Đóng
-          </Button>
-
-          {isAuthenticated && user?.role === 'Student' ? (
-            <Button
-              variant="primary"
-              onClick={() => {
-                setBlockedModalCourse(null);
-                navigate('/student/courses');
-              }}
-              className="btn-primary-pill d-flex align-items-center gap-2 px-3"
-            >
-              <i className="bi bi-mortarboard-fill"></i>
-              <span>Vào Khóa Học Của Tôi</span>
-            </Button>
-          ) : (
-            <Button
-              variant="primary"
-              onClick={() => {
-                setBlockedModalCourse(null);
-                navigate('/login');
-              }}
-              className="btn-primary-pill px-3"
-            >
-              Đăng Nhập
-            </Button>
-          )}
-        </Modal.Footer>
-      </Modal>
+        </div>
+      )}
     </div>
   );
 }

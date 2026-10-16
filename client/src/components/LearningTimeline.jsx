@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
-import { Container, Row, Col } from 'react-bootstrap';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import MeshGradientBackground from './MeshGradientBackground';
 import step1Img from '../assets/timeline/timeline_step1_1791094283433.jpg';
 import step2Img from '../assets/timeline/timeline_step2_1791094295409.jpg';
 import step3Img from '../assets/timeline/timeline_step3_1791094304858.jpg';
 import step4Img from '../assets/timeline/timeline_step4_1791094316191.jpg';
 import step5Img from '../assets/timeline/timeline_step5_1791094326365.jpg';
 
+/**
+ * =============================================================================
+ * COMPONENT: LearningTimeline (Lộ Trình Học Tập - Pure Tailwind CSS)
+ * =============================================================================
+ */
 export default function LearningTimeline() {
   const { t } = useTranslation();
   const [activeStep, setActiveStep] = useState(1);
@@ -18,99 +21,113 @@ export default function LearningTimeline() {
       id: 1,
       title: t('home.timeline.step1_title', 'Khám phá khóa học'),
       desc: t('home.timeline.step1_desc', 'Tìm kiếm và lựa chọn lộ trình học tập phù hợp từ danh sách các khóa học chất lượng cao trên nền tảng.'),
-      image: step1Img
+      image: step1Img,
     },
     {
       id: 2,
       title: t('home.timeline.step2_title', 'Không gian học tập'),
       desc: t('home.timeline.step2_desc', 'Trải nghiệm môi trường học tập tĩnh lặng, tập trung, với giao diện quản lý tiến trình cá nhân thân thiện.'),
-      image: step2Img
+      image: step2Img,
     },
     {
       id: 3,
       title: t('home.timeline.step3_title', 'Bài giảng trực quan'),
       desc: t('home.timeline.step3_desc', 'Tiếp thu kiến thức hiệu quả thông qua video giảng dạy sắc nét, cấu trúc bài học rõ ràng và tài liệu phong phú.'),
-      image: step3Img
+      image: step3Img,
     },
     {
       id: 4,
       title: t('home.timeline.step4_title', 'Luyện tập & Đánh giá'),
       desc: t('home.timeline.step4_desc', 'Áp dụng ngay lý thuyết vào thực hành thông qua các bài tập và củng cố kỹ năng sau mỗi chương học.'),
-      image: step4Img
+      image: step4Img,
     },
     {
       id: 5,
       title: t('home.timeline.step5_title', 'Chứng nhận hoàn thành'),
       desc: t('home.timeline.step5_desc', 'Tổng kết quá trình nỗ lực, nhận chứng chỉ hoàn thành để nâng cấp hồ sơ năng lực và mở rộng cơ hội.'),
       image: step5Img,
-      isFinal: true
-    }
+      isFinal: true,
+    },
   ];
 
   return (
-    <section className="bg-white position-relative py-5 my-5">
-      <Container className="mb-5 text-center">
-        <div className="badge-pill-soft mb-3 mx-auto">
+    <section className="relative py-12 my-12 bg-white/70 dark:bg-slate-900/60 backdrop-blur-md rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mb-12 text-center">
+        <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-blue-50/90 dark:bg-blue-950/60 border border-blue-200/60 dark:border-blue-800/60 text-blue-700 dark:text-blue-300 text-xs sm:text-sm font-semibold mb-3 shadow-xs">
           <span>{t('home.timeline.badge', 'Hành trình chinh phục tri thức')}</span>
         </div>
-        <h2 className="display-5 fw-bold text-dark mb-2" style={{ letterSpacing: '-0.02em' }}>
-          {t('home.timeline.main_title_part1', 'Từ bước khởi đầu đến khi ')}<span className="text-primary">{t('home.timeline.main_title_part2', 'làm chủ')}</span>
+        <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-3">
+          {t('home.timeline.main_title_part1', 'Từ bước khởi đầu đến khi ')}
+          <span className="text-blue-600 dark:text-blue-400">{t('home.timeline.main_title_part2', 'làm chủ')}</span>
         </h2>
-        <p className="text-secondary mx-auto mb-0" style={{ maxWidth: '600px', fontSize: '1.1rem' }}>
+        <p className="mx-auto max-w-2xl text-slate-600 dark:text-slate-300 text-base sm:text-lg leading-relaxed">
           {t('home.timeline.main_desc', 'Trải nghiệm lộ trình học tập tiêu chuẩn: từ chọn môn, vào không gian học tập, xem bài giảng, thực hành cho đến khi nhận chứng nhận.')}
         </p>
-      </Container>
+      </div>
 
-      <Container className="position-relative">
-        <Row className="g-5">
-          {/* Cột trái: Timeline dọc có thể click */}
-          <Col lg={5} className="position-relative">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 relative">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+          {/* Cột trái: Timeline dọc */}
+          <div className="lg:col-span-5 relative">
             {/* Đường kẻ dọc mờ kết nối các bước */}
-            <div 
-              className="position-absolute bg-light border-start border-2 border-dashed" 
-              style={{ width: '2px', left: '39px', top: '20px', bottom: '40px', zIndex: 0 }}
-            ></div>
+            <div
+              className="absolute border-l-2 border-dashed border-slate-200 dark:border-slate-800"
+              style={{ width: '2px', left: '26px', top: '24px', bottom: '40px', zIndex: 0 }}
+            />
 
-            <div className="d-flex flex-column gap-3 position-relative" style={{ zIndex: 1 }}>
+            <div className="relative z-10 flex flex-col gap-3.5">
               {STICKY_STEPS.map((step) => {
                 const isActive = activeStep === step.id;
                 const isFinal = step.isFinal;
-                const colorClass = isFinal ? 'success' : 'primary';
-                
+
                 return (
                   <div
                     key={step.id}
-                    className={`d-flex align-items-start gap-3 p-3 rounded-4 cursor-pointer transition-all ${
-                      isActive 
-                        ? `bg-${colorClass} bg-opacity-10 border border-${colorClass} border-opacity-50 shadow-sm` 
-                        : 'border border-transparent hover-bg-light'
+                    className={`flex items-start gap-3.5 p-4 rounded-2xl cursor-pointer transition-all duration-200 ${
+                      isActive
+                        ? isFinal
+                          ? 'bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700 shadow-sm'
+                          : 'bg-blue-50 dark:bg-blue-950/40 border border-blue-300 dark:border-blue-700 shadow-sm'
+                        : 'border border-transparent hover:bg-slate-50 dark:hover:bg-slate-800/50'
                     }`}
                     onMouseEnter={() => setActiveStep(step.id)}
                     onClick={() => setActiveStep(step.id)}
-                    style={{ cursor: 'pointer', transition: 'all 0.2s ease-in-out' }}
                   >
                     {/* Vòng tròn số */}
-                    <div 
-                      className={`d-flex align-items-center justify-content-center flex-shrink-0 fw-bold rounded-circle transition-all ${
-                        isActive 
-                          ? `bg-${colorClass} text-white shadow-sm` 
-                          : 'bg-light text-secondary border'
+                    <div
+                      className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold transition-all ${
+                        isActive
+                          ? isFinal
+                            ? 'bg-emerald-600 text-white shadow-sm'
+                            : 'bg-blue-600 text-white shadow-sm'
+                          : 'border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                       }`}
-                      style={{ width: '28px', height: '28px', fontSize: '0.85rem', marginTop: '2px' }}
                     >
                       {step.id}
                     </div>
 
                     {/* Văn bản */}
                     <div>
-                      <h6 className={`fw-bold mb-1 transition-all ${
-                        isActive ? `text-${colorClass}` : 'text-dark'
-                      }`}>
+                      <h4
+                        className={`text-sm sm:text-base font-bold mb-1 transition-all ${
+                          isActive
+                            ? isFinal
+                              ? 'text-emerald-700 dark:text-emerald-300'
+                              : 'text-blue-700 dark:text-blue-300'
+                            : 'text-slate-800 dark:text-slate-100'
+                        }`}
+                      >
                         {step.title}
-                      </h6>
-                      <p className={`small mb-0 transition-all ${
-                        isActive ? `text-${colorClass} text-opacity-75` : 'text-secondary'
-                      }`} style={{ lineHeight: '1.6' }}>
+                      </h4>
+                      <p
+                        className={`text-xs sm:text-sm leading-relaxed transition-all ${
+                          isActive
+                            ? isFinal
+                              ? 'text-emerald-800/80 dark:text-emerald-200/80'
+                              : 'text-blue-800/80 dark:text-blue-200/80'
+                            : 'text-slate-600 dark:text-slate-400'
+                        }`}
+                      >
                         {step.desc}
                       </p>
                     </div>
@@ -118,57 +135,46 @@ export default function LearningTimeline() {
                 );
               })}
             </div>
-          </Col>
+          </div>
 
           {/* Cột phải: Hình ảnh/Widget thay đổi tương ứng */}
-          <Col lg={7} className="d-none d-lg-block position-relative">
-            <div className="position-sticky d-flex align-items-center justify-content-center" style={{ top: '15vh', height: '70vh' }}>
-              <div 
-                className="w-100 h-100 rounded-5 d-flex align-items-center justify-content-center position-relative overflow-hidden shadow-sm border"
-                style={{ backgroundColor: '#fafcff' }}
-              >
-                {/* Background trang trí động */}
-                <MeshGradientBackground className="position-absolute w-100 h-100" style={{ opacity: 0.5 }} />
+          <div className="hidden lg:block lg:col-span-7 relative">
+            <div className="sticky top-28 flex items-center justify-center" style={{ height: '65vh' }}>
+              <div className="w-full h-full rounded-3xl flex items-center justify-center relative overflow-hidden shadow-md border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
+                {/* Background trang trí động nhẹ nhàng */}
+                <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/10 via-indigo-500/5 to-cyan-500/10 rounded-3xl pointer-events-none" />
 
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={activeStep}
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
+                    initial={{ opacity: 0, scale: 0.96 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.96 }}
                     transition={{ duration: 0.3, ease: 'easeOut' }}
-                    className="d-flex flex-column align-items-center text-center position-relative z-1 w-100 px-5"
+                    className="flex flex-col items-center text-center relative z-10 w-full px-8"
                   >
-                    {/* Hình ảnh minh họa 3D */}
-                    <div 
-                      className="rounded-circle d-flex align-items-center justify-content-center mb-4 position-relative overflow-hidden"
-                      style={{ 
-                        width: '320px', height: '320px',
-                        boxShadow: '0 30px 60px rgba(0,0,0,0.1), inset 0 0 0 8px rgba(255,255,255,0.8)'
-                      }}
+                    {/* Hình ảnh minh họa */}
+                    <div
+                      className="rounded-full flex items-center justify-center mb-6 relative overflow-hidden shadow-2xl border-4 border-white dark:border-slate-800"
+                      style={{ width: '280px', height: '280px' }}
                     >
-                      <img 
-                        src={STICKY_STEPS.find(s => s.id === activeStep)?.image} 
-                        alt={STICKY_STEPS.find(s => s.id === activeStep)?.title || "Illustration"}
-                        className="w-100 h-100 object-fit-cover"
-                        style={{ transform: 'scale(1.05)' }}
+                      <img
+                        src={STICKY_STEPS.find((s) => s.id === activeStep)?.image}
+                        alt={STICKY_STEPS.find((s) => s.id === activeStep)?.title || 'Illustration'}
+                        className="w-full h-full object-cover transform scale-105"
                       />
                     </div>
-                    
-                    {/* Floating Text mô phỏng ảnh yêu cầu */}
-                    <p 
-                      className="text-secondary fw-medium mx-auto mt-2" 
-                      style={{ fontSize: '1.25rem', maxWidth: '80%', lineHeight: '1.6' }}
-                    >
-                      {STICKY_STEPS.find(s => s.id === activeStep)?.desc}
+
+                    <p className="text-slate-700 dark:text-slate-200 font-medium text-base sm:text-lg max-w-lg leading-relaxed">
+                      {STICKY_STEPS.find((s) => s.id === activeStep)?.desc}
                     </p>
                   </motion.div>
                 </AnimatePresence>
               </div>
             </div>
-          </Col>
-        </Row>
-      </Container>
+          </div>
+        </div>
+      </div>
     </section>
   );
 }

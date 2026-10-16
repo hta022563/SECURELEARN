@@ -17,7 +17,7 @@ export const ThemeContext = createContext({
 
 export function ThemeProvider({ children }) {
   const [theme, setThemeState] = useState(() => {
-    const savedTheme = localStorage.getItem('securelearn_theme');
+    const savedTheme = localStorage.getItem('securelearn_theme') || localStorage.getItem('securelearn-theme');
     if (savedTheme === 'light' || savedTheme === 'dark') {
       return savedTheme;
     }
@@ -29,9 +29,15 @@ export function ThemeProvider({ children }) {
   });
 
   useEffect(() => {
-    // Cập nhật thuộc tính của thẻ <html> cho Bootstrap 5.3
+    // Cập nhật cả data-bs-theme và class 'dark' cho thẻ <html>
     document.documentElement.setAttribute('data-bs-theme', theme);
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
     localStorage.setItem('securelearn_theme', theme);
+    localStorage.setItem('securelearn-theme', theme);
   }, [theme]);
 
   const toggleTheme = () => {

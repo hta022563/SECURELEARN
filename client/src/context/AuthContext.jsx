@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { logout as apiLogout } from '../services/authService';
 
 /**
  * Key định danh lưu thông tin phiên đăng nhập trong SessionStorage
@@ -49,14 +50,19 @@ export function AuthProvider({ children }) {
   };
 
   /**
-   * Hàm Đăng xuất: Xóa state và làm sạch sessionStorage
+   * Hàm Đăng xuất: Gọi API GlobalSignOut tới backend, xóa state và làm sạch sessionStorage
    */
-  const logout = () => {
+  const logout = async () => {
     try {
+      const currentToken = user?.token;
+      if (currentToken) {
+        await apiLogout(currentToken);
+      }
+    } catch (err) {
+      console.warn('Lỗi khi gọi API đăng xuất toàn cầu Cognito:', err);
+    } finally {
       setUser(null);
       sessionStorage.removeItem(STORAGE_KEY);
-    } catch (err) {
-      console.error('Lỗi khi xóa Auth SessionStorage:', err);
     }
   };
 

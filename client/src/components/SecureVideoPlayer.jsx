@@ -1,25 +1,13 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import {
-  Container,
-  Row,
-  Col,
-  Card,
-  Spinner,
-  Alert,
-  Button,
-} from 'react-bootstrap';
+import { ShieldAlert, RefreshCw, RotateCcw, Loader2 } from 'lucide-react';
 import { useSecurePlayer } from '../hooks/useSecurePlayer';
 import { useSecureHls } from '../hooks/useSecureHls';
 
 /**
- * Component: SecureVideoPlayer
- * Trình phát video bảo vệ bản quyền nâng cao (Client-Side DRM & Anti-Piracy):
- * - Focus-based Blackout (Tự động phủ đen & pause khi mất tiêu điểm / rời tab / mở Snipping Tool)
- * - Anti-PrintScreen (Ghi đè Clipboard và phủ đen màn hình 3 giây khi chụp màn hình)
- * - Anti-Debugging (Chặn F12, DevTools, Inspect Element, View Source, Copy, Chuột phải)
- * - Chặn Picture-in-Picture & Tải xuống (disablePictureInPicture, nodownload)
- * - Tương thích luồng HLS mã hóa AES-128 & ECDH hoặc Video URL trực tiếp
+ * =============================================================================
+ * COMPONENT: SecureVideoPlayer (Pure Tailwind CSS Player)
+ * =============================================================================
  */
 export default function SecureVideoPlayer({
   videoUrl,
@@ -34,22 +22,19 @@ export default function SecureVideoPlayer({
   // Hook bảo vệ Client-side: Focus Blackout, Anti-PrintScreen, Anti-Debugging
   const { isScreenHidden, hideReason } = useSecurePlayer(videoRef);
 
-  // Kiểm tra xem videoUrl có phải là URL phát trực tiếp hoàn chỉnh không (http://, https://, blob:)
   const isDirectUrl = Boolean(
     typeof videoUrl === 'string' &&
-    (videoUrl.startsWith('http://') || videoUrl.startsWith('https://') || videoUrl.startsWith('blob:'))
+      (videoUrl.startsWith('http://') || videoUrl.startsWith('https://') || videoUrl.startsWith('blob:'))
   );
 
-  // Tự động load lại video khi videoUrl thay đổi và là URL trực tiếp
-  React.useEffect(() => {
+  useEffect(() => {
     if (videoRef.current && isDirectUrl) {
       videoRef.current.load();
     }
   }, [videoUrl, isDirectUrl]);
 
-  // Hook xử lý Signed URL HLS / PlaybackController (chỉ chạy khi có videoId và không truyền trực tiếp URL web)
   const activeVideoId = isDirectUrl ? null : (videoId || videoUrl);
-  const { isLoading, error, isReady, securityStatus, reload } = useSecureHls(
+  const { isLoading, error, securityStatus, reload } = useSecureHls(
     activeVideoId,
     studentId,
     videoRef,
@@ -57,17 +42,17 @@ export default function SecureVideoPlayer({
   );
 
   const playerCard = (
-    <Card className="card-clean shadow-sm border rounded-4 overflow-hidden bg-white">
-      {/* Card Header: Tiêu đề bài giảng */}
-      <Card.Header className="bg-white border-bottom py-3 px-4">
-        <h5 className="mb-0 fw-bold text-dark text-truncate">
+    <div className="relative w-full overflow-hidden rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl isolate">
+      {/* Header: Tiêu đề bài giảng */}
+      <div className="border-b border-slate-100 dark:border-slate-800 px-5 sm:px-6 py-4">
+        <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white truncate">
           {title}
-        </h5>
-      </Card.Header>
+        </h3>
+      </div>
 
-      {/* Khung chứa Video & Overlays (Responsive 16:9 Aspect Ratio) */}
+      {/* Khung chứa Video & Overlays (16:9 Aspect Ratio) */}
       <div
-        className="position-relative w-100 bg-black overflow-hidden"
+        className="relative w-full bg-black overflow-hidden"
         style={{
           aspectRatio: '16 / 9',
           maxHeight: '75vh',
@@ -75,107 +60,90 @@ export default function SecureVideoPlayer({
         }}
         onContextMenu={(e) => e.preventDefault()}
       >
-        {/* Thẻ Video HTML5 với đầy đủ các thuộc tính bảo mật theo yêu cầu */}
+        {/* Thẻ Video HTML5 */}
         <video
           ref={videoRef}
           src={isDirectUrl ? videoUrl : undefined}
-          className="w-100 h-100 d-block"
+          className="w-full h-full block object-contain"
           controls
-          controlsList="nodownload" // Chặn nút tải xuống trên trình duyệt Chromium
-          disablePictureInPicture // Chặn Picture-in-Picture để tránh lách thu nhỏ cửa sổ
-          onContextMenu={(e) => e.preventDefault()} // Chặn menu chuột phải trên video
+          controlsList="nodownload"
+          disablePictureInPicture
+          onContextMenu={(e) => e.preventDefault()}
           playsInline
-          style={{ objectFit: 'contain' }}
         />
 
-        {/* =========================================================================
-            GIAO DIỆN BÔI ĐEN (BLACKOUT OVERLAY): Render khi isScreenHidden === true
-            z-index cực cao (9999), nền đen tuyền, che phủ hoàn toàn video
-            ========================================================================= */}
+        {/* GIAO DIỆN BÔI ĐEN (BLACKOUT OVERLAY) */}
         {isScreenHidden && (
           <div
-            className="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column justify-content-center align-items-center text-center p-4 user-select-none"
-            style={{
-              backgroundColor: '#000000',
-              zIndex: 9999, // z-index cực cao đè kín hoàn toàn video
-            }}
+            className="absolute inset-0 z-30 flex flex-col justify-center items-center text-center p-6 select-none bg-black"
           >
-            <div style={{ maxWidth: '480px' }}>
-              <h4 className="text-white fw-bold mb-2 text-uppercase tracking-wider">
+            <div className="max-w-md">
+              <h4 className="text-white font-extrabold text-base sm:text-lg mb-2 uppercase tracking-wider">
                 Nội dung đã được bảo vệ bản quyền
               </h4>
-              <p className="text-secondary small mb-3">
+              <p className="text-slate-400 text-xs sm:text-sm mb-4 leading-relaxed">
                 {hideReason === 'print_screen'
                   ? 'Phát hiện thao tác chụp màn hình (PrintScreen). Hình ảnh đã bị vô hiệu hóa trong Clipboard và màn hình tạm thời bị ẩn trong 3 giây.'
                   : 'Phát hiện mất tiêu điểm cửa sổ hoặc thao tác ghi màn hình. Video đã tạm dừng và phủ đen để bảo vệ nội dung bài giảng.'}
               </p>
-              <div className="p-2 border border-secondary border-opacity-25 rounded-3 bg-dark bg-opacity-50">
-                <small className="text-light text-opacity-75">
+              <div className="p-3 rounded-2xl border border-slate-800 bg-slate-900/60">
+                <span className="text-xs text-slate-300">
                   Vui lòng quay lại cửa sổ bài học và bấm phát tiếp tục để theo dõi.
-                </small>
+                </span>
               </div>
             </div>
           </div>
         )}
 
-        {/* 1. Loading State Overlay (khi tải HLS) */}
+        {/* Loading State Overlay */}
         {!videoUrl && isLoading && !error && (
-          <div
-            className="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column justify-content-center align-items-center bg-black bg-opacity-75"
-            style={{ zIndex: 30 }}
-          >
-            <Spinner
-              animation="border"
-              variant="primary"
-              role="status"
-              style={{ width: '3.5rem', height: '3.5rem' }}
-            >
-              <span className="visually-hidden">Loading...</span>
-            </Spinner>
-            <p className="mt-3 text-light text-center px-3 small">
+          <div className="absolute inset-0 z-10 flex flex-col justify-center items-center bg-black/80 backdrop-blur-xs p-4">
+            <Loader2 className="h-12 w-12 animate-spin text-blue-500 mb-3" />
+            <p className="text-white text-xs sm:text-sm text-center font-medium max-w-sm">
               {securityStatus}
             </p>
           </div>
         )}
 
-        {/* 2. Error State Overlay (khi tải HLS gặp sự cố) */}
+        {/* Error State Overlay */}
         {!videoUrl && error && (
-          <div
-            className="position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center p-3 bg-black bg-opacity-90"
-            style={{ zIndex: 40 }}
-          >
-            <Alert
-              variant="danger"
-              className="w-100 text-center shadow-lg border-danger mb-0"
-              style={{ maxWidth: '520px' }}
-            >
-              <Alert.Heading className="fs-5 fw-bold mb-2">
-                <i className="bi bi-shield-x me-2"></i>Không Thể Phát Video Bảo Mật
-              </Alert.Heading>
-              <p className="small mb-3">{error}</p>
-              <hr className="my-2 border-danger opacity-25" />
-              <div className="d-flex justify-content-center gap-2">
-                <Button variant="outline-danger" size="sm" onClick={reload}>
-                  Thử Lại (Retry)
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => window.location.reload()}
-                >
-                  Tải Lại Trang
-                </Button>
+          <div className="absolute inset-0 z-20 flex justify-center items-center p-4 bg-black/90 backdrop-blur-xs">
+            <div className="w-full max-w-md rounded-2xl border border-rose-500/50 bg-slate-950/95 p-6 text-center text-white shadow-2xl">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-950/80 text-rose-400 mx-auto mb-3">
+                <ShieldAlert className="h-6 w-6" />
               </div>
-            </Alert>
+              <h4 className="text-base font-bold text-rose-400 mb-1.5">
+                Không Thể Phát Video Bảo Mật
+              </h4>
+              <p className="text-xs text-slate-300 mb-4">{error}</p>
+              <div className="flex justify-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={reload}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-rose-500 bg-transparent px-4 py-1.5 text-xs font-semibold text-rose-300 hover:bg-rose-950/50 transition-colors"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Thử Lại
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-slate-800 px-4 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-700 transition-colors"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Tải Lại Trang
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* 3. Dynamic Watermark Overlay */}
+        {/* Dynamic Watermark Overlay */}
         {(!isLoading || videoUrl) && !error && (
           <DynamicWatermark studentId={studentId} />
         )}
       </div>
-    </Card>
+    </div>
   );
 
   if (embedded) {
@@ -183,47 +151,36 @@ export default function SecureVideoPlayer({
   }
 
   return (
-    <Container fluid="md" className="py-4 securelearn-player-container">
-      <Row className="justify-content-center">
-        <Col xs={12} lg={10} xl={9}>
-          {playerCard}
-        </Col>
-      </Row>
-    </Container>
+    <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-6">
+      {playerCard}
+    </div>
   );
 }
 
 SecureVideoPlayer.propTypes = {
   videoUrl: PropTypes.string,
   videoId: PropTypes.string,
+  courseId: PropTypes.string,
   studentId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   title: PropTypes.string,
   embedded: PropTypes.bool,
 };
 
-/**
- * Component: DynamicWatermark (Lớp phủ chống quay lén)
- * - Cố định góc trên bên phải
- * - Làm mờ (opacity thấp)
- */
 function DynamicWatermark({ studentId }) {
   return (
     <div
-      className="position-absolute user-select-none"
+      className="absolute top-3 right-4 select-none pointer-events-none z-10 text-right text-xs font-semibold"
       style={{
-        top: '12px',
-        right: '14px',
         color: 'rgba(255, 255, 255, 0.45)',
-        fontSize: '13px',
-        fontWeight: '600',
         textShadow: '1px 1px 3px rgba(0,0,0,0.9)',
-        zIndex: 50,
-        pointerEvents: 'none',
         lineHeight: 1.5,
-        textAlign: 'right',
       }}
     >
       User: {studentId} <br /> SecureLearn
     </div>
   );
 }
+
+DynamicWatermark.propTypes = {
+  studentId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+};

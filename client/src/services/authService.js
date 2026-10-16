@@ -75,24 +75,30 @@ export async function login({ email, password }) {
 // ─── logout ───────────────────────────────────────────────────────────────────
 
 /**
- * Globally invalidates the current user's Cognito tokens.
- * The frontend clears local storage regardless of whether this succeeds.
- * @returns {Promise<void>}
+ * Globally invalidates the current user's Cognito tokens (GlobalSignOut).
+ * Endpoint: POST /api/v1/auth/logout
+ * Requires: Authorization: Bearer <accessToken>
+ * @param {string} [tokenOverride]
+ * @returns {Promise<{ message?: string }>}
  */
-export async function logout() {
-  const token = getAccessToken();
-  if (!token) return;
+export async function logout(tokenOverride) {
+  const token = tokenOverride || getAccessToken();
+  if (!token) {
+    return { message: 'Logged out locally' };
+  }
 
   try {
-    await fetch(`${BASE_URL}/auth/logout`, {
+    const res = await fetch(`${BASE_URL}/auth/logout`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
     });
-  } catch {
-    // Best-effort — frontend clears tokens regardless
+    return handleResponse(res);
+  } catch (err) {
+    console.warn('[authService] Backend GlobalSignOut notice:', err.message);
+    return null;
   }
 }
 
@@ -100,26 +106,66 @@ export async function logout() {
 
 /**
  * Exchanges a refresh token for a new access token.
- * @param {{ refreshToken: string, email: string }} params
+ * Endpoint: POST /api/v1/auth/refresh (Public / permitAll)
+ * @param {{ refreshToken?: string, email?: string }} [params]
  * @returns {Promise<{ accessToken: string, idToken: string, expiresIn: number }>}
  */
-export async function refreshToken({ refreshToken, email }) {
+export async function refreshToken(params = {}) {
+  let { refreshToken: rToken, email } = params;
+
+  // Auto-read from session if not explicitly provided
+  if (!rToken || !email) {
+    try {
+      const stored = sessionStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        rToken = rToken || parsed?.refreshToken;
+        email = email || parsed?.email;
+      }
+    } catch {
+      // Ignore
+    }
+  }
+
+  if (!rToken || !email) {
+    throw new Error('Refresh token and email are required for /api/v1/auth/refresh');
+  }
+
   const res = await fetch(`${BASE_URL}/auth/refresh`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refreshToken, email }),
+    body: JSON.stringify({ refreshToken: rToken, email }),
   });
-  return handleResponse(res);
+  const data = await handleResponse(res);
+
+  // Automatically update the stored tokens in sessionStorage if available
+  try {
+    const stored = sessionStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (data.accessToken) parsed.token = data.accessToken;
+      if (data.idToken) parsed.idToken = data.idToken;
+      if (data.expiresIn) parsed.expiresIn = data.expiresIn;
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+    }
+  } catch {
+    // Ignore
+  }
+
+  return data;
 }
 
 // ─── me ───────────────────────────────────────────────────────────────────────
 
 /**
  * Returns the current user's claims from the backend using the stored access token.
+ * Endpoint: GET /api/v1/auth/me
+ * Requires: Authorization: Bearer <accessToken>
+ * @param {string} [tokenOverride]
  * @returns {Promise<{ sub: string, email: string, name: string, roles: string[] }>}
  */
-export async function me() {
-  const token = getAccessToken();
+export async function me(tokenOverride) {
+  const token = tokenOverride || getAccessToken();
   if (!token) throw new Error('Not authenticated');
 
   const res = await fetch(`${BASE_URL}/auth/me`, {

@@ -1,16 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation, Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import {
-  Container,
-  Row,
-  Col,
-  Card,
-  Form,
-  FloatingLabel,
-  Button,
-  Alert,
-} from 'react-bootstrap';
+import { Shield, AlertCircle, Zap, UserPlus, Grid, Loader2, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { users } from '../data/mockDatabase';
 import Logo from '../components/Logo';
@@ -72,22 +63,17 @@ export default function Login() {
       // 1. Authenticate with Cognito via backend
       const tokens = await apiLogin({ email: cleanEmail, password });
 
-      // 2. Fetch the user's profile / role from the JWT claims
-      // Temporarily store the accessToken so axiosClient / authService.me() can use it
-      const tempUser = { token: tokens.accessToken };
-      sessionStorage.setItem('securelearn_auth_user', JSON.stringify(tempUser));
+      // 2. Fetch the user's profile / role from the JWT claims using the freshly received accessToken
+      const profile = await apiMe(tokens.accessToken);
 
-      const profile = await apiMe();
-
-      // 3. Build the userData shape AuthContext + axiosClient expect:
-      //    { userId, name, email, role, token, idToken, refreshToken }
+      // 3. Build the userData shape AuthContext + axiosClient expect
       const displayRole = mapCognitoRoleToDisplayRole(profile.roles || []);
       const userData = {
         userId: profile.sub,
         name: profile.name || cleanEmail.split('@')[0],
         email: profile.email || cleanEmail,
         role: displayRole,
-        token: tokens.accessToken,   // axiosClient reads user.token as Bearer
+        token: tokens.accessToken,
         idToken: tokens.idToken,
         refreshToken: tokens.refreshToken,
         expiresIn: tokens.expiresIn,
@@ -126,132 +112,152 @@ export default function Login() {
   };
 
   return (
-    <div className="py-5 flex-grow-1 d-flex align-items-center">
-      <Container>
-        <Row className="justify-content-center">
-          <Col xs={12} sm={10} md={8} lg={6} xl={5}>
-            <Card className="card-clean shadow-lg overflow-hidden border">
-              {/* Card Header Trắng Xanh */}
-              <Card.Header className="bg-white border-bottom text-center py-4">
-                <div className="mb-3 d-flex justify-content-center">
-                  <Logo size="lg" showBadge={true} badgeText="E-LEARNING" />
-                </div>
-                <h4 className="fw-bold mb-1 text-dark">
-                  {t('login.title')}
-                </h4>
-                <p className="text-muted small mb-0">
-                  {t('login.subtitle')}
-                </p>
-              </Card.Header>
+    <div className="min-h-[80vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-xl shadow-slate-200/50 dark:shadow-slate-950/50 border border-slate-200/80 dark:border-slate-800 overflow-hidden transition-all">
+        {/* Card Header */}
+        <div className="bg-slate-50/50 dark:bg-slate-850 border-b border-slate-100 dark:border-slate-800 text-center py-6 px-6">
+          <div className="mb-3 flex justify-center">
+            <Logo size="lg" showBadge={true} badgeText="E-LEARNING" />
+          </div>
+          <h4 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white mb-1">
+            {t('login.title')}
+          </h4>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            {t('login.subtitle')}
+          </p>
+        </div>
 
-              <Card.Body className="p-4 p-md-5 bg-white">
-                {/* Thông báo lỗi */}
-                {errorMessage && (
-                  <Alert variant="danger" dismissible onClose={() => setErrorMessage(null)} className="small py-2 mb-4 rounded-3">
-                    <i className="bi bi-exclamation-triangle-fill me-2"></i>
-                    {errorMessage}
-                  </Alert>
-                )}
+        <div className="p-6 sm:p-8 space-y-5">
+          {/* Thông báo lỗi */}
+          {errorMessage && (
+            <div className="flex items-start justify-between gap-2 p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0 text-rose-500" />
+                <span>{errorMessage}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setErrorMessage(null)}
+                className="text-rose-400 hover:text-rose-600 p-0.5 rounded-lg"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
 
-                {/* Đăng nhập nhanh bằng AWS Cognito (Hosted UI - OAuth2) */}
-                <div className="d-grid mb-3">
-                  <a
-                    href={COGNITO_LOGIN_URL}
-                    className="btn btn-outline-dark rounded-pill py-2 fw-semibold d-flex align-items-center justify-content-center gap-2 shadow-sm text-decoration-none"
-                  >
-                    <i className="bi bi-shield-lock-fill text-warning fs-5"></i>
-                    <span>Đăng nhập với AWS Cognito (Hosted UI)</span>
-                  </a>
-                </div>
+          {/* Đăng nhập nhanh bằng AWS Cognito (Hosted UI - OAuth2) */}
+          <div>
+            <a
+              href={COGNITO_LOGIN_URL}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-750 shadow-xs transition-all no-underline"
+            >
+              <Shield className="h-4 w-4 text-amber-500" />
+              <span>Đăng nhập với AWS Cognito (Hosted UI)</span>
+            </a>
+          </div>
 
-                <div className="position-relative my-4 text-center">
-                  <hr className="text-muted opacity-25" />
-                  <span className="position-absolute top-50 start-50 translate-middle bg-white px-3 small text-muted">
-                    hoặc đăng nhập tài khoản
-                  </span>
-                </div>
+          <div className="relative my-4 text-center">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-200 dark:border-slate-800" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white dark:bg-slate-900 px-3 text-slate-400 font-medium">
+                hoặc đăng nhập tài khoản
+              </span>
+            </div>
+          </div>
 
-                {/* Form Đăng Nhập */}
-                <Form onSubmit={handleSubmit}>
-                  <FloatingLabel controlId="loginEmail" label={t('login.email_label')} className="mb-3 text-secondary">
-                    <Form.Control
-                      type="email"
-                      placeholder={t('login.email_placeholder')}
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      className="form-control-clean"
-                    />
-                  </FloatingLabel>
+          {/* Form Đăng Nhập */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                {t('login.email_label')}
+              </label>
+              <input
+                type="email"
+                placeholder={t('login.email_placeholder')}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60 px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+              />
+            </div>
 
-                  <FloatingLabel controlId="loginPassword" label={t('login.password_label')} className="mb-4 text-secondary">
-                    <Form.Control
-                      type="password"
-                      placeholder={t('login.password_placeholder')}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      className="form-control-clean"
-                    />
-                  </FloatingLabel>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                {t('login.password_label')}
+              </label>
+              <input
+                type="password"
+                placeholder={t('login.password_placeholder')}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60 px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+              />
+            </div>
 
-                  <div className="d-grid mb-4">
-                    <Button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="btn-primary-pill py-3 fw-bold"
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <span className="spinner-border spinner-border-sm me-2" role="status"></span>
-                          Processing...
-                        </>
-                      ) : (
-                        t('login.login_button')
-                      )}
-                    </Button>
-                  </div>
-                </Form>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 px-5 py-3 text-xs font-bold text-white shadow-md shadow-blue-500/25 transition-all mt-2 cursor-pointer"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Processing...</span>
+                </>
+              ) : (
+                <span>{t('login.login_button')}</span>
+              )}
+            </button>
+          </form>
 
-                {/* Khu vực Đăng nhập Nhanh Demo */}
-                <div className="pt-3 border-top text-center">
-                  <div className="text-muted small mb-3 fw-medium">
-                    <i className="bi bi-lightning-charge-fill me-1 text-warning"></i>{t('login.demo_accounts')}
-                  </div>
-                  <div className="d-flex flex-wrap gap-2 justify-content-center mb-3">
-                    {DEMO_ACCOUNTS.map((acc, index) => (
-                      <button
-                        key={index}
-                        type="button"
-                        className="btn btn-sm btn-outline-primary rounded-pill px-3 py-1 fw-medium"
-                        onClick={() => handleSelectDemo(acc)}
-                      >
-                        {acc.label}
-                      </button>
-                    ))}
-                  </div>
+          {/* Khu vực Đăng nhập Nhanh Demo */}
+          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 text-center">
+            <div className="flex items-center justify-center gap-1 text-slate-500 dark:text-slate-400 text-xs font-medium mb-3">
+              <Zap className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+              <span>{t('login.demo_accounts')}</span>
+            </div>
+            <div className="flex flex-wrap gap-2 justify-center mb-4">
+              {DEMO_ACCOUNTS.map((acc, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  className="rounded-full border border-blue-200 dark:border-blue-900/60 bg-blue-50/50 dark:bg-blue-950/30 px-3 py-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all"
+                  onClick={() => handleSelectDemo(acc)}
+                >
+                  {acc.label}
+                </button>
+              ))}
+            </div>
 
-                  {/* Links điều hướng sang Đăng ký & Catalog */}
-                  <div className="pt-3 border-top text-center d-flex justify-content-between small flex-wrap gap-2">
-                    <Link to={`/${currentLang}/register`} className="text-primary fw-semibold text-decoration-none">
-                      <i className="bi bi-person-plus me-1"></i>{t('login.no_account')}
-                    </Link>
-                    <Link to={`/${currentLang}/catalog`} className="text-muted text-decoration-none">
-                      <i className="bi bi-collection me-1"></i>{t('login.explore_catalog')}
-                    </Link>
-                  </div>
-                </div>
-              </Card.Body>
+            {/* Links điều hướng sang Đăng ký & Catalog */}
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+              <Link
+                to={`/${currentLang}/register`}
+                className="inline-flex items-center gap-1.5 font-semibold text-blue-600 dark:text-blue-400 hover:underline no-underline"
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                <span>{t('login.no_account')}</span>
+              </Link>
+              <Link
+                to={`/${currentLang}/catalog`}
+                className="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 no-underline"
+              >
+                <Grid className="h-3.5 w-3.5" />
+                <span>{t('login.explore_catalog')}</span>
+              </Link>
+            </div>
+          </div>
+        </div>
 
-              <Card.Footer className="bg-light border-top py-3 text-center">
-                <small className="text-muted">
-                  Hệ thống bảo vệ phân quyền Role-Based Access Control (RBAC)
-                </small>
-              </Card.Footer>
-            </Card>
-          </Col>
-        </Row>
-      </Container>
+        <div className="bg-slate-50 dark:bg-slate-850/80 border-t border-slate-100 dark:border-slate-800 py-3 px-6 text-center">
+          <small className="text-[11px] text-slate-400 dark:text-slate-500">
+            Hệ thống bảo vệ phân quyền Role-Based Access Control (RBAC)
+          </small>
+        </div>
+      </div>
     </div>
   );
 }

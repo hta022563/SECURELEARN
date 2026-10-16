@@ -1,42 +1,39 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import axios from 'axios';
 import {
-  Container,
-  Row,
-  Col,
-  Card,
-  Table,
-  Button,
-  Badge,
-  Modal,
-  Form,
-  FloatingLabel,
-} from 'react-bootstrap';
+  UserPlus,
+  Key,
+  ShieldCheck,
+  Check,
+  X,
+  Users,
+  GraduationCap,
+  Briefcase,
+  ShieldAlert,
+  Info,
+  Loader2,
+} from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { useTranslation } from 'react-i18next';
-import {
-  users as dbUsers,
-  entitlements as dbEntitlements,
-} from '../data/mockDatabase';
 import { getCourses } from '../services/courseService';
 
-/**
- * =============================================================================
- * PAGE: AdminUserManagement
- * =============================================================================
- * Quản trị người dùng & Cấp quyền khóa học:
- * - Khóa học được nạp trực tiếp từ Backend API (GET /api/v1/allcourses)
- * =============================================================================
- */
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+
 export default function AdminUserManagement() {
   const { showToast } = useToast();
   const { t } = useTranslation();
 
-  // Dữ liệu người dùng demo
-  const [usersList, setUsersList] = useState(dbUsers);
-  const [entitlementsList, setEntitlementsList] = useState(dbEntitlements);
+  // State dữ liệu người dùng & khóa học thật
+  const [usersList, setUsersList] = useState([]);
   const [realCourses, setRealCourses] = useState([]);
 
-  // Nạp danh sách khóa học từ Backend API
+  // Helper lấy token đăng nhập của Admin
+  const getAuthHeader = () => {
+    const token = localStorage.getItem('accessToken');
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
+
+  // 1. Load danh sách khóa học thật từ BE
   useEffect(() => {
     getCourses()
       .then((data) => {
@@ -50,13 +47,14 @@ export default function AdminUserManagement() {
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newRole, setNewRole] = useState('Student');
+  const [submitting, setSubmitting] = useState(false);
 
-  // State Modal 2: Cấp Quyền Khóa Học (Assign Course)
+  // State Modal 2: Cấp Quyền Khóa Học (Entitlements)
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [tempAssignedCourses, setTempAssignedCourses] = useState([]);
+  const [initialAssignedCourses, setInitialAssignedCourses] = useState([]);
 
-  // Danh mục khóa học thật từ Backend
   const availableCourses = useMemo(() => {
     return realCourses.map((c) => ({
       id: c.ID || c.id,
@@ -66,7 +64,6 @@ export default function AdminUserManagement() {
     }));
   }, [realCourses]);
 
-  // Chuyển đổi Role sang format hiển thị
   const formatRole = (role) => {
     const r = (role || '').toLowerCase();
     if (r === 'admin' || r === 'administrator') return 'Administrator';
@@ -74,9 +71,6 @@ export default function AdminUserManagement() {
     return 'Student';
   };
 
-  /* =========================================================================
-   * LOGIC MODAL 1: TẠO NGƯỜI DÙNG MỚI
-   * ========================================================================= */
   const handleOpenAddModal = () => {
     setNewEmail('');
     setNewPassword('');
@@ -88,7 +82,10 @@ export default function AdminUserManagement() {
     setShowAddModal(false);
   };
 
-  const handleCreateUser = (e) => {
+  // =========================================================================
+  // GỌI API THẬT: POST /api/v1/auth/register
+  // =========================================================================
+  const handleCreateUser = async (e) => {
     e.preventDefault();
 
     if (!newEmail.trim() || !newPassword) {
@@ -97,55 +94,46 @@ export default function AdminUserManagement() {
     }
 
     const emailTrimmed = newEmail.trim().toLowerCase();
+    const rawRole = newRole === 'Instructor' ? 'instructor' : 'student';
 
-    // Kiểm tra trùng username
-    if (dbUsers.some((u) => u.Username.toLowerCase() === emailTrimmed)) {
-      showToast(t('admin_users.username_exists'), 'danger', t('admin_users.duplicate'));
-      return;
-    }
+    setSubmitting(true);
+    try {
+      const response = await axios.post(`${API_BASE_URL}/api/v1/auth/register`, {
+        fullName: emailTrimmed.split('@')[0],
+        email: emailTrimmed,
+        password: newPassword,
+        role: rawRole,
+      });
 
-    const nextNumber = dbUsers.length + 1;
-    const newUserId = `u-${String(nextNumber).padStart(3, '0')}`;
-    const rawRole = newRole === 'Administrator' ? 'admin' : newRole === 'Instructor' ? 'instructor' : 'student';
-
-    const newUser = {
-      ID: newUserId,
-      Username: emailTrimmed,
-      Password: `hashed_${newPassword}`,
-      Role: rawRole,
-      CreationTime: new Date().toISOString(),
-    };
-
-    // Cập nhật CSDL mềm
-    dbUsers.push(newUser);
-    setUsersList([...dbUsers]);
-
-    // Nếu tạo Student thì cấp quyền mặc định khóa đầu tiên
-    if (rawRole === 'student' && dbCourses.length > 0) {
-      const defaultEntitlement = {
-        UserID: newUserId,
-        CoursesID: dbCourses[0].ID,
-        Status: 'active',
-        'Join Date': new Date().toISOString(),
-        'Completion Date': null,
+      // Thêm user mới vào danh sách hiển thị
+      const createdUser = {
+        ID: emailTrimmed,
+        Username: emailTrimmed,
+        Role: rawRole,
+        CreationTime: new Date().toISOString(),
+        assignedCourses: [],
       };
-      dbEntitlements.push(defaultEntitlement);
-      setEntitlementsList([...dbEntitlements]);
-    }
+      setUsersList((prev) => [createdUser, ...prev]);
 
-    showToast(`${t('admin_users.created_account')} "${emailTrimmed}" (${newRole}) ${t('admin_users.success_suffix')}`, 'success', t('admin_users.success'));
-    handleCloseAddModal();
+      showToast(
+        response.data?.message || `Đã tạo tài khoản "${emailTrimmed}" (${newRole}) thành công!`,
+        'success',
+        t('admin_users.success')
+      );
+      handleCloseAddModal();
+    } catch (err) {
+      const errMsg = err.response?.data?.error || err.message || 'Tạo tài khoản thất bại';
+      showToast(errMsg, 'danger', 'Lỗi tạo người dùng');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  /* =========================================================================
-   * LOGIC MODAL 2: CẤP QUYỀN KHÓA HỌC CHO HỌC VIÊN (ENTITLEMENT)
-   * ========================================================================= */
   const handleOpenAssignModal = (student) => {
     setSelectedStudent(student);
-    const assignedIds = entitlementsList
-      .filter((e) => e.UserID === student.ID && (e.Status === 'active' || e.Status === 'completed'))
-      .map((e) => e.CoursesID);
+    const assignedIds = student.assignedCourses || [];
     setTempAssignedCourses(assignedIds);
+    setInitialAssignedCourses(assignedIds);
     setShowAssignModal(true);
   };
 
@@ -153,6 +141,7 @@ export default function AdminUserManagement() {
     setShowAssignModal(false);
     setSelectedStudent(null);
     setTempAssignedCourses([]);
+    setInitialAssignedCourses([]);
   };
 
   const handleToggleCourseCheckbox = (courseId) => {
@@ -163,378 +152,231 @@ export default function AdminUserManagement() {
     );
   };
 
-  const handleSaveAssignedCourses = (e) => {
+  // =========================================================================
+  // GỌI API THẬT: PUT/DELETE /api/v1/course/{courseId}/entitlements/{userSub}
+  // =========================================================================
+  const handleSaveAssignedCourses = async (e) => {
     e.preventDefault();
     if (!selectedStudent) return;
 
-    const studentId = selectedStudent.ID;
+    const userSub = selectedStudent.ID || selectedStudent.Username;
+    setSubmitting(true);
 
-    // Cập nhật bảng dbEntitlements
-    dbCourses.forEach((c) => {
-      const isSelected = tempAssignedCourses.includes(c.ID);
-      const existingIdx = dbEntitlements.findIndex(
-        (e) => e.UserID === studentId && e.CoursesID === c.ID
+    try {
+      // 1. Tìm các khóa học mới được chọn -> gọi API CẤP QUYỀN (PUT)
+      const toGrant = tempAssignedCourses.filter((id) => !initialAssignedCourses.includes(id));
+      for (const courseId of toGrant) {
+        await axios.put(
+          `${API_BASE_URL}/api/v1/course/${courseId}/entitlements/${userSub}`,
+          {},
+          { headers: getAuthHeader() }
+        );
+      }
+
+      // 2. Tìm các khóa học bị bỏ chọn -> gọi API THU HỒI QUYỀN (DELETE)
+      const toRevoke = initialAssignedCourses.filter((id) => !tempAssignedCourses.includes(id));
+      for (const courseId of toRevoke) {
+        await axios.delete(
+          `${API_BASE_URL}/api/v1/course/${courseId}/entitlements/${userSub}`,
+          { headers: getAuthHeader() }
+        );
+      }
+
+      // Cập nhật lại state danh sách khóa học của học viên
+      setUsersList((prev) =>
+        prev.map((u) =>
+          u.ID === selectedStudent.ID ? { ...u, assignedCourses: tempAssignedCourses } : u
+        )
       );
 
-      if (isSelected) {
-        if (existingIdx !== -1) {
-          dbEntitlements[existingIdx].Status = 'active';
-        } else {
-          dbEntitlements.push({
-            UserID: studentId,
-            CoursesID: c.ID,
-            Status: 'active',
-            'Join Date': new Date().toISOString(),
-            'Completion Date': null,
-          });
-        }
-      } else {
-        if (existingIdx !== -1) {
-          dbEntitlements[existingIdx].Status = 'expired';
-        }
-      }
-    });
-
-    setEntitlementsList([...dbEntitlements]);
-
-    showToast(
-      `${t('admin_users.updated_entitlements')} ${tempAssignedCourses.length} ${t('admin_users.courses_for_student')} ${selectedStudent.Username}!`,
-      'success',
-      t('admin_users.grant_success')
-    );
-    handleCloseAssignModal();
-  };
-
-  /* =========================================================================
-   * HELPER RENDER BADGE
-   * ========================================================================= */
-  const renderRoleBadge = (role) => {
-    const r = formatRole(role);
-    switch (r) {
-      case 'Administrator':
-        return <span className="fw-bold text-danger fs-6">Admin</span>;
-      case 'Instructor':
-        return <span className="fw-bold fs-6" style={{ color: '#d97706' }}>Instructor</span>;
-      case 'Student':
-      default:
-        return <span className="fw-bold text-primary fs-6">Student</span>;
+      showToast(
+        `Đã cập nhật quyền ${tempAssignedCourses.length} khóa học cho ${selectedStudent.Username}!`,
+        'success',
+        t('admin_users.grant_success')
+      );
+      handleCloseAssignModal();
+    } catch (err) {
+      const errMsg = err.response?.data?.error || err.message || 'Cập nhật quyền thất bại';
+      showToast(errMsg, 'danger', 'Lỗi cấp quyền');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  // Thống kê nhanh từ dữ liệu mềm
-  const totalUsers = usersList.length;
-  const studentCount = usersList.filter((u) => formatRole(u.Role) === 'Student').length;
-  const instructorCount = usersList.filter((u) => formatRole(u.Role) === 'Instructor').length;
-  const adminCount = usersList.filter((u) => formatRole(u.Role) === 'Administrator').length;
-
   return (
-    <Container fluid className="px-3 px-xl-5 py-4 admin-user-management-page">
-      {/* Header Banner & Nút Add New User */}
-      <div className="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4 pb-3 border-bottom">
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
+      {/* Header & Nút thêm người dùng */}
+      <div className="flex justify-between items-center">
         <div>
-          <div className="badge-pill-soft mb-2">
-            <span>{t('admin_users.user_management_erd')}</span>
-          </div>
-          <h2 className="fw-bold text-dark mb-1">
-            {t('admin_users.user_management_title')} <span className="text-primary">{t('admin_users.user_entitlement')}</span>
-          </h2>
-          <p className="text-secondary mb-0 small">
-            {t('admin_users.sync_desc')}
-          </p>
+          <h1 className="text-2xl font-bold text-gray-800">Quản Lý Người Dùng</h1>
+          <p className="text-gray-500 text-sm">Quản lý tài khoản và phân quyền khóa học của học viên</p>
         </div>
-
-        <div>
-          <Button
-            onClick={handleOpenAddModal}
-            className="btn-primary-pill d-flex align-items-center gap-2"
-          >
-            <i className="bi bi-person-plus-fill fs-5"></i>
-            <span>{t('admin_users.add_user')}</span>
-          </Button>
-        </div>
+        <button
+          onClick={handleOpenAddModal}
+          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium shadow-sm transition"
+        >
+          <UserPlus size={18} />
+          <span>Thêm Người Dùng</span>
+        </button>
       </div>
 
-      {/* Thống kê tài khoản mềm */}
-      <Row className="g-3 mb-4">
-        <Col xs={6} md={3}>
-          <Card className="card-clean bg-white border">
-            <Card.Body className="py-3">
-              <div className="text-muted small mb-1">{t('admin_users.total_accounts')}</div>
-              <h4 className="fw-bold mb-0 text-dark">{totalUsers}</h4>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col xs={6} md={3}>
-          <Card className="card-clean bg-white border">
-            <Card.Body className="py-3">
-              <div className="text-primary small mb-1 fw-semibold">{t('admin_users.students')}</div>
-              <h4 className="fw-bold mb-0 text-primary">{studentCount}</h4>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col xs={6} md={3}>
-          <Card className="card-clean bg-white border">
-            <Card.Body className="py-3">
-              <div className="text-warning small mb-1 fw-semibold">{t('admin_users.instructors')}</div>
-              <h4 className="fw-bold mb-0 text-warning">{instructorCount}</h4>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col xs={6} md={3}>
-          <Card className="card-clean bg-white border">
-            <Card.Body className="py-3">
-              <div className="text-danger small mb-1 fw-semibold">{t('admin_users.admins')}</div>
-              <h4 className="fw-bold mb-0 text-danger">{adminCount}</h4>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-
-      {/* Bảng Danh Sách Người Dùng (Table) */}
-      <Card className="card-clean shadow-sm border rounded-4 overflow-hidden bg-white">
-        <Card.Header className="bg-white border-bottom py-3 px-4 d-flex justify-content-between align-items-center">
-          <h5 className="mb-0 fw-bold text-dark">{t('admin_users.system_user_list')}</h5>
-          <span className="badge-pill-cyan">ERD Table: users &amp; entitlements</span>
-        </Card.Header>
-
-        <Card.Body className="p-0">
-          <div className="table-responsive">
-            <Table hover className="table-clean mb-0 align-middle text-nowrap">
-              <thead>
-                <tr>
-                  <th style={{ width: '90px' }}>User ID</th>
-                  <th>Username / Email</th>
-                  <th style={{ width: '130px' }}>Role</th>
-                  <th style={{ width: '120px' }}>{t('admin_users.creation_date')}</th>
-                  <th>{t('admin_users.entitled_courses')}</th>
-                  <th style={{ width: '150px' }} className="text-center">{t('admin_users.actions')}</th>
+      {/* Bảng danh sách người dùng */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50 text-gray-600 text-xs uppercase font-semibold">
+            <tr>
+              <th className="px-6 py-3 text-left">Email / Username</th>
+              <th className="px-6 py-3 text-left">Vai Trò</th>
+              <th className="px-6 py-3 text-left">Ngày Tạo</th>
+              <th className="px-6 py-3 text-right">Thao Tác</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 text-sm">
+            {usersList.length === 0 ? (
+              <tr>
+                <td colSpan="4" className="px-6 py-8 text-center text-gray-400">
+                  Chưa có người dùng nào. Nhấn "Thêm Người Dùng" để tạo tài khoản mới qua API.
+                </td>
+              </tr>
+            ) : (
+              usersList.map((user) => (
+                <tr key={user.ID} className="hover:bg-gray-50/80">
+                  <td className="px-6 py-4 font-medium text-gray-800">{user.Username}</td>
+                  <td className="px-6 py-4">
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        formatRole(user.Role) === 'Administrator'
+                          ? 'bg-purple-100 text-purple-800'
+                          : formatRole(user.Role) === 'Instructor'
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-emerald-100 text-emerald-800'
+                      }`}
+                    >
+                      {formatRole(user.Role)}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-gray-500">
+                    {new Date(user.CreationTime).toLocaleDateString()}
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    {formatRole(user.Role) === 'Student' && (
+                      <button
+                        onClick={() => handleOpenAssignModal(user)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-md transition"
+                      >
+                        <GraduationCap size={15} />
+                        <span>Cấp Quyền Khóa Học</span>
+                      </button>
+                    )}
+                  </td>
                 </tr>
-              </thead>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
 
-              <tbody>
-                {usersList.map((item) => {
-                  const roleFormatted = formatRole(item.Role);
-                  const isStudent = roleFormatted === 'Student';
-                  const activeEntitlements = entitlementsList.filter(
-                    (e) => e.UserID === item.ID && (e.Status === 'active' || e.Status === 'completed')
-                  );
-
-                  return (
-                    <tr key={item.ID}>
-                      {/* User ID */}
-                      <td className="text-muted small">
-                        <code>{item.ID}</code>
-                      </td>
-
-                      {/* Username / Email */}
-                      <td className="fw-bold text-dark">
-                        {item.Username}
-                      </td>
-
-                      {/* Role */}
-                      <td>{renderRoleBadge(item.Role)}</td>
-
-                      {/* Ngày Tạo */}
-                      <td className="text-secondary small">
-                        {item.CreationTime ? item.CreationTime.split('T')[0] : '—'}
-                      </td>
-
-                      {/* Cột hiển thị số lượng khóa học được cấp quyền */}
-                      <td>
-                        {isStudent ? (
-                          <div className="d-flex align-items-center gap-1 flex-wrap">
-                            <span className="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill">
-                              {activeEntitlements.length} {t('admin_users.courses')}
-                            </span>
-                            {activeEntitlements.map((ent) => (
-                              <span key={ent.CoursesID} className="badge bg-light text-dark border rounded-pill">
-                                {ent.CoursesID.toUpperCase()}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-muted small fst-italic">{t('admin_users.full_system_access')}</span>
-                        )}
-                      </td>
-
-                      {/* Actions: Nút Assign Course cho Role là Student */}
-                      <td className="text-center">
-                        {isStudent ? (
-                          <Button
-                            variant="outline-primary"
-                            size="sm"
-                            onClick={() => handleOpenAssignModal(item)}
-                            className="rounded-pill px-3 fw-medium"
-                          >
-                            <i className="bi bi-key-fill me-1"></i>{t('admin_users.grant_course_access')}
-                          </Button>
-                        ) : (
-                          <span className="text-muted small">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </Table>
-          </div>
-        </Card.Body>
-
-        <Card.Footer className="bg-light border-top py-3 px-4 text-muted small">
-          {t('admin_users.displaying')} <strong>{usersList.length}</strong> {t('admin_users.accounts_in_db')}
-        </Card.Footer>
-      </Card>
-
-      {/* ========================================================================= */}
-      {/* MODAL 1: TẠO NGƯỜI DÙNG MỚI (ADD NEW USER)                                 */}
-      {/* ========================================================================= */}
-      <Modal
-        show={showAddModal}
-        onHide={handleCloseAddModal}
-        centered
-        backdrop="static"
-        contentClassName="bg-white border rounded-4 shadow-lg overflow-hidden"
-      >
-        <Modal.Header closeButton className="border-bottom bg-light">
-          <Modal.Title className="fs-5 fw-bold text-dark">
-            <i className="bi bi-person-plus-fill text-primary me-2"></i>{t('admin_users.add_new_user')}
-          </Modal.Title>
-        </Modal.Header>
-
-        <Form onSubmit={handleCreateUser}>
-          <Modal.Body className="py-4">
-            {/* Email / Username */}
-            <FloatingLabel controlId="addUserEmail" label={t('admin_users.email_username_required')} className="mb-3 text-secondary">
-              <Form.Control
-                type="email"
-                placeholder="user@securelearn.edu.vn"
-                value={newEmail}
-                onChange={(e) => setNewEmail(e.target.value)}
-                required
-                className="form-control-clean"
-                autoFocus
-              />
-            </FloatingLabel>
-
-            {/* Mật Khẩu */}
-            <FloatingLabel controlId="addUserPassword" label={t('admin_users.initial_password_required')} className="mb-3 text-secondary">
-              <Form.Control
-                type="password"
-                placeholder={t('admin_users.password_placeholder')}
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                required
-                className="form-control-clean"
-              />
-            </FloatingLabel>
-
-            {/* Chọn Role */}
-            <FloatingLabel controlId="addUserRole" label={t('admin_users.role')} className="mb-2 text-secondary">
-              <Form.Select
-                value={newRole}
-                onChange={(e) => setNewRole(e.target.value)}
-                className="form-control-clean"
-              >
-                <option value="Student">{t('admin_users.role_student')}</option>
-                <option value="Instructor">{t('admin_users.role_instructor')}</option>
-                <option value="Administrator">{t('admin_users.role_admin')}</option>
-              </Form.Select>
-            </FloatingLabel>
-          </Modal.Body>
-
-          <Modal.Footer className="border-top bg-light">
-            <Button variant="outline-secondary" size="sm" onClick={handleCloseAddModal} className="rounded-pill px-3">
-              {t('common.cancel')}
-            </Button>
-            <Button size="sm" type="submit" className="btn-primary-pill px-4">
-              {t('admin_users.save_user')}
-            </Button>
-          </Modal.Footer>
-        </Form>
-      </Modal>
-
-      {/* ========================================================================= */}
-      {/* MODAL 2: CẤP QUYỀN KHÓA HỌC (ASSIGN COURSES TO STUDENT)                    */}
-      {/* ========================================================================= */}
-      <Modal
-        show={showAssignModal}
-        onHide={handleCloseAssignModal}
-        centered
-        backdrop="static"
-        size="lg"
-        contentClassName="bg-white border rounded-4 shadow-lg overflow-hidden"
-      >
-        <Modal.Header closeButton className="border-bottom bg-light">
-          <Modal.Title className="fs-5 fw-bold text-dark d-flex align-items-center gap-2">
-            <i className="bi bi-shield-lock-fill text-primary"></i>
-            <span>{t('admin_users.grant_access_entitlement')}</span>
-          </Modal.Title>
-        </Modal.Header>
-
-        <Form onSubmit={handleSaveAssignedCourses}>
-          <Modal.Body className="p-4">
-            <div className="alert alert-info bg-primary bg-opacity-10 border-0 text-dark small mb-4 rounded-3 d-flex align-items-center gap-2">
-              <i className="bi bi-info-circle-fill text-primary fs-5"></i>
+      {/* MODAL 1: Tạo Người Dùng */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+            <h3 className="text-lg font-bold text-gray-900">Tạo Tài Khoản Mới</h3>
+            <form onSubmit={handleCreateUser} className="space-y-4">
               <div>
-                {t('admin_users.granting_access_for')} <strong>{selectedStudent?.Username}</strong> {t('admin_users.code_prefix')}
-                <code>{selectedStudent?.ID}</code>).
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  required
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="user@example.com"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu</label>
+                <input
+                  type="password"
+                  required
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Tối thiểu 8 ký tự"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Vai trò</label>
+                <select
+                  value={newRole}
+                  onChange={(e) => setNewRole(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="Student">Student (Học viên)</option>
+                  <option value="Instructor">Instructor (Giảng viên)</option>
+                </select>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={handleCloseAddModal}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {submitting ? 'Đang tạo...' : 'Tạo Tài Khoản'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: Cấp Quyền Khóa Học */}
+      {showAssignModal && selectedStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 space-y-4">
+            <h3 className="text-lg font-bold text-gray-900">
+              Cấp Quyền Cho: <span className="text-indigo-600">{selectedStudent.Username}</span>
+            </h3>
+            <p className="text-sm text-gray-500">Tích chọn các khóa học mà học viên được phép vào học:</p>
+            <div className="max-h-60 overflow-y-auto divide-y divide-gray-100 border border-gray-200 rounded-lg p-2">
+              {availableCourses.map((course) => (
+                <label key={course.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={tempAssignedCourses.includes(course.id)}
+                    onChange={() => handleToggleCourseCheckbox(course.id)}
+                    className="h-4 w-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                  />
+                  <div className="flex-1 text-sm font-medium text-gray-800">{course.name}</div>
+                </label>
+              ))}
             </div>
-
-            <p className="fw-bold text-dark small mb-3">
-              {t('admin_users.select_courses_desc')}
-            </p>
-
-            <div className="d-flex flex-column gap-2 mb-3">
-              {availableCourses.map((c) => {
-                const isChecked = tempAssignedCourses.includes(c.id);
-                return (
-                  <div
-                    key={c.id}
-                    onClick={() => handleToggleCourseCheckbox(c.id)}
-                    className={`p-3 rounded-3 border d-flex justify-content-between align-items-center cursor-pointer transition ${
-                      isChecked
-                        ? 'border-primary bg-primary bg-opacity-10 shadow-sm'
-                        : 'border-light-subtle bg-white hover-bg-light'
-                    }`}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <div className="d-flex align-items-center gap-3">
-                      <Form.Check
-                        type="checkbox"
-                        id={`course-check-${c.id}`}
-                        checked={isChecked}
-                        onChange={() => {}}
-                        className="fs-5 m-0"
-                      />
-                      <div>
-                        <div className="fw-bold text-dark">{c.name}</div>
-                        <small className="text-secondary">
-                          {t('admin_users.course_code')} <code>{c.id}</code> • {t('admin_users.tuition_fee')}
-                          {c.price ? `${c.price.toLocaleString('vi-VN')} đ` : t('admin_users.free')}
-                        </small>
-                      </div>
-                    </div>
-
-                    <Badge bg={isChecked ? 'primary' : 'secondary'} className="rounded-pill px-3 py-1">
-                      {isChecked ? t('admin_users.granted') : t('admin_users.not_granted')}
-                    </Badge>
-                  </div>
-                );
-              })}
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={handleCloseAssignModal}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={handleSaveAssignedCourses}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {submitting ? 'Đang lưu...' : 'Lưu Quyền Hạn'}
+              </button>
             </div>
-          </Modal.Body>
-
-          <Modal.Footer className="border-top bg-light">
-            <Button variant="outline-secondary" size="sm" onClick={handleCloseAssignModal} className="rounded-pill px-3">
-              {t('common.cancel')}
-            </Button>
-            <Button size="sm" type="submit" className="btn-primary-pill px-4">
-              {t('admin_users.save_access_rights')}
-            </Button>
-          </Modal.Footer>
-        </Form>
-      </Modal>
-    </Container>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
