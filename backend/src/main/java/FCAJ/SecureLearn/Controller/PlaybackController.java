@@ -6,8 +6,6 @@ import java.util.UUID;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -24,12 +22,11 @@ public class PlaybackController {
 
     @GetMapping("/api/v1/lesson/{id}/playback")
     public ResponseEntity<?> createPlayback(
-            @PathVariable UUID id,
-            @AuthenticationPrincipal Jwt jwt) {
+            @PathVariable UUID id) {
         String contextUrl = ServletUriComponentsBuilder.fromCurrentContextPath()
                 .build()
                 .toUriString();
-        PlaybackService.PlaybackDetails details = playbackService.createPlayback(id, jwt, contextUrl);
+        PlaybackService.PlaybackDetails details = playbackService.createPlayback(id, contextUrl);
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(Map.of("playbackUrl", details.playbackUrl(), "expiresAt", details.expiresAt()));
@@ -39,10 +36,22 @@ public class PlaybackController {
     public ResponseEntity<String> getManifest(
             @PathVariable UUID id,
             @RequestParam String token) {
-        String manifest = playbackService.getSignedManifest(id, token);
+        String contextUrl = ServletUriComponentsBuilder.fromCurrentContextPath()
+            .build()
+            .toUriString();
+        String manifest = playbackService.getSignedManifest(id, token, contextUrl);
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType("application/vnd.apple.mpegurl"))
                 .cacheControl(CacheControl.noStore())
                 .body(manifest);
+    }
+
+    @GetMapping(value = "/api/v1/lesson/{id}/key", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
+    public ResponseEntity<byte[]> getContentKey(
+            @PathVariable UUID id,
+            @RequestParam String token) {
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(playbackService.getContentKey(id, token));
     }
 }

@@ -1,6 +1,7 @@
 package FCAJ.SecureLearn.Controller;
 
 import FCAJ.SecureLearn.Request.LoginRequest;
+import FCAJ.SecureLearn.Request.PasswordChangeRequest;
 import FCAJ.SecureLearn.Request.RegisterRequest;
 import FCAJ.SecureLearn.Service.AuthService;
 import org.springframework.http.ResponseEntity;
@@ -61,6 +62,7 @@ public class AuthController {
         }
 
         try {
+            if(request.getRole().equalsIgnoreCase("student")){
             authService.register(
                     request.getFullName(),
                     request.getEmail().trim().toLowerCase(),
@@ -71,6 +73,7 @@ public class AuthController {
                     "message", "Account created successfully. You can now log in.",
                     "email", request.getEmail().trim().toLowerCase()
             ));
+            }else return ResponseEntity.badRequest().body(Map.of("message","Cannot register account, please contact admin if you want to add instructor or admin"));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (RuntimeException e) {
@@ -175,7 +178,29 @@ public class AuthController {
                     .body(Map.of("error", "Token refresh failed."));
         }
     }
-
+    
+    @PostMapping("/password")
+    public ResponseEntity<?> changePassword(@RequestBody PasswordChangeRequest request){
+        if (request.getAccessToken() == null || request.getAccessToken().isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Email is required."));
+        }
+        if (request.getOldPassword() == null || request.getOldPassword().length() < 8) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Password must be at least 8 characters."));
+        }
+        if (request.getNewPassword() == null || request.getNewPassword().length() < 8) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Password must be at least 8 characters."));
+        }
+        try{
+            authService.updateAccountByUser(request.getAccessToken(), request.getNewPassword(), request.getOldPassword());
+            return ResponseEntity.ok(Map.of("message", "Change password successfully"));
+        }
+        catch (IllegalArgumentException e) {
+            return ResponseEntity.status(401).body(Map.of("error", e.getMessage()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "Update password fail"));
+        }
+    }
     // -------------------------------------------------------------------------
     // Me
     // -------------------------------------------------------------------------
@@ -212,4 +237,5 @@ public class AuthController {
                 "roles",  groups != null ? groups : List.of()
         ));
     }
+    
 }

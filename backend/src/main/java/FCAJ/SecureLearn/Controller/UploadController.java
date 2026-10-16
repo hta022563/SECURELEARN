@@ -4,6 +4,8 @@ import java.net.URL;
 import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
@@ -37,6 +39,7 @@ import FCAJ.SecureLearn.Service.VideoProcessingService;
 @RestController
 @RequestMapping("/api/v1/upload")
 public class UploadController {
+    private static final Logger log = LoggerFactory.getLogger(UploadController.class);
 
     private final R2Service r2Service;
     private final VideoProcessingService processingService;
@@ -81,14 +84,19 @@ public class UploadController {
         if (request.getContentType() == null || request.getContentType().isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "contentType is required"));
         }
+        if (request.getCourseId() == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "courseId is required"));
+        }
+        if (!request.getContentType().toLowerCase().startsWith("video/")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "contentType must be a video MIME type"));
+        }
 
         // Namespace the object key so files from different courses don't collide
         String sanitized = request.getFileName()
                 .replaceAll("[^a-zA-Z0-9._-]", "_")
                 .toLowerCase();
-        String objectKey = "videos/"
-                + (request.getCourseId() != null ? request.getCourseId() + "/" : "")
-                + System.currentTimeMillis() + "_" + sanitized;
+        String objectKey = "videos/" + request.getCourseId() + "/"
+            + System.currentTimeMillis() + "_" + sanitized;
 
         try {
             URL presignedUrl = r2Service.generatePresignedPutUrl(
@@ -126,11 +134,7 @@ public class UploadController {
      *   "courseId":    "uuid"
      * }
      *
-     * Response:
-     * {
-     *   "lessonId":    "uuid",
-    *   "lessonId": "uuid"
-     * }
+    * Response: { "lessonId": "uuid" }
      *
      * This call blocks while FFmpeg runs — for long videos consider making
      * this async and polling a status endpoint instead.
@@ -142,6 +146,8 @@ public class UploadController {
         String description = body.get("description");
         String chapterIdStr = body.get("chapterId");
         String courseIdStr  = body.get("courseId");
+        String existingLessonId = body.get("lessonId");
+        boolean replacingLesson = existingLessonId != null && !existingLessonId.isBlank();
 
         // ── Validate required fields ──────────────────────────────────────
         if (objectKey == null || objectKey.isBlank())
@@ -150,32 +156,52 @@ public class UploadController {
             return ResponseEntity.badRequest().body(Map.of("error", "title is required"));
         if (description == null || description.isBlank())
             return ResponseEntity.badRequest().body(Map.of("error", "description is required"));
-        if (chapterIdStr == null || chapterIdStr.isBlank())
+        if (!replacingLesson && (chapterIdStr == null || chapterIdStr.isBlank()))
             return ResponseEntity.badRequest().body(Map.of("error", "chapterId is required"));
         if (courseIdStr == null || courseIdStr.isBlank())
             return ResponseEntity.badRequest().body(Map.of("error", "courseId is required"));
 
-        UUID chapterId, courseId;
+        UUID chapterId = null;
+        UUID courseId;
+        UUID lessonIdToReplace = null;
         try {
-            chapterId = UUID.fromString(chapterIdStr);
             courseId  = UUID.fromString(courseIdStr);
+            if (chapterIdStr != null && !chapterIdStr.isBlank()) {
+                chapterId = UUID.fromString(chapterIdStr);
+            }
+            if (replacingLesson) {
+                lessonIdToReplace = UUID.fromString(existingLessonId);
+            }
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Invalid UUID format for chapterId or courseId"));
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid UUID format in upload request"));
+        }
+
+        if (!isCourseUploadKey(objectKey, courseId)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "objectKey must belong to the supplied course"));
         }
 
         try {
-            // ── Transcode raw video → HLS segments → upload to R2 ────────
-                String playlistKey = processingService.processToHls(objectKey);
+            lessonService.validateUploadTarget(chapterId, courseId, lessonIdToReplace);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
 
-                String existingLessonId = body.get("lessonId");
-                UUID lessonId;
-                if (existingLessonId != null && !existingLessonId.isBlank()) {
-                lessonId = UUID.fromString(existingLessonId);
+        try {
+            String playlistKey = processingService.processToHls(objectKey);
+            UUID lessonId;
+            if (replacingLesson) {
+                lessonId = lessonIdToReplace;
                 lessonService.updateLesson(courseId, lessonId, title, description, playlistKey);
-                } else {
+            } else {
                 lessonId = lessonService.addLessonReturningId(
                     chapterId, title, description, playlistKey, courseId);
-                }
+            }
+
+            try {
+                r2Service.deleteObject(bucketName, objectKey);
+            } catch (RuntimeException cleanupError) {
+                log.warn("Processed video source could not be deleted from R2: {}", objectKey, cleanupError);
+            }
 
             return ResponseEntity.ok(Map.of(
                     "lessonId", lessonId.toString()
@@ -188,5 +214,18 @@ public class UploadController {
             return ResponseEntity.internalServerError()
                     .body(Map.of("error", "Unexpected error during processing"));
         }
+    }
+
+    private boolean isCourseUploadKey(String objectKey, UUID courseId) {
+        String prefix = "videos/" + courseId + "/";
+        if (!objectKey.startsWith(prefix) || objectKey.contains("\\")) {
+            return false;
+        }
+        for (String part : objectKey.substring(prefix.length()).split("/")) {
+            if (part.isBlank() || part.equals(".") || part.equals("..")) {
+                return false;
+            }
+        }
+        return true;
     }
 }
