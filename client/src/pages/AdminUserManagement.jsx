@@ -1,5 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   UserPlus,
   Key,
@@ -12,38 +11,40 @@ import {
   ShieldAlert,
   Info,
   Loader2,
+  Trash2,
+  RefreshCw,
+  Search,
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { useTranslation } from 'react-i18next';
 import { getCourses } from '../services/courseService';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+import {
+  getAdminUsers,
+  createAdminUser,
+  updateAdminUserPassword,
+  deleteAdminUser,
+} from '../services/adminService';
+import {
+  grantCourseEntitlement,
+  revokeCourseEntitlement,
+} from '../services/entitlementService';
 
 export default function AdminUserManagement() {
   const { showToast } = useToast();
   const { t } = useTranslation();
 
-  // State dữ liệu người dùng & khóa học thật
+  // State danh sách người dùng & khóa học
   const [usersList, setUsersList] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
   const [realCourses, setRealCourses] = useState([]);
 
-  // Helper lấy token đăng nhập của Admin
-  const getAuthHeader = () => {
-    const token = localStorage.getItem('accessToken');
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  };
-
-  // 1. Load danh sách khóa học thật từ BE
-  useEffect(() => {
-    getCourses()
-      .then((data) => {
-        if (Array.isArray(data)) setRealCourses(data);
-      })
-      .catch((err) => console.warn('[AdminUserManagement] Lỗi nạp khóa học:', err));
-  }, []);
+  // State bộ lọc & tìm kiếm
+  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState('ALL');
 
   // State Modal 1: Tạo Người Dùng Mới
   const [showAddModal, setShowAddModal] = useState(false);
+  const [newFullName, setNewFullName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newRole, setNewRole] = useState('Student');
@@ -54,6 +55,43 @@ export default function AdminUserManagement() {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [tempAssignedCourses, setTempAssignedCourses] = useState([]);
   const [initialAssignedCourses, setInitialAssignedCourses] = useState([]);
+
+  // State Modal 3: Đổi Mật Khẩu (Admin Reset Password)
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [userForPassword, setUserForPassword] = useState(null);
+  const [updatedPassword, setUpdatedPassword] = useState('');
+
+  // State Modal 4: Xóa Tài Khoản (Admin Delete User)
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [userForDelete, setUserForDelete] = useState(null);
+
+  // 1. Tải danh sách người dùng thật từ AWS Cognito qua AdminController
+  const fetchUsers = useCallback(async () => {
+    setLoadingUsers(true);
+    try {
+      const data = await getAdminUsers({ limit: 60 });
+      setUsersList(data.users || []);
+    } catch (err) {
+      console.warn('[AdminUserManagement] Lỗi tải danh sách người dùng:', err);
+      showToast(
+        err.response?.data?.error || err.message || 'Không thể tải danh sách người dùng từ hệ thống.',
+        'warning',
+        'Cảnh báo'
+      );
+    } finally {
+      setLoadingUsers(false);
+    }
+  }, [showToast]);
+
+  // 2. Tải danh sách khóa học để cấp quyền
+  useEffect(() => {
+    fetchUsers();
+    getCourses()
+      .then((data) => {
+        if (Array.isArray(data)) setRealCourses(data);
+      })
+      .catch((err) => console.warn('[AdminUserManagement] Lỗi nạp khóa học:', err));
+  }, [fetchUsers]);
 
   const availableCourses = useMemo(() => {
     return realCourses.map((c) => ({
@@ -71,64 +109,148 @@ export default function AdminUserManagement() {
     return 'Student';
   };
 
+  // Danh sách người dùng sau khi lọc
+  const filteredUsers = useMemo(() => {
+    return usersList.filter((u) => {
+      const matchSearch =
+        !searchTerm.trim() ||
+        (u.email && u.email.toLowerCase().includes(searchTerm.toLowerCase().trim())) ||
+        (u.username && u.username.toLowerCase().includes(searchTerm.toLowerCase().trim())) ||
+        (u.fullName && u.fullName.toLowerCase().includes(searchTerm.toLowerCase().trim()));
+
+      const matchRole =
+        roleFilter === 'ALL' ||
+        formatRole(u.role).toLowerCase() === roleFilter.toLowerCase();
+
+      return matchSearch && matchRole;
+    });
+  }, [usersList, searchTerm, roleFilter]);
+
+  // =========================================================================
+  // XỬ LÝ 1: TẠO NGƯỜI DÙNG MỚI (POST /api/v1/admin/register)
+  // =========================================================================
   const handleOpenAddModal = () => {
+    setNewFullName('');
     setNewEmail('');
     setNewPassword('');
     setNewRole('Student');
     setShowAddModal(true);
   };
 
-  const handleCloseAddModal = () => {
-    setShowAddModal(false);
-  };
-
-  // =========================================================================
-  // GỌI API THẬT: POST /api/v1/auth/register
-  // =========================================================================
   const handleCreateUser = async (e) => {
     e.preventDefault();
 
     if (!newEmail.trim() || !newPassword) {
-      showToast(t('admin_users.missing_email_password'), 'warning', t('admin_users.missing_info'));
+      showToast('Vui lòng nhập đầy đủ Email và Mật khẩu.', 'warning', 'Thiếu thông tin');
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      showToast('Mật khẩu phải có tối thiểu 8 ký tự.', 'warning', 'Mật khẩu yếu');
       return;
     }
 
     const emailTrimmed = newEmail.trim().toLowerCase();
-    const rawRole = newRole === 'Instructor' ? 'instructor' : 'student';
-
     setSubmitting(true);
+
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/v1/auth/register`, {
-        fullName: emailTrimmed.split('@')[0],
+      const res = await createAdminUser({
+        fullName: newFullName.trim() || emailTrimmed.split('@')[0],
         email: emailTrimmed,
         password: newPassword,
-        role: rawRole,
+        role: newRole,
       });
 
-      // Thêm user mới vào danh sách hiển thị
-      const createdUser = {
-        ID: emailTrimmed,
-        Username: emailTrimmed,
-        Role: rawRole,
-        CreationTime: new Date().toISOString(),
-        assignedCourses: [],
-      };
-      setUsersList((prev) => [createdUser, ...prev]);
-
       showToast(
-        response.data?.message || `Đã tạo tài khoản "${emailTrimmed}" (${newRole}) thành công!`,
+        res?.message || `Đã tạo tài khoản "${emailTrimmed}" (${newRole}) thành công!`,
         'success',
-        t('admin_users.success')
+        'Thành công'
       );
-      handleCloseAddModal();
+      setShowAddModal(false);
+      await fetchUsers();
     } catch (err) {
-      const errMsg = err.response?.data?.error || err.message || 'Tạo tài khoản thất bại';
+      const errMsg = err.response?.data?.error || err.response?.data?.message || err.message || 'Tạo tài khoản thất bại';
       showToast(errMsg, 'danger', 'Lỗi tạo người dùng');
     } finally {
       setSubmitting(false);
     }
   };
 
+  // =========================================================================
+  // XỬ LÝ 2: ĐỔI MẬT KHẨU (POST /api/v1/admin/update)
+  // =========================================================================
+  const handleOpenPasswordModal = (user) => {
+    setUserForPassword(user);
+    setUpdatedPassword('');
+    setShowPasswordModal(true);
+  };
+
+  const handleUpdatePassword = async (e) => {
+    e.preventDefault();
+    if (!userForPassword) return;
+
+    if (!updatedPassword || updatedPassword.length < 8) {
+      showToast('Mật khẩu mới phải có ít nhất 8 ký tự.', 'warning', 'Mật khẩu không hợp lệ');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await updateAdminUserPassword({
+        email: userForPassword.email || userForPassword.username,
+        password: updatedPassword,
+      });
+
+      showToast(
+        res?.message || `Đã cập nhật mật khẩu mới cho ${userForPassword.email}!`,
+        'success',
+        'Đổi mật khẩu thành công'
+      );
+      setShowPasswordModal(false);
+      setUserForPassword(null);
+    } catch (err) {
+      const errMsg = err.response?.data?.error || err.message || 'Cập nhật mật khẩu thất bại';
+      showToast(errMsg, 'danger', 'Lỗi đổi mật khẩu');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // =========================================================================
+  // XỬ LÝ 3: XÓA NGƯỜI DÙNG (DELETE /api/v1/admin/delete)
+  // =========================================================================
+  const handleOpenDeleteModal = (user) => {
+    setUserForDelete(user);
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteUser = async () => {
+    if (!userForDelete) return;
+
+    setSubmitting(true);
+    try {
+      const email = userForDelete.email || userForDelete.username;
+      const res = await deleteAdminUser(email);
+
+      showToast(
+        res?.message || `Đã xóa tài khoản "${email}" khỏi hệ thống!`,
+        'success',
+        'Xóa tài khoản thành công'
+      );
+      setShowDeleteModal(false);
+      setUserForDelete(null);
+      await fetchUsers();
+    } catch (err) {
+      const errMsg = err.response?.data?.error || err.message || 'Xóa người dùng thất bại';
+      showToast(errMsg, 'danger', 'Lỗi xóa tài khoản');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // =========================================================================
+  // XỬ LÝ 4: CẤP QUYỀN KHÓA HỌC (PUT / DELETE /api/v1/course/.../entitlements)
+  // =========================================================================
   const handleOpenAssignModal = (student) => {
     setSelectedStudent(student);
     const assignedIds = student.assignedCourses || [];
@@ -152,47 +274,37 @@ export default function AdminUserManagement() {
     );
   };
 
-  // =========================================================================
-  // GỌI API THẬT: PUT/DELETE /api/v1/course/{courseId}/entitlements/{userSub}
-  // =========================================================================
   const handleSaveAssignedCourses = async (e) => {
     e.preventDefault();
     if (!selectedStudent) return;
 
-    const userSub = selectedStudent.ID || selectedStudent.Username;
+    const userSub = selectedStudent.sub || selectedStudent.id || selectedStudent.username;
     setSubmitting(true);
 
     try {
-      // 1. Tìm các khóa học mới được chọn -> gọi API CẤP QUYỀN (PUT)
+      // 1. Cấp quyền các khóa học mới
       const toGrant = tempAssignedCourses.filter((id) => !initialAssignedCourses.includes(id));
       for (const courseId of toGrant) {
-        await axios.put(
-          `${API_BASE_URL}/api/v1/course/${courseId}/entitlements/${userSub}`,
-          {},
-          { headers: getAuthHeader() }
-        );
+        await grantCourseEntitlement(courseId, userSub);
       }
 
-      // 2. Tìm các khóa học bị bỏ chọn -> gọi API THU HỒI QUYỀN (DELETE)
+      // 2. Thu hồi quyền các khóa học bị bỏ chọn
       const toRevoke = initialAssignedCourses.filter((id) => !tempAssignedCourses.includes(id));
       for (const courseId of toRevoke) {
-        await axios.delete(
-          `${API_BASE_URL}/api/v1/course/${courseId}/entitlements/${userSub}`,
-          { headers: getAuthHeader() }
-        );
+        await revokeCourseEntitlement(courseId, userSub);
       }
 
       // Cập nhật lại state danh sách khóa học của học viên
       setUsersList((prev) =>
         prev.map((u) =>
-          u.ID === selectedStudent.ID ? { ...u, assignedCourses: tempAssignedCourses } : u
+          u.id === selectedStudent.id ? { ...u, assignedCourses: tempAssignedCourses } : u
         )
       );
 
       showToast(
-        `Đã cập nhật quyền ${tempAssignedCourses.length} khóa học cho ${selectedStudent.Username}!`,
+        `Đã cập nhật quyền ${tempAssignedCourses.length} khóa học cho ${selectedStudent.username}!`,
         'success',
-        t('admin_users.grant_success')
+        'Cấp quyền thành công'
       );
       handleCloseAssignModal();
     } catch (err) {
@@ -205,130 +317,284 @@ export default function AdminUserManagement() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
-      {/* Header & Nút thêm người dùng */}
-      <div className="flex justify-between items-center">
+      {/* Header & Công cụ tìm kiếm / Thêm mới */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Quản Lý Người Dùng</h1>
-          <p className="text-gray-500 text-sm">Quản lý tài khoản và phân quyền khóa học của học viên</p>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-white">
+            Quản Lý Người Dùng
+          </h1>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
+            Quản trị danh sách tài khoản AWS Cognito, đặt lại mật khẩu và phân quyền khóa học
+          </p>
         </div>
-        <button
-          onClick={handleOpenAddModal}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium shadow-sm transition"
-        >
-          <UserPlus size={18} />
-          <span>Thêm Người Dùng</span>
-        </button>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={fetchUsers}
+            disabled={loadingUsers}
+            className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-200 rounded-lg text-sm font-medium transition disabled:opacity-50"
+            title="Làm mới danh sách từ AWS Cognito"
+          >
+            <RefreshCw size={16} className={loadingUsers ? 'animate-spin' : ''} />
+            <span className="hidden sm:inline">Làm Mới</span>
+          </button>
+
+          <button
+            onClick={handleOpenAddModal}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium shadow-sm transition"
+          >
+            <UserPlus size={18} />
+            <span>Thêm Người Dùng</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Thanh công cụ tìm kiếm và lọc vai trò */}
+      <div className="flex flex-col sm:flex-row gap-3 bg-white dark:bg-slate-850 p-4 rounded-xl shadow-xs border border-gray-200 dark:border-slate-800">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Tìm theo email, tên đăng nhập hoặc họ tên..."
+            className="w-full pl-9 pr-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg text-sm bg-transparent focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-medium text-gray-500 whitespace-nowrap">Vai trò:</label>
+          <select
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-300 dark:border-slate-700 rounded-lg text-sm bg-transparent focus:ring-2 focus:ring-indigo-500 outline-none"
+          >
+            <option value="ALL">Tất cả vai trò</option>
+            <option value="Student">Student (Học viên)</option>
+            <option value="Instructor">Instructor (Giảng viên)</option>
+            <option value="Administrator">Administrator (Quản trị viên)</option>
+          </select>
+        </div>
       </div>
 
       {/* Bảng danh sách người dùng */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50 text-gray-600 text-xs uppercase font-semibold">
-            <tr>
-              <th className="px-6 py-3 text-left">Email / Username</th>
-              <th className="px-6 py-3 text-left">Vai Trò</th>
-              <th className="px-6 py-3 text-left">Ngày Tạo</th>
-              <th className="px-6 py-3 text-right">Thao Tác</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 text-sm">
-            {usersList.length === 0 ? (
+      <div className="bg-white dark:bg-slate-850 rounded-xl shadow-xs border border-gray-200 dark:border-slate-800 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-800">
+            <thead className="bg-gray-50 dark:bg-slate-900/60 text-gray-600 dark:text-gray-400 text-xs uppercase font-semibold">
               <tr>
-                <td colSpan="4" className="px-6 py-8 text-center text-gray-400">
-                  Chưa có người dùng nào. Nhấn "Thêm Người Dùng" để tạo tài khoản mới qua API.
-                </td>
+                <th className="px-6 py-3.5 text-left">Email / Người dùng</th>
+                <th className="px-6 py-3.5 text-left">Vai Trò</th>
+                <th className="px-6 py-3.5 text-left">Trạng Thái</th>
+                <th className="px-6 py-3.5 text-left">Ngày Tạo</th>
+                <th className="px-6 py-3.5 text-right">Thao Tác</th>
               </tr>
-            ) : (
-              usersList.map((user) => (
-                <tr key={user.ID} className="hover:bg-gray-50/80">
-                  <td className="px-6 py-4 font-medium text-gray-800">{user.Username}</td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        formatRole(user.Role) === 'Administrator'
-                          ? 'bg-purple-100 text-purple-800'
-                          : formatRole(user.Role) === 'Instructor'
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'bg-emerald-100 text-emerald-800'
-                      }`}
-                    >
-                      {formatRole(user.Role)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-gray-500">
-                    {new Date(user.CreationTime).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    {formatRole(user.Role) === 'Student' && (
-                      <button
-                        onClick={() => handleOpenAssignModal(user)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-md transition"
-                      >
-                        <GraduationCap size={15} />
-                        <span>Cấp Quyền Khóa Học</span>
-                      </button>
-                    )}
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-slate-800 text-sm">
+              {loadingUsers ? (
+                <tr>
+                  <td colSpan="5" className="px-6 py-12 text-center text-gray-400">
+                    <div className="flex flex-col items-center justify-center gap-3">
+                      <Loader2 className="h-8 w-8 text-indigo-600 animate-spin" />
+                      <span>Đang nạp danh sách người dùng từ AWS Cognito...</span>
+                    </div>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : filteredUsers.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="px-6 py-12 text-center text-gray-400">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <Users className="h-10 w-10 text-gray-300" />
+                      <p className="font-medium text-gray-600 dark:text-gray-300">Không tìm thấy người dùng nào</p>
+                      <p className="text-xs text-gray-400">
+                        {searchTerm ? 'Thử thay đổi từ khóa tìm kiếm' : 'Nhấn "Thêm Người Dùng" để tạo tài khoản mới qua API'}
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredUsers.map((user) => (
+                  <tr key={user.id} className="hover:bg-gray-50/80 dark:hover:bg-slate-800/40 transition">
+                    <td className="px-6 py-4">
+                      <div>
+                        <div className="font-medium text-gray-900 dark:text-gray-100">
+                          {user.email || user.username}
+                        </div>
+                        {user.fullName && user.fullName !== user.email && (
+                          <div className="text-xs text-gray-400 mt-0.5">{user.fullName}</div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                          formatRole(user.role) === 'Administrator'
+                            ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300'
+                            : formatRole(user.role) === 'Instructor'
+                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300'
+                            : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                        }`}
+                      >
+                        {formatRole(user.role)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`inline-flex items-center gap-1 text-xs font-medium ${
+                          user.status === 'CONFIRMED'
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : 'text-amber-600 dark:text-amber-400'
+                        }`}
+                      >
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${
+                            user.status === 'CONFIRMED' ? 'bg-emerald-500' : 'bg-amber-500'
+                          }`}
+                        />
+                        {user.status || 'Active'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-gray-500 dark:text-gray-400 text-xs">
+                      {user.creationTime
+                        ? new Date(user.creationTime).toLocaleString('vi-VN', {
+                            dateStyle: 'short',
+                            timeStyle: 'short',
+                          })
+                        : '—'}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {/* Nút Cấp quyền khóa học cho học viên */}
+                        {formatRole(user.role) === 'Student' && (
+                          <button
+                            onClick={() => handleOpenAssignModal(user)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 rounded-md transition"
+                            title="Cấp quyền truy cập bài giảng khóa học"
+                          >
+                            <GraduationCap size={14} />
+                            <span className="hidden md:inline">Cấp Quyền</span>
+                          </button>
+                        )}
+
+                        {/* Nút Đổi mật khẩu (Admin Update) */}
+                        <button
+                          onClick={() => handleOpenPasswordModal(user)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900/60 rounded-md transition"
+                          title="Đặt lại mật khẩu cho tài khoản này"
+                        >
+                          <Key size={14} />
+                          <span className="hidden md:inline">Đổi MK</span>
+                        </button>
+
+                        {/* Nút Xóa tài khoản (Admin Delete) */}
+                        <button
+                          onClick={() => handleOpenDeleteModal(user)}
+                          className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/50 hover:bg-red-100 dark:hover:bg-red-900/60 rounded-md transition"
+                          title="Xóa tài khoản vĩnh viễn"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {/* MODAL 1: Tạo Người Dùng */}
+      {/* MODAL 1: Tạo Người Dùng Mới (POST /api/v1/admin/register) */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
-            <h3 className="text-lg font-bold text-gray-900">Tạo Tài Khoản Mới</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 border border-gray-100 dark:border-slate-800">
+            <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-slate-800">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <UserPlus className="h-5 w-5 text-indigo-600" />
+                <span>Tạo Tài Khoản Mới</span>
+              </h3>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
             <form onSubmit={handleCreateUser} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Họ và Tên
+                </label>
+                <input
+                  type="text"
+                  value={newFullName}
+                  onChange={(e) => setNewFullName(e.target.value)}
+                  placeholder="Ví dụ: Nguyễn Văn A"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 bg-transparent rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Email / Tên đăng nhập *
+                </label>
                 <input
                   type="email"
                   required
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
                   placeholder="user@example.com"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 bg-transparent rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                 />
               </div>
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Mật khẩu *
+                </label>
                 <input
                   type="password"
                   required
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Tối thiểu 8 ký tự"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Tối thiểu 8 ký tự (hoa, thường, số)"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 bg-transparent rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                 />
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Mật khẩu phải thỏa mãn chính sách bảo mật của AWS Cognito.
+                </p>
               </div>
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Vai trò</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Vai trò hệ thống
+                </label>
                 <select
                   value={newRole}
                   onChange={(e) => setNewRole(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 bg-transparent rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                 >
                   <option value="Student">Student (Học viên)</option>
                   <option value="Instructor">Instructor (Giảng viên)</option>
                 </select>
               </div>
-              <div className="flex justify-end gap-2 pt-2">
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-gray-100 dark:border-slate-800">
                 <button
                   type="button"
-                  onClick={handleCloseAddModal}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  onClick={() => setShowAddModal(false)}
+                  className="px-4 py-2 border border-gray-300 dark:border-slate-700 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 transition"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 transition"
                 >
-                  {submitting ? 'Đang tạo...' : 'Tạo Tài Khoản'}
+                  {submitting && <Loader2 size={16} className="animate-spin" />}
+                  <span>{submitting ? 'Đang tạo...' : 'Tạo Tài Khoản'}</span>
                 </button>
               </div>
             </form>
@@ -336,32 +602,163 @@ export default function AdminUserManagement() {
         </div>
       )}
 
-      {/* MODAL 2: Cấp Quyền Khóa Học */}
-      {showAssignModal && selectedStudent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 space-y-4">
-            <h3 className="text-lg font-bold text-gray-900">
-              Cấp Quyền Cho: <span className="text-indigo-600">{selectedStudent.Username}</span>
-            </h3>
-            <p className="text-sm text-gray-500">Tích chọn các khóa học mà học viên được phép vào học:</p>
-            <div className="max-h-60 overflow-y-auto divide-y divide-gray-100 border border-gray-200 rounded-lg p-2">
-              {availableCourses.map((course) => (
-                <label key={course.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={tempAssignedCourses.includes(course.id)}
-                    onChange={() => handleToggleCourseCheckbox(course.id)}
-                    className="h-4 w-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
-                  />
-                  <div className="flex-1 text-sm font-medium text-gray-800">{course.name}</div>
-                </label>
-              ))}
+      {/* MODAL 2: Đổi Mật Khẩu (POST /api/v1/admin/update) */}
+      {showPasswordModal && userForPassword && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 border border-gray-100 dark:border-slate-800">
+            <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-slate-800">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <Key className="h-5 w-5 text-amber-500" />
+                <span>Đặt Lại Mật Khẩu</span>
+              </h3>
+              <button
+                onClick={() => setShowPasswordModal(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              >
+                <X size={18} />
+              </button>
             </div>
-            <div className="flex justify-end gap-2 pt-2">
+
+            <form onSubmit={handleUpdatePassword} className="space-y-4">
+              <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/60 rounded-xl text-xs text-amber-800 dark:text-amber-300">
+                Bạn đang đặt lại mật khẩu cho tài khoản:{' '}
+                <strong>{userForPassword.email || userForPassword.username}</strong>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Mật khẩu mới *
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={updatedPassword}
+                  onChange={(e) => setUpdatedPassword(e.target.value)}
+                  placeholder="Tối thiểu 8 ký tự"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 bg-transparent rounded-lg text-sm focus:ring-2 focus:ring-amber-500 outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-gray-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordModal(false)}
+                  className="px-4 py-2 border border-gray-300 dark:border-slate-700 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 transition"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 transition"
+                >
+                  {submitting && <Loader2 size={16} className="animate-spin" />}
+                  <span>{submitting ? 'Đang lưu...' : 'Cập Nhật Mật Khẩu'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: Xóa Người Dùng (DELETE /api/v1/admin/delete) */}
+      {showDeleteModal && userForDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 border border-gray-100 dark:border-slate-800">
+            <div className="flex items-center gap-3 text-red-600">
+              <div className="p-2 bg-red-100 dark:bg-red-950/60 rounded-full">
+                <ShieldAlert className="h-6 w-6" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Xác Nhận Xóa Tài Khoản</h3>
+            </div>
+
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              Bạn có chắc chắn muốn xóa tài khoản{' '}
+              <strong className="text-red-600">{userForDelete.email || userForDelete.username}</strong> khỏi
+              hệ thống AWS Cognito không? Hành động này không thể hoàn tác.
+            </p>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-gray-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                className="px-4 py-2 border border-gray-300 dark:border-slate-700 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 transition"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={handleDeleteUser}
+                className="flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 transition"
+              >
+                {submitting && <Loader2 size={16} className="animate-spin" />}
+                <span>{submitting ? 'Đang xóa...' : 'Xóa Tài Khoản'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: Cấp Quyền Khóa Học (PUT/DELETE /api/v1/course/.../entitlements) */}
+      {showAssignModal && selectedStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4 border border-gray-100 dark:border-slate-800">
+            <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-slate-800">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-indigo-600" />
+                <span>
+                  Cấp Quyền Cho: <span className="text-indigo-600">{selectedStudent.username}</span>
+                </span>
+              </h3>
+              <button
+                onClick={handleCloseAssignModal}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Tích chọn các khóa học mà học viên được phép xem video bài giảng bảo mật HLS DRM:
+            </p>
+
+            <div className="max-h-64 overflow-y-auto divide-y divide-gray-100 dark:divide-slate-800 border border-gray-200 dark:border-slate-800 rounded-xl p-2 space-y-1">
+              {availableCourses.length === 0 ? (
+                <div className="p-4 text-center text-sm text-gray-400">Không có khóa học nào trên hệ thống</div>
+              ) : (
+                availableCourses.map((course) => {
+                  const isChecked = tempAssignedCourses.includes(course.id);
+                  return (
+                    <label
+                      key={course.id}
+                      className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition ${
+                        isChecked
+                          ? 'bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800'
+                          : 'hover:bg-gray-50 dark:hover:bg-slate-800/60 border border-transparent'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => handleToggleCourseCheckbox(course.id)}
+                        className="h-4 w-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                      />
+                      <div className="flex-1">
+                        <div className="text-sm font-medium text-gray-800 dark:text-gray-200">{course.name}</div>
+                        <div className="text-[11px] text-gray-400">Mã: {course.code}</div>
+                      </div>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-gray-100 dark:border-slate-800">
               <button
                 type="button"
                 onClick={handleCloseAssignModal}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                className="px-4 py-2 border border-gray-300 dark:border-slate-700 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 transition"
               >
                 Hủy
               </button>
@@ -369,9 +766,10 @@ export default function AdminUserManagement() {
                 type="button"
                 disabled={submitting}
                 onClick={handleSaveAssignedCourses}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 transition"
               >
-                {submitting ? 'Đang lưu...' : 'Lưu Quyền Hạn'}
+                {submitting && <Loader2 size={16} className="animate-spin" />}
+                <span>{submitting ? 'Đang lưu...' : 'Lưu Quyền Hạn'}</span>
               </button>
             </div>
           </div>
