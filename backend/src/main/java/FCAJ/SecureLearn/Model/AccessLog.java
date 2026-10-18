@@ -5,7 +5,11 @@
 package FCAJ.SecureLearn.Model;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 /**
  *
@@ -13,13 +17,16 @@ import java.time.LocalDateTime;
  */
 @Entity
 public class AccessLog {
-    String id, studentEmail, objectAccessed, currentUrl;
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+    String studentEmail, objectAccessed, currentUrl;
     LocalDateTime accessedTime;
 
     public AccessLog() {
     }
 
-    public AccessLog(String id, String studentEmail, String objectAccessed, String currentUrl, LocalDateTime accessedTime) {
+    public AccessLog(UUID id, String studentEmail, String objectAccessed, String currentUrl, LocalDateTime accessedTime) {
         this.id = id;
         this.studentEmail = studentEmail;
         this.objectAccessed = objectAccessed;
@@ -27,14 +34,17 @@ public class AccessLog {
         this.accessedTime = accessedTime;
     }
 
-    public String getId() {
+    public UUID getId() {
         return id;
     }
 
-    public void setId(String id) {
+    public void setId(UUID id) {
         this.id = id;
     }
 
+    
+
+    
     public String getStudentEmail() {
         return studentEmail;
     }

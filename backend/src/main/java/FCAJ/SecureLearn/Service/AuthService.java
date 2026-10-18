@@ -270,7 +270,18 @@ public class AuthService {
            if (nextToken != null && !nextToken.isBlank()) {
                request.paginationToken(nextToken);
            }
+           ListUsersResponse userResponse = cognitoClient.listUsers(request.build());
+           userResponse.users();
            return cognitoClient.listUsers(request.build());
+       }catch (CognitoIdentityProviderException e){
+           throw new RuntimeException("Could not retrieve users: " + e.awsErrorDetails().errorMessage(), e);
+       }
+   }
+   
+   public List<String> getUserRole(String username){
+       try{
+           AdminListGroupsForUserRequest request = AdminListGroupsForUserRequest.builder().userPoolId(userPoolId).username(username).build();
+         return cognitoClient.adminListGroupsForUser(request).groups().stream().map(GroupType::groupName).toList();
        }catch (CognitoIdentityProviderException e){
            throw new RuntimeException("Could not retrieve users: " + e.awsErrorDetails().errorMessage(), e);
        }

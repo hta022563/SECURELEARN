@@ -6,8 +6,11 @@ package FCAJ.SecureLearn.Controller;
 
 import FCAJ.SecureLearn.Request.LoginRequest;
 import FCAJ.SecureLearn.Request.RegisterRequest;
+import FCAJ.SecureLearn.Response.UserAttributeDTO;
+import FCAJ.SecureLearn.Response.UserListDTO;
 import FCAJ.SecureLearn.Response.UserPage;
 import FCAJ.SecureLearn.Service.AuthService;
+import java.util.List;
 import java.util.Map;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -18,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.ListUsersResponse;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.UserType;
 
 /**
  *
@@ -41,7 +45,6 @@ public class AdminController {
         }
 
         try {
-            if(request.getRole().equalsIgnoreCase("student")){
             authService.register(
                     request.getFullName(),
                     request.getEmail().trim().toLowerCase(),
@@ -52,7 +55,6 @@ public class AdminController {
                     "message", "Account created successfully. You can now log in.",
                     "email", request.getEmail().trim().toLowerCase()
             ));
-            }else return ResponseEntity.badRequest().body(Map.of("message","Cannot register account, please contact admin if you want to add instructor or admin"));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (RuntimeException e) {
@@ -108,7 +110,16 @@ public class AdminController {
         }
         try{
             ListUsersResponse result = authService.getUserPage(nextToken, limit);
-            return ResponseEntity.ok(new UserPage(result.users(), result.paginationToken()));
+            
+            List<UserListDTO> userList = result.users().stream().map(user -> new UserListDTO(user.username(),
+                    user.attributes().stream().map(attribute -> new UserAttributeDTO(attribute.name(), 
+                            attribute.value())).toList(),
+                    authService.getUserRole(user.username()).stream().findFirst().orElse("STUDENT"),
+                    user.userStatus()== null ? null : user.userStatusAsString(),
+                    user.enabled(),
+                    user.userCreateDate(),
+                    user.userLastModifiedDate())).toList();
+            return ResponseEntity.ok(new UserPage(userList, result.paginationToken()));
         }catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (RuntimeException e) {
