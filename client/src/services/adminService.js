@@ -39,7 +39,7 @@ export async function getAdminUsers({ limit = 50, nextToken = null } = {}) {
     const email = getAttr('email') || username;
     const name = getAttr('name') || email.split('@')[0];
     const sub = getAttr('sub') || username;
-    const roleAttr = getAttr('custom:role') || getAttr('role');
+    const roleAttr = u.role || getAttr('custom:role') || getAttr('role');
 
     // Phân loại Vai trò
     let role = 'Student';
