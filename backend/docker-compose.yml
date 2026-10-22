@@ -81,8 +81,8 @@ services:
       R2_REGION: ${R2_REGION:-auto}
       R2_BUCKET_NAME: ${R2_BUCKET_NAME:?Set R2_BUCKET_NAME in the .env file}
       R2_PUBLIC_URL: ${R2_PUBLIC_URL:?Set R2_PUBLIC_URL in the .env file}
-      R2_ACCESS_KEY: ${R2_ACCESS_KEY:?Set R2_ACCESS_KEY in the .env file}
-      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:?Set R2_SECRET_ACCESS_KEY in the .env file}
+      R2_ACCESS_KEY: ${R2_ACCESS_KEY:-${AWS_ACCESS_KEY_ID:?Set AWS_ACCESS_KEY_ID or R2_ACCESS_KEY in the .env file}}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-${AWS_SECRET_ACCESS_KEY:?Set AWS_SECRET_ACCESS_KEY or R2_SECRET_ACCESS_KEY in the .env file}}
 
       # Spring Cloud AWS / DynamoDB — must match spring.cloud.aws.* property keys
       AWS_DYNAMODB_ENDPOINT: http://dynamodb-local:8000
