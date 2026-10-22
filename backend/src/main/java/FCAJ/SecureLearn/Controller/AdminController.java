@@ -10,9 +10,14 @@ import FCAJ.SecureLearn.Response.UserAttributeDTO;
 import FCAJ.SecureLearn.Response.UserListDTO;
 import FCAJ.SecureLearn.Response.UserPage;
 import FCAJ.SecureLearn.Service.AuthService;
+import FCAJ.SecureLearn.Service.LogService;
+import jakarta.servlet.http.HttpServletRequest;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -31,12 +36,14 @@ import software.amazon.awssdk.services.cognitoidentityprovider.model.UserType;
 @RequestMapping("/api/v1/admin")
 public class AdminController {
      private final AuthService authService;
+     private final LogService logService;
 
-    public AdminController(AuthService authService) {
+    public AdminController(AuthService authService, LogService logService) {
         this.authService = authService;
+        this.logService = logService;
     }
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
+    public ResponseEntity<?> register(@RequestBody RegisterRequest request, HttpServletRequest servletRequest, @AuthenticationPrincipal Jwt jwt) {
         if (request.getEmail() == null || request.getEmail().isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Email is required."));
         }
@@ -51,6 +58,7 @@ public class AdminController {
                     request.getPassword(),
                     request.getRole()
             );
+            logService.createLog(jwt.getClaimAsString("username"),"AdminRegister", LocalDateTime.now(), servletRequest.getRemoteAddr());
             return ResponseEntity.ok(Map.of(
                     "message", "Account created successfully. You can now log in.",
                     "email", request.getEmail().trim().toLowerCase()
@@ -64,7 +72,7 @@ public class AdminController {
     }
     
     @PostMapping("/update")
-    public ResponseEntity<?> updateUser(@RequestBody LoginRequest request){
+    public ResponseEntity<?> updateUser(@RequestBody LoginRequest request, HttpServletRequest servletRequest, @AuthenticationPrincipal Jwt jwt){
         if (request.getEmail() == null || request.getEmail().isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Email is required."));
         }
@@ -73,6 +81,7 @@ public class AdminController {
         }
         try{
             authService.updateAccountByAdmin(request.getEmail(), request.getPassword());
+            logService.createLog(jwt.getClaimAsString("username"),"AdminUpdate", LocalDateTime.now(), servletRequest.getRemoteAddr());
             return ResponseEntity.ok(Map.of("message", "Successfully update user password"));
         }catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -83,12 +92,13 @@ public class AdminController {
     }
     
     @DeleteMapping("/delete")
-    public ResponseEntity<?> deleteUser (@RequestBody String email){
+    public ResponseEntity<?> deleteUser (@RequestBody String email, HttpServletRequest servletRequest, @AuthenticationPrincipal Jwt jwt){
         if(email == null || email.isBlank()){
             return ResponseEntity.badRequest().body(Map.of("error","User Email is required"));
         }
         try{
             authService.deleteAccount(email);
+            logService.createLog(jwt.getClaimAsString("username"),"AdminDelete", LocalDateTime.now(), servletRequest.getRemoteAddr());
             return ResponseEntity.ok(Map.of("message", "Successfully delete"));
         }catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));

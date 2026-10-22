@@ -5,6 +5,7 @@ import FCAJ.SecureLearn.Request.PasswordChangeRequest;
 import FCAJ.SecureLearn.Request.RegisterRequest;
 import FCAJ.SecureLearn.Service.AuthService;
 import FCAJ.SecureLearn.Service.LogService;
+import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -105,7 +106,7 @@ public class AuthController {
      * }
      */
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<?> login(@RequestBody LoginRequest request, HttpServletRequest servletRequest) {
         if (request.getEmail() == null || request.getEmail().isBlank()
                 || request.getPassword() == null || request.getPassword().isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Email and password are required."));
@@ -116,7 +117,7 @@ public class AuthController {
                     request.getEmail().trim().toLowerCase(),
                     request.getPassword()
             );
-            logService.logTest(request.getEmail(), LocalDateTime.now());
+            logService.createLog(request.getEmail().trim().toLowerCase(), "Login", LocalDateTime.now(),servletRequest.getRemoteAddr());
             return ResponseEntity.ok(Map.of(
                     "accessToken",  result.accessToken(),
                     "idToken",      result.idToken(),

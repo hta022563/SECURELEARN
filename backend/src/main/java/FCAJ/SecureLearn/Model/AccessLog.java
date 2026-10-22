@@ -26,8 +26,6 @@ public class AccessLog {
     LocalDateTime accessedTime;
     String actionType, ipAddress;
     long videoId;
-    int downloadInterval;
-
     public AccessLog() {
     }
 
@@ -92,13 +90,6 @@ public class AccessLog {
         this.videoId = videoId;
     }
 
-    public int getDownloadInterval() {
-        return downloadInterval;
-    }
-
-    public void setDownloadInterval(int downloadInterval) {
-        this.downloadInterval = downloadInterval;
-    }
 
     
 }

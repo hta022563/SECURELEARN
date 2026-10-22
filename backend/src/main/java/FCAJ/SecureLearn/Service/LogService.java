@@ -30,22 +30,7 @@ public class LogService {
         this.enhancedClient = enhancedClient;
         logTable = enhancedClient.table("AccessLog", TableSchema.fromBean(AccessLog.class));
     }
-   
- 
-    
-    public void logTest(String userEmail,LocalDateTime accessedTime){
-        QueryConditional userQuery = QueryConditional.keyEqualTo(Key.builder().addPartitionValue(userEmail).build());
-        PageIterable<AccessLog> logList = logTable.query(userQuery);
-        int count = 1;
-        for(AccessLog log : logList.items()){
-                        if(log.getLogId().startsWith("ACC")){
-                            count ++;
-                        }
-                    }
-                    String logId = "ACC" + String.format("%04d", count);
-                    AccessLog newLog = new AccessLog(logId, userEmail, accessedTime,"Login ", "192.168.1.1");
-                    logTable.putItem(newLog);
-    }
+  
     
     public void createLog(String userId, String actionType, LocalDateTime accessedTime, String ipAddress){
         QueryConditional userQuery = QueryConditional.keyEqualTo(Key.builder().addPartitionValue(userId).build());
@@ -85,7 +70,7 @@ public class LogService {
                     logTable.putItem(newLog);
                 }
                 
-                case "AdminCreate" -> {
+                case "AdminRegister" -> {
                     for(AccessLog log : logList.items()){
                         if(log.getLogId().startsWith("ADM")){
                             count ++;
@@ -143,6 +128,16 @@ public class LogService {
                         }
                     }
                     String logId = "COU" + String.format("%04d", count);
+                    AccessLog newLog = new AccessLog(logId, userId, accessedTime,actionType, ipAddress);
+                    logTable.putItem(newLog);
+                }
+                default ->{
+                    for(AccessLog log : logList.items()){
+                        if(log.getLogId().startsWith("UNK")){
+                            count ++;
+                        }
+                    }
+                    String logId = "UNK" + String.format("%04d", count);
                     AccessLog newLog = new AccessLog(logId, userId, accessedTime,actionType, ipAddress);
                     logTable.putItem(newLog);
                 }
