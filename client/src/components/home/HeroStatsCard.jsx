@@ -54,7 +54,6 @@ export default function HeroStatsCard({
       : 'grid-cols-2 sm:grid-cols-4';
 
   const defaultBadge = t('home.hero_card_badge', lang === 'vi' ? 'Khóa học trực tuyến' : 'Live Online');
-  const defaultStatus = t('home.hero_card_status', lang === 'vi' ? 'Hệ thống trực tuyến' : 'System Online');
   const defaultSlogan = t(
     'home.hero_card_slogan',
     lang === 'vi'
@@ -84,12 +83,12 @@ export default function HeroStatsCard({
               </div>
               <span className="font-bold text-slate-800 dark:text-slate-200">{rating}</span>
             </div>
-          ) : (
+          ) : statusText ? (
             <div className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium">
               <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              <span>{statusText || defaultStatus}</span>
+              <span>{statusText}</span>
             </div>
-          )}
+          ) : null}
         </div>
 
         {/* Dynamic Metric Columns: 100% Dữ liệu mềm */}
