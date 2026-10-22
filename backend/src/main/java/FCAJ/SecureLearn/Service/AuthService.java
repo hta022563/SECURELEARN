@@ -270,8 +270,6 @@ public class AuthService {
            if (nextToken != null && !nextToken.isBlank()) {
                request.paginationToken(nextToken);
            }
-           ListUsersResponse userResponse = cognitoClient.listUsers(request.build());
-           userResponse.users();
            return cognitoClient.listUsers(request.build());
        }catch (CognitoIdentityProviderException e){
            throw new RuntimeException("Could not retrieve users: " + e.awsErrorDetails().errorMessage(), e);
@@ -286,6 +284,18 @@ public class AuthService {
            throw new RuntimeException("Could not retrieve users: " + e.awsErrorDetails().errorMessage(), e);
        }
    }
-   
-  
+
+   public String getEmailByUsername(String username){
+       try{
+           AdminGetUserRequest request = AdminGetUserRequest.builder().userPoolId(userPoolId).username(username).build();
+           return cognitoClient.adminGetUser(request).userAttributes().stream()
+                   .filter(attribute -> "email".equals(attribute.name()))
+                   .map(AttributeType::value)
+                   .findFirst()
+                   .orElse(username);
+       }catch (CognitoIdentityProviderException e){
+           throw new RuntimeException("Could not retrieve user: " + e.awsErrorDetails().errorMessage(), e);
+       }
+   }
+
 }

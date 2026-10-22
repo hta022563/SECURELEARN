@@ -16,39 +16,7 @@ services:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-SecureLearn}"]
       interval: 10s
       timeout: 5s
-      retries: 5
-
-  # DynamoDB Local
-  dynamodb-local:
-    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath ./data"
-    image: "amazon/dynamodb-local:latest"
-    container_name: dynamodb-local
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    volumes:
-      - "./docker/dynamodb:/home/dynamodblocal/data"
-    working_dir: /home/dynamodblocal
-
-  # DynamoDB Table Initialization
-  dynamodb-init:
-    image: amazon/aws-cli
-    container_name: dynamodb-init
-    depends_on:
-      - dynamodb-local
-    environment:
-      AWS_ACCESS_KEY_ID: dummy
-      AWS_SECRET_ACCESS_KEY: dummy
-      AWS_DEFAULT_REGION: ap-southeast-1
-    entrypoint: /bin/sh
-    command:
-      - "-c"
-      - |
-        echo "Waiting for DynamoDB..."
-        until aws dynamodb list-tables --endpoint-url http://dynamodb-local:8000 >/dev/null 2>&1; do sleep 1; done
-        echo "DynamoDB ready."
-        echo "DynamoDB initialized."
-
+      retries: 5      
   # Spring Boot Backend
   backend:
     build: .
@@ -59,8 +27,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      dynamodb-init:
-        condition: service_completed_successfully
     environment:
       # PostgreSQL
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-SecureLearn}
@@ -82,12 +48,6 @@ services:
       R2_PUBLIC_URL: ${R2_PUBLIC_URL:?Set R2_PUBLIC_URL in the .env file}
       R2_ACCESS_KEY: ${R2_ACCESS_KEY:?Set R2_ACCESS_KEY in the .env file}
       R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:?Set R2_SECRET_ACCESS_KEY in the .env file}
-
-      # Spring Cloud AWS / DynamoDB — must match spring.cloud.aws.* property keys
-      AWS_DYNAMODB_ENDPOINT: http://dynamodb-local:8000
-      AWS_DYNAMODB_REGION: ${AWS_REGION:-ap-southeast-1}
-      AWS_DYNAMODB_ACCESS_KEY: dummy
-      AWS_DYNAMODB_SECRET_KEY: dummy
 
       # CORS
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173,http://localhost:5174}

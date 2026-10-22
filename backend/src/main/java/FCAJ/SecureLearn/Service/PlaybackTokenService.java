@@ -25,15 +25,15 @@ public class PlaybackTokenService {
         this.ttlSeconds = ttlSeconds;
     }
 
-    public IssuedToken issue(UUID lessonId) {
+    public IssuedToken issue(UUID lessonId, String username) {
         long expiresAt = Instant.now().getEpochSecond() + ttlSeconds;
-        String payload = lessonId + ":" + expiresAt;
+        String payload = lessonId + ":" + username + ":" + expiresAt;
         String encodedPayload = Base64.getUrlEncoder().withoutPadding()
                 .encodeToString(payload.getBytes(StandardCharsets.UTF_8));
         return new IssuedToken(encodedPayload + "." + sign(encodedPayload), expiresAt);
     }
 
-    public boolean isValid(UUID lessonId, String token) {
+    public boolean isValid(UUID lessonId, String token, String username) {
         if (token == null) {
             return false;
         }
@@ -45,10 +45,11 @@ public class PlaybackTokenService {
         }
         try {
             String payload = new String(Base64.getUrlDecoder().decode(parts[0]), StandardCharsets.UTF_8);
-            String[] claims = payload.split(":", 2);
-            return claims.length == 2
+            String[] claims = payload.split(":", 3);
+            return claims.length == 3
+                    && claims[1].equals(username)
                     && lessonId.equals(UUID.fromString(claims[0]))
-                    && Instant.now().getEpochSecond() < Long.parseLong(claims[1]);
+                    && Instant.now().getEpochSecond() < Long.parseLong(claims[2]);
         } catch (IllegalArgumentException e) {
             return false;
         }

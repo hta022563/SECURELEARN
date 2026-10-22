@@ -25,14 +25,21 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 @Service
 public class LogService {
    private final DynamoDbEnhancedClient enhancedClient;
-    final DynamoDbTable<AccessLog> logTable;   
-    public LogService(DynamoDbEnhancedClient enhancedClient) {
+   private final AuthService authService;
+    final DynamoDbTable<AccessLog> logTable;
+    public LogService(DynamoDbEnhancedClient enhancedClient, AuthService authService) {
         this.enhancedClient = enhancedClient;
+        this.authService = authService;
         logTable = enhancedClient.table("AccessLog", TableSchema.fromBean(AccessLog.class));
     }
-  
-    
-    public void createLog(String userId, String actionType, LocalDateTime accessedTime, String ipAddress){
+
+    // Takes the Cognito username from the JWT and logs under the user's email
+    public void createLog(String username, String actionType, LocalDateTime accessedTime, String ipAddress){
+        createLogWithEmail(authService.getEmailByUsername(username), actionType, accessedTime, ipAddress);
+    }
+
+    // Use when the email is already known (e.g. login) to skip the Cognito lookup
+    public void createLogWithEmail(String userId, String actionType, LocalDateTime accessedTime, String ipAddress){
         QueryConditional userQuery = QueryConditional.keyEqualTo(Key.builder().addPartitionValue(userId).build());
         PageIterable<AccessLog> logList = logTable.query(userQuery);
         int count = 1;

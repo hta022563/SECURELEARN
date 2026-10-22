@@ -1,5 +1,6 @@
 package FCAJ.SecureLearn.Controller;
 
+import FCAJ.SecureLearn.Service.AuthService;
 import FCAJ.SecureLearn.Service.LogService;
 import FCAJ.SecureLearn.Service.PlaybackService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,10 +22,12 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 public class PlaybackController {
     private final PlaybackService playbackService;
     private final LogService logService;
+    private final AuthService authService;
 
-    public PlaybackController(PlaybackService playbackService, LogService logService) {
+    public PlaybackController(PlaybackService playbackService, LogService logService, AuthService authService) {
         this.playbackService = playbackService;
         this.logService = logService;
+        this.authService = authService;
     }
 
     @GetMapping("/api/v1/lesson/{id}/playback")
@@ -35,7 +38,7 @@ public class PlaybackController {
         String contextUrl = ServletUriComponentsBuilder.fromCurrentContextPath()
                 .build()
                 .toUriString();
-        PlaybackService.PlaybackDetails details = playbackService.createPlayback(id, contextUrl);
+        PlaybackService.PlaybackDetails details = playbackService.createPlayback(id, contextUrl,jwt.getClaimAsString("username"));
         logService.createLog(jwt.getClaimAsString("username"), "Playback", LocalDateTime.now(), servletRequest.getRemoteAddr());
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
@@ -45,11 +48,12 @@ public class PlaybackController {
     @GetMapping(value = "/api/v1/lesson/{id}/manifest", produces = "application/vnd.apple.mpegurl")
     public ResponseEntity<String> getManifest(
             @PathVariable UUID id,
-            @RequestParam String token) {
+            @RequestParam String token,
+            @AuthenticationPrincipal Jwt jwt) {
         String contextUrl = ServletUriComponentsBuilder.fromCurrentContextPath()
             .build()
             .toUriString();
-        String manifest = playbackService.getSignedManifest(id, token, contextUrl);
+        String manifest = playbackService.getSignedManifest(id, token, contextUrl, jwt.getClaimAsString("username"));
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType("application/vnd.apple.mpegurl"))
                 .cacheControl(CacheControl.noStore())
@@ -59,9 +63,10 @@ public class PlaybackController {
     @GetMapping(value = "/api/v1/lesson/{id}/key", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
     public ResponseEntity<byte[]> getContentKey(
             @PathVariable UUID id,
-            @RequestParam String token) {
+            @RequestParam String token,
+            @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
-                .body(playbackService.getContentKey(id, token));
+                .body(playbackService.getContentKey(id, token, jwt.getClaimAsString("username")));
     }
 }

@@ -117,7 +117,7 @@ public class AuthController {
                     request.getEmail().trim().toLowerCase(),
                     request.getPassword()
             );
-            logService.createLog(request.getEmail().trim().toLowerCase(), "Login", LocalDateTime.now(),servletRequest.getRemoteAddr());
+            logService.createLogWithEmail(request.getEmail().trim().toLowerCase(), "Login", LocalDateTime.now(),servletRequest.getRemoteAddr());
             return ResponseEntity.ok(Map.of(
                     "accessToken",  result.accessToken(),
                     "idToken",      result.idToken(),
