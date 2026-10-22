@@ -13,13 +13,7 @@ import org.slf4j.LoggerFactory;
 
 import FCAJ.SecureLearn.Model.Course;
 import java.util.UUID;
-import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
-import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
-import software.amazon.awssdk.enhanced.dynamodb.Key;
-import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
-import software.amazon.awssdk.enhanced.dynamodb.model.PageIterable;
-import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
-import FCAJ.SecureLearn.repositories.CourseRepo;
+import FCAJ.SecureLearn.Repositories.CourseRepo;
 
 /**
  * Service for managing courses and lessons in DynamoDB

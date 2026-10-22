@@ -16,9 +16,9 @@ import FCAJ.SecureLearn.Model.Chapter;
 import FCAJ.SecureLearn.Model.Course;
 import FCAJ.SecureLearn.Model.Lesson;
 import FCAJ.SecureLearn.Response.LessonResponse;
-import FCAJ.SecureLearn.repositories.ChapterRepo;
-import FCAJ.SecureLearn.repositories.CourseRepo;
-import FCAJ.SecureLearn.repositories.LessonRepo;
+import FCAJ.SecureLearn.Repositories.ChapterRepo;
+import FCAJ.SecureLearn.Repositories.CourseRepo;
+import FCAJ.SecureLearn.Repositories.LessonRepo;
 
 /**
  *

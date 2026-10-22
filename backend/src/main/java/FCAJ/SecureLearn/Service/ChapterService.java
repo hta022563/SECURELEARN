@@ -6,10 +6,10 @@ package FCAJ.SecureLearn.Service;
 
 import FCAJ.SecureLearn.Model.Chapter;
 import FCAJ.SecureLearn.Model.Course;
-import FCAJ.SecureLearn.repositories.ChapterRepo;
+import FCAJ.SecureLearn.Repositories.ChapterRepo;
 import java.util.List;
 import org.springframework.stereotype.Service;
-import FCAJ.SecureLearn.repositories.CourseRepo;
+import FCAJ.SecureLearn.Repositories.CourseRepo;
 import java.time.LocalDateTime;
 import java.util.UUID;
 

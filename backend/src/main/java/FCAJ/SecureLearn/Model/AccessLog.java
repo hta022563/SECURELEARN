@@ -11,71 +11,94 @@ import jakarta.persistence.Id;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortKey;
 /**
  *
  * @author ngoct
  */
-@Entity
+@DynamoDbBean
 public class AccessLog {
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
-    String studentEmail, objectAccessed, currentUrl;
+   
+    private String logId;
+    String userEmail;
     LocalDateTime accessedTime;
+    String actionType, ipAddress;
+    long videoId;
+    int downloadInterval;
 
     public AccessLog() {
     }
 
-    public AccessLog(UUID id, String studentEmail, String objectAccessed, String currentUrl, LocalDateTime accessedTime) {
-        this.id = id;
-        this.studentEmail = studentEmail;
-        this.objectAccessed = objectAccessed;
-        this.currentUrl = currentUrl;
+    public AccessLog(String logId, String userId, LocalDateTime accessedTime, String actionType, String ipAddress) {
+        this.logId = logId;
+        this.userEmail = userId;
         this.accessedTime = accessedTime;
+        this.actionType = actionType;
+        this.ipAddress = ipAddress;
     }
 
-    public UUID getId() {
-        return id;
+   
+    @DynamoDbSortKey
+    public String getLogId() {
+        return logId;
     }
 
-    public void setId(UUID id) {
-        this.id = id;
+    public void setLogId(String logId) {
+        this.logId = logId;
+    }
+    @DynamoDbPartitionKey
+    public String getUserEmail() {
+        return userEmail;
     }
 
+    public void setUserEmail(String userEmail) {
+        this.userEmail = userEmail;
+    }
     
-
     
-    public String getStudentEmail() {
-        return studentEmail;
-    }
-
-    public void setStudentEmail(String studentEmail) {
-        this.studentEmail = studentEmail;
-    }
-
-    public String getObjectAccessed() {
-        return objectAccessed;
-    }
-
-    public void setObjectAccessed(String objectAccessed) {
-        this.objectAccessed = objectAccessed;
-    }
-
-    public String getCurrentUrl() {
-        return currentUrl;
-    }
-
-    public void setCurrentUrl(String currentUrl) {
-        this.currentUrl = currentUrl;
-    }
-
     public LocalDateTime getAccessedTime() {
         return accessedTime;
     }
 
+    
+    
     public void setAccessedTime(LocalDateTime accessedTime) {
         this.accessedTime = accessedTime;
     }
-    
+
+    public String getActionType() {
+        return actionType;
+    }
+
+    public void setActionType(String actionType) {
+        this.actionType = actionType;
+    }
+
+    public String getIpAddress() {
+        return ipAddress;
+    }
+
+    public void setIpAddress(String ipAddress) {
+        this.ipAddress = ipAddress;
+    }
+
+    public long getVideoId() {
+        return videoId;
+    }
+
+    public void setVideoId(long videoId) {
+        this.videoId = videoId;
+    }
+
+    public int getDownloadInterval() {
+        return downloadInterval;
+    }
+
+    public void setDownloadInterval(int downloadInterval) {
+        this.downloadInterval = downloadInterval;
+    }
+
     
 }

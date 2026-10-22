@@ -1,7 +1,7 @@
 package FCAJ.SecureLearn.Service;
 
 import FCAJ.SecureLearn.Model.Lesson;
-import FCAJ.SecureLearn.repositories.LessonRepo;
+import FCAJ.SecureLearn.Repositories.LessonRepo;
 import jakarta.persistence.EntityNotFoundException;
 import java.net.URI;
 import java.net.URL;

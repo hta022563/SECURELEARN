@@ -4,6 +4,8 @@ import FCAJ.SecureLearn.Request.LoginRequest;
 import FCAJ.SecureLearn.Request.PasswordChangeRequest;
 import FCAJ.SecureLearn.Request.RegisterRequest;
 import FCAJ.SecureLearn.Service.AuthService;
+import FCAJ.SecureLearn.Service.LogService;
+import java.time.LocalDateTime;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -31,9 +33,11 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
+    private final LogService logService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, LogService logService) {
         this.authService = authService;
+        this.logService = logService;
     }
 
     // -------------------------------------------------------------------------
@@ -112,6 +116,7 @@ public class AuthController {
                     request.getEmail().trim().toLowerCase(),
                     request.getPassword()
             );
+            logService.logTest(request.getEmail(), LocalDateTime.now());
             return ResponseEntity.ok(Map.of(
                     "accessToken",  result.accessToken(),
                     "idToken",      result.idToken(),

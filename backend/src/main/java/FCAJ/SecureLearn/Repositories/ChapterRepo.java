@@ -2,7 +2,7 @@
  * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
  * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
  */
-package FCAJ.SecureLearn.repositories;
+package FCAJ.SecureLearn.Repositories;
 
 import FCAJ.SecureLearn.Model.Chapter;
 import java.util.List;
