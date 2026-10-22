@@ -16,6 +16,8 @@ import {
   sessions as dbSessions,
   anomalyAlerts as dbAlerts,
 } from '../data/mockDatabase';
+import AccessLogLicenseAuditTable from '../components/AccessLogLicenseAuditTable';
+
 
 /**
  * =============================================================================
@@ -387,6 +389,11 @@ export default function LeakTracing() {
           <strong className="text-slate-700 dark:text-slate-200">{recentTraces.length}</strong>
           {t('watermark_trace.showing_history_part2')}
         </div>
+      </div>
+
+      {/* BẢNG ĐỐI CHIẾU TRUY VẾT: NHẬT KÝ TRUY CẬP & CẤP PHÉP DRM (AccessLog & License Audit) */}
+      <div className="mt-8">
+        <AccessLogLicenseAuditTable initialSearchQuery={searchWatermarkId} embedded={true} />
       </div>
 
       {/* MODAL THU HỒI QUYỀN */}

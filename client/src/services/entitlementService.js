@@ -120,8 +120,34 @@ export function getEntitledCourseIds(user, allCourses = []) {
 }
 
 /**
- * Cấp quyền xem khóa học cho người dùng (Role Admin)
- * Backend: PUT /api/v1/course/{courseId}/entitlements/{userSub}
+ * Lấy danh sách khóa học mà Học viên hiện tại được cấp quyền (Student Portal API)
+ * Chỉ truy xuất quyền của cá nhân đang đăng nhập, không gọi API quản trị.
+ * 
+ * @param {Object} user 
+ * @returns {Promise<string[]>}
+ */
+export async function getStudentEntitlements(user) {
+  const effectiveUserId = getEffectiveUserId(user);
+  if (!effectiveUserId) return [];
+
+  try {
+    // Gọi API của cá nhân học viên
+    const res = await apiClient.get('/me/entitlements');
+    const courseIds = res?.courseIds || res?.courses || (Array.isArray(res) ? res.map(c => c.courseId || c.id || c) : []);
+    if (courseIds && courseIds.length > 0) {
+      return courseIds;
+    }
+  } catch (err) {
+    // Fallback qua bộ nhớ local
+  }
+
+  const stored = getStoredEnrollments(effectiveUserId);
+  return stored || [];
+}
+
+/**
+ * Cấp quyền xem khóa học cho người dùng (Role Admin Portal API)
+ * Backend: PUT /api/v1/admin/course/{courseId}/entitlements/{userSub}
  *
  * @param {string} courseId - UUID của khóa học
  * @param {string} userSub - Sub/ID của người dùng được cấp quyền
@@ -130,14 +156,27 @@ export async function grantCourseEntitlement(courseId, userSub) {
   if (!courseId || !userSub) {
     throw new Error('400: Thiếu thông tin courseId hoặc userSub.');
   }
-  const res = await apiClient.put(`/course/${courseId}/entitlements/${userSub}`);
+
+  let res;
+  try {
+    // Chuẩn API Admin Portal: /api/v1/admin/...
+    res = await apiClient.put(`/admin/course/${courseId}/entitlements/${userSub}`);
+  } catch (adminErr) {
+    // Fallback tương thích ngược với route cũ nếu backend chưa map prefix
+    if (adminErr.response?.status === 404) {
+      res = await apiClient.put(`/course/${courseId}/entitlements/${userSub}`);
+    } else {
+      throw adminErr;
+    }
+  }
+
   recordCourseEnrollment(userSub, courseId);
   return res;
 }
 
 /**
- * Thu hồi quyền xem khóa học của người dùng (Role Admin)
- * Backend: DELETE /api/v1/course/{courseId}/entitlements/{userSub}
+ * Thu hồi quyền xem khóa học của người dùng (Role Admin Portal API)
+ * Backend: DELETE /api/v1/admin/course/{courseId}/entitlements/{userSub}
  *
  * @param {string} courseId - UUID của khóa học
  * @param {string} userSub - Sub/ID của người dùng bị thu hồi quyền
@@ -146,6 +185,16 @@ export async function revokeCourseEntitlement(courseId, userSub) {
   if (!courseId || !userSub) {
     throw new Error('400: Thiếu thông tin courseId hoặc userSub.');
   }
-  return await apiClient.delete(`/course/${courseId}/entitlements/${userSub}`);
+
+  try {
+    // Chuẩn API Admin Portal: /api/v1/admin/...
+    return await apiClient.delete(`/admin/course/${courseId}/entitlements/${userSub}`);
+  } catch (adminErr) {
+    // Fallback tương thích ngược với route cũ nếu backend chưa map prefix
+    if (adminErr.response?.status === 404) {
+      return await apiClient.delete(`/course/${courseId}/entitlements/${userSub}`);
+    }
+    throw adminErr;
+  }
 }
 

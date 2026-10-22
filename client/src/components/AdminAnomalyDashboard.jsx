@@ -22,6 +22,7 @@ import {
   sessions as dbSessions,
 } from '../data/mockDatabase';
 import { useToast } from '../context/ToastContext';
+import AccessLogLicenseAuditTable from './AccessLogLicenseAuditTable';
 
 /**
  * =============================================================================
@@ -87,6 +88,9 @@ export default function AdminAnomalyDashboard() {
   // State Modal khóa quyền học viên
   const [showBanModal, setShowBanModal] = useState(false);
   const [selectedUserToBan, setSelectedUserToBan] = useState(null);
+
+  // State chuyển tab chính của Admin Anomaly Dashboard: 'alerts' | 'audit' | 'assets'
+  const [mainDashboardTab, setMainDashboardTab] = useState('alerts');
 
   // State quản lý tab phân chia 2 bảng: 'pending' (Chưa xử lý) hoặc 'resolved' (Đã xử lý)
   const [activeTableTab, setActiveTableTab] = useState('pending');
@@ -330,19 +334,72 @@ export default function AdminAnomalyDashboard() {
         </div>
       </div>
 
-      {/* SECTION 1: CÔNG CỤ TRUY VẾT RÒ RỈ TỪ WATERMARK */}
-      <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xl space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-          <div className="flex items-center gap-2">
-            <Fingerprint className="h-5 w-5 text-blue-600" />
-            <h3 className="font-bold text-slate-900 dark:text-white text-base">
-              {t('admin_alerts.watermark_leak_tracing_tool')}
-            </h3>
-          </div>
-          <span className="text-xs font-semibold text-blue-600 bg-blue-50 dark:bg-blue-950 px-3 py-1 rounded-full border border-blue-200">
-            {t('admin_alerts.search_student_db')}
-          </span>
-        </div>
+      {/* Primary Dashboard Tabs */}
+      <div className="flex items-center gap-2 border-b border-slate-200/80 dark:border-slate-800 pb-3 overflow-x-auto">
+        <button
+          type="button"
+          onClick={() => setMainDashboardTab('alerts')}
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            mainDashboardTab === 'alerts'
+              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+              : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+          }`}
+        >
+          Cảnh Báo AI & Rò Rỉ ({totalAlerts})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMainDashboardTab('audit')}
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            mainDashboardTab === 'audit'
+              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+              : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+          }`}
+        >
+          Nhật Ký Truy Cập & Cấp Phép DRM (AccessLog & License Audit)
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMainDashboardTab('assets')}
+          className={`px-4 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            mainDashboardTab === 'assets'
+              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+              : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+          }`}
+        >
+          Trạng Thái Mã Hóa Video DRM
+        </button>
+      </div>
+
+      {/* VIEW 1: TRUY VẾT & CẤP PHÉP RIÊNG */}
+      {mainDashboardTab === 'audit' && (
+        <AccessLogLicenseAuditTable showAssetsTab={false} initialSearchQuery={searchWatermarkId} />
+      )}
+
+      {/* VIEW 2: TÀI SẢN MÃ HÓA DRM RIÊNG */}
+      {mainDashboardTab === 'assets' && (
+        <AccessLogLicenseAuditTable showAssetsTab={true} />
+      )}
+
+      {/* VIEW 3: CẢNH BÁO BẤT THƯỜNG AI & BẢNG ACCESSLOG LIÊN KẾT */}
+      {mainDashboardTab === 'alerts' && (
+        <>
+          {/* SECTION 1: CÔNG CỤ TRUY VẾT RÒ RỈ TỪ WATERMARK */}
+          <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <Fingerprint className="h-5 w-5 text-blue-600" />
+                <h3 className="font-bold text-slate-900 dark:text-white text-base">
+                  {t('admin_alerts.watermark_leak_tracing_tool')}
+                </h3>
+              </div>
+              <span className="text-xs font-semibold text-blue-600 bg-blue-50 dark:bg-blue-950 px-3 py-1 rounded-full border border-blue-200">
+                {t('admin_alerts.search_student_db')}
+              </span>
+            </div>
+
 
         <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
           {t('admin_alerts.leak_desc_1')} <strong>{t('admin_alerts.watermark_code')}</strong> {t('admin_alerts.eg')}
@@ -621,6 +678,11 @@ export default function AdminAnomalyDashboard() {
           </span>
         </div>
       </div>
+
+      {/* BẢNG NHẬT KÝ TRUY CẬP & CẤP PHÉP DRM LIÊN KẾT TRỰC TIẾP TRONG TAB CẢNH BÁO */}
+      <AccessLogLicenseAuditTable embedded={true} initialSearchQuery={searchWatermarkId} />
+    </>
+  )}
 
       {/* MODAL KHÓA TÀI KHOẢN */}
       {showBanModal && (

@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation, Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Shield, AlertCircle, Zap, UserPlus, Grid, Loader2, X } from 'lucide-react';
+import { AlertCircle, Zap, UserPlus, Grid, Loader2, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { users } from '../data/mockDatabase';
 import Logo from '../components/Logo';
-import { COGNITO_LOGIN_URL } from '../services/courseService';
 import { login as apiLogin, me as apiMe, mapCognitoRoleToDisplayRole, ROLE_REDIRECT } from '../services/authService';
 
 // Map Role trong mockDb → Role trong RBAC routing (used for demo fallback)
@@ -119,12 +118,9 @@ export default function Login() {
           <div className="mb-3 flex justify-center">
             <Logo size="lg" showBadge={true} badgeText="E-LEARNING" />
           </div>
-          <h4 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white mb-1">
+          <h4 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
             {t('login.title')}
           </h4>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            {t('login.subtitle')}
-          </p>
         </div>
 
         <div className="p-6 sm:p-8 space-y-5">
@@ -145,27 +141,6 @@ export default function Login() {
             </div>
           )}
 
-          {/* Đăng nhập nhanh bằng AWS Cognito (Hosted UI - OAuth2) */}
-          <div>
-            <a
-              href={COGNITO_LOGIN_URL}
-              className="w-full inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-750 shadow-xs transition-all no-underline"
-            >
-              <Shield className="h-4 w-4 text-amber-500" />
-              <span>Đăng nhập với AWS Cognito (Hosted UI)</span>
-            </a>
-          </div>
-
-          <div className="relative my-4 text-center">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-200 dark:border-slate-800" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white dark:bg-slate-900 px-3 text-slate-400 font-medium">
-                hoặc đăng nhập tài khoản
-              </span>
-            </div>
-          </div>
 
           {/* Form Đăng Nhập */}
           <form onSubmit={handleSubmit} className="space-y-4">

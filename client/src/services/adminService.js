@@ -108,3 +108,11 @@ export async function deleteAdminUser(email) {
     headers: { 'Content-Type': 'text/plain' },
   });
 }
+
+// Re-export các API Quản trị DRM từ drmService
+export {
+  getAdminDrmAssets,
+  getAdminLicenseAudit,
+  revokeDrmSession,
+} from './drmService.js';
+

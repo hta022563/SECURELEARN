@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getCourses } from '../services/courseService';
+import { getStudentEntitlements } from '../services/entitlementService';
 
 /**
  * Component: MyCourses
@@ -31,25 +32,42 @@ export default function MyCourses() {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
-  // Hàm gọi API lấy danh sách khóa học
+  // Hàm gọi API lấy danh sách khóa học và đối soát quyền Entitlement của học viên
   const fetchStudentCourses = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const allCourses = await getCourses();
+      const [allCourses, entitledIds] = await Promise.all([
+        getCourses(),
+        getStudentEntitlements(user),
+      ]);
+
       if (Array.isArray(allCourses) && allCourses.length > 0) {
-        const formatted = allCourses.map((course) => ({
-          id: course.ID || course.id,
-          title: course.Title || course.title,
-          description: course.Description || course.description,
-          owner: course.Owner || course.owner || course.instructor || '',
-          status: 'Active',
-          joinDate: course['Creation Time'] || course.createdAt,
-          completionDate: null,
-          creationTime: course['Creation Time'] || course.createdAt,
-          price: course.Price ?? course.price,
-        }));
+        const isStudent = (user?.role || '').toLowerCase() === 'student';
+        const hasSpecificEntitlements = Array.isArray(entitledIds) && entitledIds.length > 0;
+
+        // Nếu là học viên và có danh sách quyền cụ thể, lọc các khóa học được cấp quyền
+        const visibleCourses = isStudent && hasSpecificEntitlements
+          ? allCourses.filter((c) => entitledIds.includes(c.ID || c.id))
+          : allCourses;
+
+        const formatted = visibleCourses.map((course) => {
+          const courseId = course.ID || course.id;
+          const isEnrolled = Array.isArray(entitledIds) && entitledIds.includes(courseId);
+
+          return {
+            id: courseId,
+            title: course.Title || course.title,
+            description: course.Description || course.description,
+            owner: course.Owner || course.owner || course.instructor || '',
+            status: isEnrolled ? 'Active' : 'Enrolled',
+            joinDate: course['Creation Time'] || course.createdAt,
+            completionDate: null,
+            creationTime: course['Creation Time'] || course.createdAt,
+            price: course.Price ?? course.price,
+          };
+        });
         setCourses(formatted);
       } else {
         setCourses([]);

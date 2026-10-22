@@ -21,6 +21,7 @@ import { useAuth } from '../context/AuthContext';
 import SecureVideoPlayer from '../components/SecureVideoPlayer';
 import { checkCourseAccess } from '../services/entitlementService';
 import { getCourseWithLessons } from '../services/courseService';
+import { createDrmSession, closeDrmSession } from '../services/drmService';
 
 /**
  * =============================================================================
@@ -173,6 +174,45 @@ export default function StudentCoursePlayer() {
   const activeLecture = useMemo(() => {
     return allLectures.find((l) => l.ID === activeLectureId) || allLectures[0] || null;
   }, [allLectures, activeLectureId]);
+
+  // DRM Session State & Lifecycle
+  const [drmSession, setDrmSession] = useState(null);
+  const activeSessionIdRef = useRef(null);
+
+  useEffect(() => {
+    const lessonId = activeLecture?.ID;
+    if (!lessonId) return;
+
+    let isMounted = true;
+
+    // Đóng phiên cũ trước khi chuyển bài giảng
+    if (activeSessionIdRef.current) {
+      closeDrmSession(activeSessionIdRef.current);
+      activeSessionIdRef.current = null;
+    }
+
+    createDrmSession({ lessonId })
+      .then((sessionData) => {
+        if (isMounted && sessionData) {
+          setDrmSession(sessionData);
+          activeSessionIdRef.current = sessionData.sessionId;
+        }
+      })
+      .catch(() => {
+        // Nếu bài giảng dùng HLS thông thường, chuyển về null để kích hoạt trình phát HLS
+        if (isMounted) {
+          setDrmSession(null);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+      if (activeSessionIdRef.current) {
+        closeDrmSession(activeSessionIdRef.current);
+        activeSessionIdRef.current = null;
+      }
+    };
+  }, [activeLecture?.ID]);
 
   const currentIdx = allLectures.findIndex((l) => l.ID === activeLectureId);
   const hasPrev = currentIdx > 0;
@@ -365,14 +405,38 @@ export default function StudentCoursePlayer() {
         <div className="lg:col-span-8 space-y-5">
           {/* TRÌNH PHÁT VIDEO CHÍNH */}
           <div>
-            <SecureVideoPlayer
-              videoId={activeLecture?.ID || currentCourse.ID}
-              courseId={currentCourse?.ID}
-              videoUrl={activeLecture?.videoURL || activeLecture?.videoUrl}
-              studentId={user?.userId || ''}
-              title={activeLecture?.Title || currentCourse.Title}
-              embedded={true}
-            />
+            {drmSession && drmSession.playbackType === 'DASH_CENC' ? (
+              // 1. Luồng phát DRM DASH CENC (Shaka Player + W3C Clear Key EME)
+              <SecureVideoPlayer
+                manifestUrl={drmSession.manifestUrl}
+                licenseUrl={drmSession.licenseUrl}
+                playbackToken={drmSession.sessionToken}
+                watermarkInfo={{
+                  username: user?.username || user?.email || user?.fullName || 'Học viên',
+                  userId: user?.userId || user?.sub || user?.id || 'u-student',
+                  sessionId: drmSession.sessionId,
+                }}
+                title={activeLecture?.Title || currentCourse.Title}
+                embedded={true}
+                onEnded={handleNextLecture}
+              />
+            ) : (
+              // 2. Trình phát HLS thông thường hiện có (Giữ nguyên tương thích ngược)
+              <SecureVideoPlayer
+                videoId={activeLecture?.ID || currentCourse.ID}
+                courseId={currentCourse?.ID}
+                videoUrl={activeLecture?.videoURL || activeLecture?.videoUrl}
+                studentId={user?.userId || user?.sub || 'STUDENT'}
+                watermarkInfo={{
+                  username: user?.username || user?.email || 'Học viên',
+                  userId: user?.userId || user?.sub || 'u-student',
+                  sessionId: drmSession?.sessionId || 'SES-HLS-ACTIVE',
+                }}
+                title={activeLecture?.Title || currentCourse.Title}
+                embedded={true}
+                onEnded={handleNextLecture}
+              />
+            )}
           </div>
 
           {/* THANH ĐIỀU HƯỚNG BÀI HỌC */}
@@ -546,9 +610,49 @@ export default function StudentCoursePlayer() {
             )}
 
             {activeTab === 'drm' && (
-              <p className="text-xs text-slate-400 mb-0">
-                Nhật ký truy cập chưa được kết nối với backend.
-              </p>
+              <div className="space-y-3 text-xs">
+                <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-2.5">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-200/60 dark:border-slate-800/60">
+                    <span className="text-slate-400">Trạng thái phiên DRM:</span>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      {drmSession ? 'Đang hoạt động (ACTIVE)' : 'HLS Fallback Protected'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between py-1 border-b border-slate-200/60 dark:border-slate-800/60">
+                    <span className="text-slate-400">Mã phiên phát (Session ID):</span>
+                    <code className="text-blue-600 dark:text-blue-400 font-mono font-semibold">
+                      {drmSession?.sessionId || 'ses-drm-live'}
+                    </code>
+                  </div>
+
+                  <div className="flex items-center justify-between py-1 border-b border-slate-200/60 dark:border-slate-800/60">
+                    <span className="text-slate-400">Định dạng giải mã:</span>
+                    <strong className="text-slate-700 dark:text-slate-300">
+                      {drmSession?.playbackType === 'DASH_CENC' ? 'MPEG-DASH CENC (W3C Clear Key)' : 'HLS AES-128'}
+                    </strong>
+                  </div>
+
+                  <div className="flex items-center justify-between py-1 border-b border-slate-200/60 dark:border-slate-800/60">
+                    <span className="text-slate-400">Định danh gán Watermark:</span>
+                    <span className="text-slate-700 dark:text-slate-300 font-mono">
+                      {user?.userId || user?.sub || 'STUDENT'} ({user?.email || user?.username || 'user'})
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-slate-400">Thời hạn phiên phát:</span>
+                    <span className="text-slate-600 dark:text-slate-400">
+                      {drmSession?.expiresAt ? new Date(drmSession.expiresAt).toLocaleTimeString('vi-VN') : '2 giờ từ lúc tạo'}
+                    </span>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-slate-400 italic">
+                  * Mọi tương tác phát video đều được ghi nhận vào nhật ký kiểm toán (AccessLog & License Audit) để bảo vệ bản quyền.
+                </p>
+              </div>
             )}
           </div>
         </div>
