@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
 import {
   fetchSignedUrl,
+  fetchContentKey,
   generateClientECDHKeyPair,
   exportPublicKeyRaw,
   mockExchangeKeysApi,
@@ -84,26 +85,38 @@ export function useSecureHls(videoId, studentId, videoRef, courseId = null) {
             const isKeyRequest = context.type === 'key' || context.frag?.type === 'key';
 
             if (isKeyRequest) {
-              setSecurityStatus('Bắt đầu trao đổi khóa bảo mật ECDH (P-256)...');
+              setSecurityStatus('Đang lấy khóa giải mã bảo mật từ Backend...');
               (async () => {
                 const startTime = performance.now();
                 try {
-                  const clientKeyPair = await generateClientECDHKeyPair();
-                  const clientPublicKeyB64 = await exportPublicKeyRaw(clientKeyPair.publicKey);
-                  const exchangeResponse = await mockExchangeKeysApi({
-                    videoId,
-                    studentId,
-                    clientPublicKeyB64,
-                    keyUri: context.url,
-                  });
-                  const rawAes128KeyBuffer = await deriveAndDecryptContentKey(
-                    clientKeyPair,
-                    exchangeResponse.serverPublicKey,
-                    exchangeResponse.encryptedKey,
-                    exchangeResponse.iv
-                  );
+                  let rawAes128KeyBuffer;
+                  const isBackendKeyUrl =
+                    typeof context.url === 'string' &&
+                    (context.url.includes('/api/v1/lesson/') || context.url.includes('/key'));
+
+                  if (isBackendKeyUrl) {
+                    // Lấy khóa AES-128 thật từ Backend PlaybackController (Spring Boot / Cloudflare R2)
+                    rawAes128KeyBuffer = await fetchContentKey(context.url);
+                  } else {
+                    // Fallback giả lập ECDH cho bài giảng mock/offline
+                    const clientKeyPair = await generateClientECDHKeyPair();
+                    const clientPublicKeyB64 = await exportPublicKeyRaw(clientKeyPair.publicKey);
+                    const exchangeResponse = await mockExchangeKeysApi({
+                      videoId,
+                      studentId,
+                      clientPublicKeyB64,
+                      keyUri: context.url,
+                    });
+                    rawAes128KeyBuffer = await deriveAndDecryptContentKey(
+                      clientKeyPair,
+                      exchangeResponse.serverPublicKey,
+                      exchangeResponse.encryptedKey,
+                      exchangeResponse.iv
+                    );
+                  }
+
                   if (isCancelled) return;
-                  setSecurityStatus('Khóa AES-128 đã giải mã an toàn trong bộ nhớ. Sẵn sàng phát!');
+                  setSecurityStatus('Khóa AES-128 đã nạp an toàn vào bộ nhớ. Sẵn sàng phát!');
                   const loadTime = performance.now();
                   callbacks.onSuccess(
                     { url: context.url, data: rawAes128KeyBuffer },
@@ -117,9 +130,9 @@ export function useSecureHls(videoId, studentId, videoRef, courseId = null) {
                     context
                   );
                 } catch (err) {
-                  console.error('[SecureLearn DRM] Lỗi trao đổi khóa ECDH:', err);
-                  setSecurityStatus('Lỗi trao đổi khóa bản quyền.');
-                  callbacks.onError({ code: 403, text: `Lỗi giải mã ECDH: ${err.message}` }, context, null);
+                  console.error('[SecureLearn DRM] Lỗi nạp khóa giải mã:', err);
+                  setSecurityStatus('Lỗi nạp khóa bảo mật bài giảng.');
+                  callbacks.onError({ code: 403, text: `Lỗi khóa bảo mật: ${err.message}` }, context, null);
                 }
               })();
               return;
