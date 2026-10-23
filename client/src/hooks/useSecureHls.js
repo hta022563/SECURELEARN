@@ -8,6 +8,7 @@ import {
   deriveAndDecryptContentKey,
 } from '../services/cryptoService';
 
+const STORAGE_KEY = 'securelearn_auth_user';
 /**
  * Custom Hook: useSecureHls
  *
@@ -137,8 +138,15 @@ export function useSecureHls(videoId, studentId, videoRef, courseId = null) {
           manifestLoadingTimeOut: 30000,
           fragLoadingTimeOut: 60000,
           keyLoadingTimeOut: 30000,
-          xhrSetup: (xhr) => {
+          xhrSetup: (xhr, url) => {
             xhr.withCredentials = false;
+            if (url.includes('/api/v1/lesson/')) {
+              xhr.open('GET', url, true);
+              const user = JSON.parse(sessionStorage.getItem(STORAGE_KEY));
+              if(user?.token) {
+              xhr.setRequestHeader('Authorization', `Bearer ${user.token}`);
+              }
+            }
           },
         });
         hlsInstanceRef.current = hls;

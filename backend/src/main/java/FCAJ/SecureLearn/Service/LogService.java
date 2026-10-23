@@ -151,4 +151,33 @@ public class LogService {
     }
     }
     
+    public void createVideoLog(String username, String actionType, LocalDateTime accessedTime, String ipAddress, UUID lessonId){
+        String userId = authService.getEmailByUsername(username);
+        QueryConditional userQuery = QueryConditional.keyEqualTo(Key.builder().addPartitionValue(userId).build());
+        PageIterable<AccessLog> logList = logTable.query(userQuery);
+        int count = 1;
+        switch(actionType){
+                case "ManifestRequest" ->{
+                    for(AccessLog log : logList.items()){
+                        if(log.getLogId().startsWith("VID")){
+                            count ++;
+                        }
+                    }
+                    String logId = "VID" + String.format("%04d", count);
+                    AccessLog newLog = new AccessLog(logId, userId, accessedTime,actionType, ipAddress, lessonId);
+                    logTable.putItem(newLog);
+                }
+                case "KeyRequest" ->{
+                    for(AccessLog log : logList.items()){
+                        if(log.getLogId().startsWith("VID")){
+                            count ++;
+                        }
+                    }
+                    String logId = "VID" + String.format("%04d", count);
+                    AccessLog newLog = new AccessLog(logId, userId, accessedTime,actionType, ipAddress, lessonId);
+                    logTable.putItem(newLog);
+                }
+                
+        }       
+    }
 }

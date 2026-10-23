@@ -25,7 +25,7 @@ public class AccessLog {
     String userEmail;
     LocalDateTime accessedTime;
     String actionType, ipAddress;
-    long videoId;
+    UUID lessonId;
     public AccessLog() {
     }
 
@@ -35,6 +35,15 @@ public class AccessLog {
         this.accessedTime = accessedTime;
         this.actionType = actionType;
         this.ipAddress = ipAddress;
+    }
+
+    public AccessLog(String logId, String userEmail, LocalDateTime accessedTime, String actionType, String ipAddress, UUID lessonId) {
+        this.logId = logId;
+        this.userEmail = userEmail;
+        this.accessedTime = accessedTime;
+        this.actionType = actionType;
+        this.ipAddress = ipAddress;
+        this.lessonId = lessonId;
     }
 
    
@@ -82,14 +91,15 @@ public class AccessLog {
         this.ipAddress = ipAddress;
     }
 
-    public long getVideoId() {
-        return videoId;
+    public UUID getLessonId() {
+        return lessonId;
     }
 
-    public void setVideoId(long videoId) {
-        this.videoId = videoId;
+    public void setLessonId(UUID lessonId) {
+        this.lessonId = lessonId;
     }
 
+   
 
     
 }

@@ -49,11 +49,13 @@ public class PlaybackController {
     public ResponseEntity<String> getManifest(
             @PathVariable UUID id,
             @RequestParam String token,
-            @AuthenticationPrincipal Jwt jwt) {
+            @AuthenticationPrincipal Jwt jwt,
+            HttpServletRequest servletRequest) {
         String contextUrl = ServletUriComponentsBuilder.fromCurrentContextPath()
             .build()
             .toUriString();
         String manifest = playbackService.getSignedManifest(id, token, contextUrl, jwt.getClaimAsString("username"));
+        logService.createVideoLog(jwt.getClaimAsString("username"), "ManifestRequest", LocalDateTime.now(),servletRequest.getRemoteAddr(), id);
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType("application/vnd.apple.mpegurl"))
                 .cacheControl(CacheControl.noStore())
@@ -64,7 +66,9 @@ public class PlaybackController {
     public ResponseEntity<byte[]> getContentKey(
             @PathVariable UUID id,
             @RequestParam String token,
-            @AuthenticationPrincipal Jwt jwt) {
+            @AuthenticationPrincipal Jwt jwt,
+            HttpServletRequest servletRequest) {
+        logService.createVideoLog(jwt.getClaimAsString("username"), "KeyRequest", LocalDateTime.now(),servletRequest.getRemoteAddr(), id);
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(playbackService.getContentKey(id, token, jwt.getClaimAsString("username")));
