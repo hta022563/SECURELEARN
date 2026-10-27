@@ -1,9 +1,13 @@
 package FCAJ.SecureLearn.Controller;
 
+import FCAJ.SecureLearn.Model.ActionType;
 import FCAJ.SecureLearn.Request.LoginRequest;
 import FCAJ.SecureLearn.Request.PasswordChangeRequest;
 import FCAJ.SecureLearn.Request.RegisterRequest;
 import FCAJ.SecureLearn.Service.AuthService;
+import FCAJ.SecureLearn.Service.LogService;
+import jakarta.servlet.http.HttpServletRequest;
+import java.time.LocalDateTime;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -31,9 +35,11 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
+    private final LogService logService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, LogService logService) {
         this.authService = authService;
+        this.logService = logService;
     }
 
     // -------------------------------------------------------------------------
@@ -101,7 +107,7 @@ public class AuthController {
      * }
      */
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<?> login(@RequestBody LoginRequest request, HttpServletRequest servletRequest) {
         if (request.getEmail() == null || request.getEmail().isBlank()
                 || request.getPassword() == null || request.getPassword().isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Email and password are required."));
@@ -112,6 +118,8 @@ public class AuthController {
                     request.getEmail().trim().toLowerCase(),
                     request.getPassword()
             );
+            logService.createLogWithEmail(request.getEmail().trim().toLowerCase(), ActionType.LOGIN, LocalDateTime.now(),servletRequest.getRemoteAddr());
+            logService.getLogInDay(ActionType.LOGIN);
             return ResponseEntity.ok(Map.of(
                     "accessToken",  result.accessToken(),
                     "idToken",      result.idToken(),

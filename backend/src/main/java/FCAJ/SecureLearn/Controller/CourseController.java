@@ -9,7 +9,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import FCAJ.SecureLearn.Model.ActionType;
 import FCAJ.SecureLearn.Model.Course;
 import FCAJ.SecureLearn.Model.Chapter;
 import FCAJ.SecureLearn.Model.Lesson;
@@ -29,6 +33,7 @@ import FCAJ.SecureLearn.Request.LessonCreationRequest;
 import FCAJ.SecureLearn.Service.ChapterService;
 import FCAJ.SecureLearn.Service.CourseService;
 import FCAJ.SecureLearn.Service.LessonService;
+import FCAJ.SecureLearn.Service.LogService;
 import FCAJ.SecureLearn.Response.ChapterResponse;
 import FCAJ.SecureLearn.Response.LessonResponse;
 
@@ -44,11 +49,13 @@ public class CourseController {
     private final CourseService courseService;
     private final ChapterService chapterService;
     private final LessonService lessonService;
+    private final LogService logService;
 
-    public CourseController(CourseService courseService, ChapterService chapterService, LessonService lessonService) {
+    public CourseController(CourseService courseService, ChapterService chapterService, LessonService lessonService, LogService logService) {
         this.courseService = courseService;
         this.chapterService = chapterService;
         this.lessonService = lessonService;
+        this.logService = logService;
     }
     
     // =========================================================================
@@ -100,8 +107,9 @@ public class CourseController {
      * DELETE /api/v1/course/{id}
      */
     @DeleteMapping("/course/{id}")
-    public ResponseEntity<?> deleteCourse(@PathVariable UUID id){
+    public ResponseEntity<?> deleteCourse(@PathVariable UUID id, HttpServletRequest servletRequest, @AuthenticationPrincipal Jwt jwt){
         courseService.deleteCourse(id);
+        logService.createLog(jwt.getClaimAsString("username"), ActionType.COURSE_DELETION, LocalDateTime.now(), servletRequest.getRemoteAddr());
         return ResponseEntity.ok().body(Map.of("success", "Course deleted successfully"));
     }
     
@@ -150,8 +158,9 @@ public class CourseController {
      * DELETE /api/v1/chapter/{id}
      */
     @DeleteMapping("/chapter/{id}")
-    public ResponseEntity<?> deleteChapter(@PathVariable UUID id){
+    public ResponseEntity<?> deleteChapter(@PathVariable UUID id, HttpServletRequest servletRequest, @AuthenticationPrincipal Jwt jwt){
         chapterService.deleteChapter(id);
+        logService.createLog(jwt.getClaimAsString("username"), ActionType.CHAPTER_DELETION, LocalDateTime.now(), servletRequest.getRemoteAddr());
         return ResponseEntity.ok().body(Map.of("success", "Chapter deleted successfully"));
     }
     
@@ -202,8 +211,9 @@ public class CourseController {
      * DELETE /api/v1/lesson/{id}
      */
     @DeleteMapping("/lesson/{id}")
-    public ResponseEntity<?> deleteLesson(@PathVariable UUID id){
+    public ResponseEntity<?> deleteLesson(@PathVariable UUID id, HttpServletRequest servletRequest, @AuthenticationPrincipal Jwt jwt){
         lessonService.deleteLesson(id);
+        logService.createLog(jwt.getClaimAsString("username"), ActionType.VIDEO_DELETION, LocalDateTime.now(), servletRequest.getRemoteAddr());
         return ResponseEntity.ok().body(Map.of("success", "Lesson deleted successfully"));
     }
 }

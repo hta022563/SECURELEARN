@@ -1,7 +1,7 @@
 package FCAJ.SecureLearn.Service;
 
 import FCAJ.SecureLearn.Model.Lesson;
-import FCAJ.SecureLearn.repositories.LessonRepo;
+import FCAJ.SecureLearn.Repositories.LessonRepo;
 import jakarta.persistence.EntityNotFoundException;
 import java.net.URI;
 import java.net.URL;
@@ -40,7 +40,7 @@ public class PlaybackService {
     }
 
     @Transactional
-    public PlaybackDetails createPlayback(UUID lessonId, String contextUrl) {
+    public PlaybackDetails createPlayback(UUID lessonId, String contextUrl, String username) {
         Lesson lesson = getLesson(lessonId);
 
         String location = normalizeLocation(lesson);
@@ -60,7 +60,7 @@ public class PlaybackService {
                     System.currentTimeMillis() + Duration.ofSeconds(segmentUrlTtlSeconds).toMillis());
         }
 
-        PlaybackTokenService.IssuedToken token = tokenService.issue(lessonId);
+        PlaybackTokenService.IssuedToken token = tokenService.issue(lessonId,username);
         String manifestUrl = UriComponentsBuilder.fromUriString(contextUrl)
                 .path("/api/v1/lesson/{lessonId}/manifest")
                 .queryParam("token", token.value())
@@ -71,8 +71,8 @@ public class PlaybackService {
     }
 
     @Transactional
-    public String getSignedManifest(UUID lessonId, String token, String contextUrl) {
-        if (!tokenService.isValid(lessonId, token)) {
+    public String getSignedManifest(UUID lessonId, String token, String contextUrl, String username) {
+        if (!tokenService.isValid(lessonId, token, username)) {
             throw new AccessDeniedException("Playback token is invalid or expired");
         }
         Lesson lesson = getLesson(lessonId);
@@ -101,8 +101,8 @@ public class PlaybackService {
         return rewritten.toString();
     }
 
-    public byte[] getContentKey(UUID lessonId, String token) {
-        if (!tokenService.isValid(lessonId, token)) {
+    public byte[] getContentKey(UUID lessonId, String token, String username) {
+        if (!tokenService.isValid(lessonId, token, username)) {
             throw new AccessDeniedException("Playback token is invalid or expired");
         }
         Lesson lesson = getLesson(lessonId);
