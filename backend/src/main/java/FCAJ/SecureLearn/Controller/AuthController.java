@@ -1,6 +1,7 @@
 package FCAJ.SecureLearn.Controller;
 
 import FCAJ.SecureLearn.Model.ActionType;
+import FCAJ.SecureLearn.Request.ConfirmRequest;
 import FCAJ.SecureLearn.Request.LoginRequest;
 import FCAJ.SecureLearn.Request.PasswordChangeRequest;
 import FCAJ.SecureLearn.Request.RegisterRequest;
@@ -42,22 +43,7 @@ public class AuthController {
         this.logService = logService;
     }
 
-    // -------------------------------------------------------------------------
-    // Register
-    // -------------------------------------------------------------------------
-
-    /**
-     * Creates a new Cognito account and assigns the requested role group.
-     * The account is auto-confirmed so the user can log in immediately.
-     *
-     * Request body:
-     * {
-     *   "fullName": "Nguyen Van A",
-     *   "email":    "user@example.com",
-     *   "password": "Password123!",
-     *   "role":     "student" | "instructor"
-     * }
-     */
+   
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
         if (request.getEmail() == null || request.getEmail().isBlank()) {
@@ -87,25 +73,20 @@ public class AuthController {
                     .body(Map.of("error", "Registration failed. Please try again." + e.getMessage()));
         }
     }
-
-    // -------------------------------------------------------------------------
-    // Login
-    // -------------------------------------------------------------------------
-
-    /**
-     * Authenticates with Cognito USER_PASSWORD_AUTH and returns the token set.
-     *
-     * Request body:
-     * { "email": "user@example.com", "password": "Password123!" }
-     *
-     * Response body:
-     * {
-     *   "accessToken":  "...",   // use this as Bearer token for API calls
-     *   "idToken":      "...",   // contains user profile claims
-     *   "refreshToken": "...",   // use to get new tokens when accessToken expires
-     *   "expiresIn":    3600
-     * }
-     */
+    
+    @PostMapping("/otp")
+    public ResponseEntity<?> confirmSignUp(@RequestBody ConfirmRequest request){
+        if(request.getEmail() == null){
+            return ResponseEntity.badRequest().body(Map.of("error", "Email is required."));
+        }
+        try{
+            authService.registerConfirmation(request.getOtp(), request.getEmail());
+            return ResponseEntity.ok("Signup complete. Your account is registered");
+        }catch (RuntimeException e){
+            return ResponseEntity.internalServerError().body(Map.of("error","Registration failed. Please try again" + e.getMessage()));
+        }
+    }
+   
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request, HttpServletRequest servletRequest) {
         if (request.getEmail() == null || request.getEmail().isBlank()
@@ -134,16 +115,7 @@ public class AuthController {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Logout
-    // -------------------------------------------------------------------------
-
-    /**
-     * Globally invalidates the caller's Cognito tokens.
-     * The frontend should also clear its local token storage regardless of the response.
-     *
-     * Requires: Authorization: Bearer <accessToken>
-     */
+    
     @PostMapping("/logout")
     public ResponseEntity<?> logout(@AuthenticationPrincipal Jwt jwt) {
         if (jwt != null) {
@@ -153,16 +125,6 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("message", "Logged out successfully."));
     }
 
-    // -------------------------------------------------------------------------
-    // Refresh Token
-    // -------------------------------------------------------------------------
-
-    /**
-     * Exchanges a refresh token for a new access token and id token.
-     *
-     * Request body:
-     * { "refreshToken": "...", "email": "user@example.com" }
-     */
     @PostMapping("/refresh")
     public ResponseEntity<?> refresh(@RequestBody Map<String, String> body) {
         String refreshToken = body.get("refreshToken");
@@ -209,24 +171,7 @@ public class AuthController {
                     .body(Map.of("error", "Update password fail"));
         }
     }
-    // -------------------------------------------------------------------------
-    // Me
-    // -------------------------------------------------------------------------
-
-    /**
-     * Returns the claims from the caller's JWT — useful for the frontend to know
-     * the current user's email, name, and role without a separate profile endpoint.
-     *
-     * Requires: Authorization: Bearer <accessToken>
-     *
-     * Response example:
-     * {
-     *   "sub":   "a1b2c3d4-...",
-     *   "email": "user@example.com",
-     *   "name":  "Nguyen Van A",
-     *   "roles": ["STUDENT"]
-     * }
-     */
+    
     @GetMapping("/me")
     public ResponseEntity<?> me(@AuthenticationPrincipal Jwt jwt) {
         if (jwt == null) {

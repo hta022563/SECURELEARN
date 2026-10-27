@@ -13,6 +13,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Service that wraps AWS Cognito Identity Provider API calls for:
@@ -44,20 +46,22 @@ public class AuthService {
                 .build();
     }
 
-    // -------------------------------------------------------------------------
-    // Register
-    // -------------------------------------------------------------------------
-
-    /**
-     * Creates a new Cognito user (email/password), auto-confirms them, then adds
-     * them to the appropriate group (student or instructor).
-     *
-     * @throws RuntimeException wrapping any Cognito SDK exception on failure
-     */
+    
+    public void adminRegister(String fullName, String email, String password, String role){
+        try{
+        String normalizedRole = normalizeRole(role);
+        AdminCreateUserRequest request = AdminCreateUserRequest.builder().username(email).temporaryPassword(password).
+                userAttributes(AttributeType.builder().name("email").value(email).build(),AttributeType.builder().name("name").value(fullName).build()).userPoolId(userPoolId).build();                                                                                                                    
+        cognitoClient.adminCreateUser(request);
+        cognitoClient.adminSetUserPassword(AdminSetUserPasswordRequest.builder().password(password).permanent(true).username(email).userPoolId(userPoolId).build());
+        }catch (Exception e){
+            throw new IllegalArgumentException(e.getMessage());
+        }
+    }
+    
     public void register(String fullName, String email, String password, String role) {
         String normalizedRole = normalizeRole(role);
-
-        // 1. SignUp — creates the user in Cognito (status: UNCONFIRMED)
+        
         try {
             SignUpRequest signUpRequest = SignUpRequest.builder()
                     .clientId(clientId)
@@ -78,41 +82,31 @@ public class AuthService {
             throw new RuntimeException("Registration failed: " + e.awsErrorDetails().errorMessage(), e);
         }
 
-        // 2. AdminConfirmSignUp — skip email verification for now so the user can log in immediately
         try {
-            AdminConfirmSignUpRequest confirmRequest = AdminConfirmSignUpRequest.builder()
-                    .userPoolId(userPoolId)
-                    .username(email)
-                    .build();
-            cognitoClient.adminConfirmSignUp(confirmRequest);
-        } catch (CognitoIdentityProviderException e) {
-            throw new RuntimeException("Could not confirm registration: " + e.awsErrorDetails().errorMessage(), e);
-        }
-
-        // 3. AdminAddUserToGroup — assigns the role group so cognito:groups appears in the JWT
-        try {
+            if(normalizedRole.equals("STUDENT")){
             AdminAddUserToGroupRequest groupRequest = AdminAddUserToGroupRequest.builder()
                     .userPoolId(userPoolId)
                     .username(email)
                     .groupName(normalizedRole)
                     .build();
             cognitoClient.adminAddUserToGroup(groupRequest);
+            }else throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not allowed to create any other account beside Student/Learner");
         } catch (CognitoIdentityProviderException e) {
             throw new RuntimeException("Could not assign role: " + e.awsErrorDetails().errorMessage(), e);
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Login
-    // -------------------------------------------------------------------------
-
-    /**
-     * Authenticates with USER_PASSWORD_AUTH flow.
-     *
-     * @return AuthenticationResultType containing accessToken, idToken, refreshToken
-     * @throws IllegalArgumentException on bad credentials
-     * @throws RuntimeException on other Cognito errors
-     */
+    public void registerConfirmation(String otp, String email){
+        try{
+        ConfirmSignUpRequest request = ConfirmSignUpRequest.builder().clientId(clientId).secretHash(computeSecretHash(email)).username(email).confirmationCode(otp).build();
+        cognitoClient.confirmSignUp(request);
+        }catch(Exception e){
+            throw new RuntimeException("Could not confirm signup" + e.getMessage());
+        }
+        
+        
+    }
+            
     public AuthenticationResultType login(String email, String password) {
         try {
             InitiateAuthRequest authRequest = InitiateAuthRequest.builder()
@@ -254,7 +248,7 @@ public class AuthService {
    
    public void updateAccountByAdmin(String email, String password){
        try{
-           cognitoClient.adminSetUserPassword(AdminSetUserPasswordRequest.builder().userPoolId(userPoolId).username(email).password(password).build());
+           cognitoClient.adminSetUserPassword(AdminSetUserPasswordRequest.builder().userPoolId(userPoolId).username(email).password(password).permanent(true).build());
        }catch (UserNotFoundException e){
            throw new IllegalArgumentException("User cannot be found");
        }catch (CognitoIdentityProviderException e){
