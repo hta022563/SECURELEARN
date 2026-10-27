@@ -53,7 +53,7 @@ public class AdminController {
         }
 
         try {
-            authService.register(
+            authService.adminRegister(
                     request.getFullName(),
                     request.getEmail().trim().toLowerCase(),
                     request.getPassword(),
