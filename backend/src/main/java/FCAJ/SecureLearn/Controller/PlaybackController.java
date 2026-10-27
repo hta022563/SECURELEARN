@@ -1,5 +1,6 @@
 package FCAJ.SecureLearn.Controller;
 
+import FCAJ.SecureLearn.Model.ActionType;
 import FCAJ.SecureLearn.Service.AuthService;
 import FCAJ.SecureLearn.Service.LogService;
 import FCAJ.SecureLearn.Service.PlaybackService;
@@ -39,7 +40,7 @@ public class PlaybackController {
                 .build()
                 .toUriString();
         PlaybackService.PlaybackDetails details = playbackService.createPlayback(id, contextUrl,jwt.getClaimAsString("username"));
-        logService.createLog(jwt.getClaimAsString("username"), "Playback", LocalDateTime.now(), servletRequest.getRemoteAddr());
+        logService.createLog(jwt.getClaimAsString("username"), ActionType.PLAYBACK, LocalDateTime.now(), servletRequest.getRemoteAddr());
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(Map.of("playbackUrl", details.playbackUrl(), "expiresAt", details.expiresAt()));
@@ -55,7 +56,7 @@ public class PlaybackController {
             .build()
             .toUriString();
         String manifest = playbackService.getSignedManifest(id, token, contextUrl, jwt.getClaimAsString("username"));
-        logService.createVideoLog(jwt.getClaimAsString("username"), "ManifestRequest", LocalDateTime.now(),servletRequest.getRemoteAddr(), id);
+        logService.createVideoLog(jwt.getClaimAsString("username"), ActionType.MANIFEST_REQUEST, LocalDateTime.now(),servletRequest.getRemoteAddr(), id);
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType("application/vnd.apple.mpegurl"))
                 .cacheControl(CacheControl.noStore())
@@ -68,7 +69,7 @@ public class PlaybackController {
             @RequestParam String token,
             @AuthenticationPrincipal Jwt jwt,
             HttpServletRequest servletRequest) {
-        logService.createVideoLog(jwt.getClaimAsString("username"), "KeyRequest", LocalDateTime.now(),servletRequest.getRemoteAddr(), id);
+        logService.createVideoLog(jwt.getClaimAsString("username"), ActionType.KEY_REQUEST, LocalDateTime.now(),servletRequest.getRemoteAddr(), id);
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(playbackService.getContentKey(id, token, jwt.getClaimAsString("username")));

@@ -1,5 +1,6 @@
 package FCAJ.SecureLearn.Controller;
 
+import FCAJ.SecureLearn.Model.ActionType;
 import FCAJ.SecureLearn.Request.LoginRequest;
 import FCAJ.SecureLearn.Request.PasswordChangeRequest;
 import FCAJ.SecureLearn.Request.RegisterRequest;
@@ -117,7 +118,8 @@ public class AuthController {
                     request.getEmail().trim().toLowerCase(),
                     request.getPassword()
             );
-            logService.createLogWithEmail(request.getEmail().trim().toLowerCase(), "Login", LocalDateTime.now(),servletRequest.getRemoteAddr());
+            logService.createLogWithEmail(request.getEmail().trim().toLowerCase(), ActionType.LOGIN, LocalDateTime.now(),servletRequest.getRemoteAddr());
+            logService.getLogInDay(ActionType.LOGIN);
             return ResponseEntity.ok(Map.of(
                     "accessToken",  result.accessToken(),
                     "idToken",      result.idToken(),

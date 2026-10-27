@@ -4,6 +4,7 @@
  */
 package FCAJ.SecureLearn.Controller;
 
+import FCAJ.SecureLearn.Model.ActionType;
 import FCAJ.SecureLearn.Request.LoginRequest;
 import FCAJ.SecureLearn.Request.RegisterRequest;
 import FCAJ.SecureLearn.Response.UserAttributeDTO;
@@ -58,7 +59,7 @@ public class AdminController {
                     request.getPassword(),
                     request.getRole()
             );
-            logService.createLog(jwt.getClaimAsString("username"),"AdminRegister", LocalDateTime.now(), servletRequest.getRemoteAddr());
+            logService.createLog(jwt.getClaimAsString("username"),ActionType.ADMIN_REGISTER, LocalDateTime.now(), servletRequest.getRemoteAddr());
             return ResponseEntity.ok(Map.of(
                     "message", "Account created successfully. You can now log in.",
                     "email", request.getEmail().trim().toLowerCase()
@@ -81,7 +82,7 @@ public class AdminController {
         }
         try{
             authService.updateAccountByAdmin(request.getEmail(), request.getPassword());
-            logService.createLog(jwt.getClaimAsString("username"),"AdminUpdate", LocalDateTime.now(), servletRequest.getRemoteAddr());
+            logService.createLog(jwt.getClaimAsString("username"),ActionType.ADMIN_UPDATE, LocalDateTime.now(), servletRequest.getRemoteAddr());
             return ResponseEntity.ok(Map.of("message", "Successfully update user password"));
         }catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -98,7 +99,7 @@ public class AdminController {
         }
         try{
             authService.deleteAccount(email);
-            logService.createLog(jwt.getClaimAsString("username"),"AdminDelete", LocalDateTime.now(), servletRequest.getRemoteAddr());
+            logService.createLog(jwt.getClaimAsString("username"),ActionType.ADMIN_DELETE, LocalDateTime.now(), servletRequest.getRemoteAddr());
             return ResponseEntity.ok(Map.of("message", "Successfully delete"));
         }catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));

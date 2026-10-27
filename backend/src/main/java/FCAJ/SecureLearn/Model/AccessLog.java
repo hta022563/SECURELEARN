@@ -4,6 +4,7 @@
  */
 package FCAJ.SecureLearn.Model;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -13,6 +14,8 @@ import java.util.UUID;
 
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSecondaryPartitionKey;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSecondarySortKey;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortKey;
 /**
  *
@@ -24,12 +27,13 @@ public class AccessLog {
     private String logId;
     String userEmail;
     LocalDateTime accessedTime;
-    String actionType, ipAddress;
+    ActionType actionType;
+    String ipAddress;
     UUID lessonId;
     public AccessLog() {
     }
 
-    public AccessLog(String logId, String userId, LocalDateTime accessedTime, String actionType, String ipAddress) {
+    public AccessLog(String logId, String userId, LocalDateTime accessedTime, ActionType actionType, String ipAddress) {
         this.logId = logId;
         this.userEmail = userId;
         this.accessedTime = accessedTime;
@@ -37,7 +41,7 @@ public class AccessLog {
         this.ipAddress = ipAddress;
     }
 
-    public AccessLog(String logId, String userEmail, LocalDateTime accessedTime, String actionType, String ipAddress, UUID lessonId) {
+    public AccessLog(String logId, String userEmail, LocalDateTime accessedTime, ActionType actionType, String ipAddress, UUID lessonId) {
         this.logId = logId;
         this.userEmail = userEmail;
         this.accessedTime = accessedTime;
@@ -64,22 +68,21 @@ public class AccessLog {
         this.userEmail = userEmail;
     }
     
-    
+    @DynamoDbSecondarySortKey(indexNames = "LogInADay")
     public LocalDateTime getAccessedTime() {
         return accessedTime;
     }
 
-    
-    
     public void setAccessedTime(LocalDateTime accessedTime) {
         this.accessedTime = accessedTime;
     }
-
-    public String getActionType() {
+    
+    @DynamoDbSecondaryPartitionKey(indexNames = "LogInADay")
+    public ActionType getActionType() {
         return actionType;
     }
 
-    public void setActionType(String actionType) {
+    public void setActionType(ActionType actionType) {
         this.actionType = actionType;
     }
 
@@ -91,6 +94,7 @@ public class AccessLog {
         this.ipAddress = ipAddress;
     }
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public UUID getLessonId() {
         return lessonId;
     }
