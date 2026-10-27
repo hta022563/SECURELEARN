@@ -54,6 +54,7 @@ public class AuthService {
                 userAttributes(AttributeType.builder().name("email").value(email).build(),AttributeType.builder().name("name").value(fullName).build()).userPoolId(userPoolId).build();                                                                                                                    
         cognitoClient.adminCreateUser(request);
         cognitoClient.adminSetUserPassword(AdminSetUserPasswordRequest.builder().password(password).permanent(true).username(email).userPoolId(userPoolId).build());
+        cognitoClient.adminAddUserToGroup(AdminAddUserToGroupRequest.builder().groupName(normalizedRole).userPoolId(userPoolId).username(email).build());
         }catch (Exception e){
             throw new IllegalArgumentException(e.getMessage());
         }
