@@ -200,3 +200,35 @@ export async function deriveAndDecryptContentKey(
     encryptedBuffer
   );
 }
+
+/**
+ * 6. Lấy khóa giải mã AES-128 thật từ Backend PlaybackController (Spring Boot & Cloudflare R2)
+ * Endpoint: GET /api/v1/lesson/{id}/key?token=...
+ *
+ * @param {string} keyUrl - URL lấy khóa từ manifest HLS (chứa HMAC token hợp lệ)
+ * @returns {Promise<ArrayBuffer>} 16-byte raw AES-128 key buffer
+ */
+export async function fetchContentKey(keyUrl) {
+  if (!keyUrl) {
+    throw new Error('400: Thiếu URL khóa giải mã.');
+  }
+
+  const response = await fetch(keyUrl, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/octet-stream',
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    throw new Error(`Lỗi lấy khóa từ Backend (HTTP ${response.status}: ${errorText || response.statusText})`);
+  }
+
+  const keyBuffer = await response.arrayBuffer();
+  if (!keyBuffer || keyBuffer.byteLength === 0) {
+    throw new Error('Khóa giải mã trả về từ Backend rỗng.');
+  }
+
+  return keyBuffer;
+}
