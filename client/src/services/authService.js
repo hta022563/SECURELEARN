@@ -33,14 +33,21 @@ function getAccessToken() {
 }
 
 async function handleResponse(res) {
-  const data = await res.json().catch(() => ({}));
+  const text = await res.text().catch(() => '');
+  let data = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { message: text };
+  }
   if (!res.ok) {
-    throw new Error(data.error || `Request failed (${res.status})`);
+    const errorMsg = data.error || data.message || (typeof data === 'string' ? data : `Request failed (${res.status})`);
+    throw new Error(errorMsg);
   }
   return data;
 }
 
-// ─── register ─────────────────────────────────────────────────────────────────
+// ─── register & OTP verification ──────────────────────────────────────────────
 
 /**
  * Creates a new Cognito account.
@@ -55,6 +62,69 @@ export async function register({ fullName, email, password, role }) {
   });
   return handleResponse(res);
 }
+
+/**
+ * Confirms Cognito registration with OTP code.
+ * Endpoint: POST /api/v1/auth/otp
+ * @param {{ email: string, otp: string }} payload
+ * @returns {Promise<{ message?: string } | string>}
+ */
+export async function verifyRegisterOtp({ email, otp }) {
+  const res = await fetch(`${BASE_URL}/auth/otp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, otp }),
+  });
+  return handleResponse(res);
+}
+
+/**
+ * Resends signup confirmation code (OTP).
+ * Endpoint: POST /api/v1/auth/resend-otp
+ * @param {{ email: string }} payload
+ * @returns {Promise<{ message?: string }>}
+ */
+export async function resendOtp({ email }) {
+  const res = await fetch(`${BASE_URL}/auth/resend-otp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  return handleResponse(res);
+}
+
+// ─── forgot password & reset password ─────────────────────────────────────────
+
+/**
+ * Requests a password reset OTP for the given email.
+ * Endpoint: POST /api/v1/auth/forgot-password
+ * @param {{ email: string }} payload
+ * @returns {Promise<{ message?: string }>}
+ */
+export async function forgotPassword({ email }) {
+  const res = await fetch(`${BASE_URL}/auth/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  return handleResponse(res);
+}
+
+/**
+ * Confirms password reset with OTP and sets the new password.
+ * Endpoint: POST /api/v1/auth/reset-password
+ * @param {{ email: string, otp: string, newPassword: string }} payload
+ * @returns {Promise<{ message?: string }>}
+ */
+export async function resetPassword({ email, otp, newPassword }) {
+  const res = await fetch(`${BASE_URL}/auth/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, otp, newPassword }),
+  });
+  return handleResponse(res);
+}
+
 
 // ─── login ────────────────────────────────────────────────────────────────────
 

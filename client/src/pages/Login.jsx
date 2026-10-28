@@ -5,6 +5,7 @@ import { AlertCircle, Zap, UserPlus, Grid, Loader2, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { users } from '../data/mockDatabase';
 import Logo from '../components/Logo';
+import ForgotPasswordModal from '../components/ForgotPasswordModal';
 import { login as apiLogin, me as apiMe, mapCognitoRoleToDisplayRole, ROLE_REDIRECT } from '../services/authService';
 
 // Map Role trong mockDb → Role trong RBAC routing (used for demo fallback)
@@ -28,6 +29,8 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
+
 
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -159,9 +162,18 @@ export default function Login() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                {t('login.password_label')}
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  {t('login.password_label')}
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPasswordModal(true)}
+                  className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline cursor-pointer"
+                >
+                  {t('login.forgot_password')}
+                </button>
+              </div>
               <input
                 type="password"
                 placeholder={t('login.password_placeholder')}
@@ -229,10 +241,22 @@ export default function Login() {
 
         <div className="bg-slate-50 dark:bg-slate-850/80 border-t border-slate-100 dark:border-slate-800 py-3 px-6 text-center">
           <small className="text-[11px] text-slate-400 dark:text-slate-500">
-            Hệ thống bảo vệ phân quyền Role-Based Access Control (RBAC)
+            {t('portal.system_online', 'Hệ thống bảo vệ đang kích hoạt')}
           </small>
         </div>
       </div>
+
+      {/* Modal Quên Mật Khẩu */}
+      <ForgotPasswordModal
+        show={showForgotPasswordModal}
+        onHide={() => setShowForgotPasswordModal(false)}
+        initialEmail={email}
+        onSuccess={(resetEmail) => {
+          setEmail(resetEmail);
+          setPassword('');
+          setErrorMessage(null);
+        }}
+      />
     </div>
   );
 }
