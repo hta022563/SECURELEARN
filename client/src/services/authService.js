@@ -58,7 +58,7 @@ export async function register({ fullName, email, password, role }) {
   const res = await fetch(`${BASE_URL}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fullName, email, password, role }),
+    body: JSON.stringify({ fullName, email, password, role: 'student' }),
   });
   return handleResponse(res);
 }
