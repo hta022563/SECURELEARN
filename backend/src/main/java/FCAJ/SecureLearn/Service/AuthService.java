@@ -96,6 +96,11 @@ public class AuthService {
             throw new RuntimeException("Could not assign role: " + e.awsErrorDetails().errorMessage(), e);
         }
     }
+    
+    public void resendOtp(String email){
+        ResendConfirmationCodeRequest request = ResendConfirmationCodeRequest.builder().clientId(clientId).secretHash(computeSecretHash(email)).username(email).build();
+        cognitoClient.resendConfirmationCode(request);
+    }
 
     public void registerConfirmation(String otp, String email){
         try{
@@ -257,6 +262,7 @@ public class AuthService {
        }
    }
    
+   
    public ListUsersResponse getUserPage(String nextToken, int limit){
        try{
            ListUsersRequest.Builder request = ListUsersRequest.builder()
@@ -289,6 +295,24 @@ public class AuthService {
                    .findFirst()
                    .orElse(username);
        }catch (CognitoIdentityProviderException e){
+           throw new RuntimeException("Could not retrieve user: " + e.awsErrorDetails().errorMessage(), e);
+       }
+   }
+   
+   public void forgetPassword(String email){
+       try{
+           ForgotPasswordRequest request = ForgotPasswordRequest.builder().clientId(clientId).username(email).secretHash(computeSecretHash(email)).build();
+           cognitoClient.forgotPassword(request);
+       }catch(CognitoIdentityProviderException e){
+           throw new RuntimeException("Could not retrieve user: " + e.awsErrorDetails().errorMessage(), e);
+       }
+   }
+   
+   public void resetPassword(String otp, String email,String password){
+       try{
+           ConfirmForgotPasswordRequest request = ConfirmForgotPasswordRequest.builder().confirmationCode(otp).username(email).secretHash(computeSecretHash(email)).password(password).clientId(clientId).build();
+           cognitoClient.confirmForgotPassword(request);
+       }catch(CognitoIdentityProviderException e){
            throw new RuntimeException("Could not retrieve user: " + e.awsErrorDetails().errorMessage(), e);
        }
    }

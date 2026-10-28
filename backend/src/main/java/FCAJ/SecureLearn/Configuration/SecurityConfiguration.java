@@ -80,6 +80,10 @@ public class SecurityConfiguration {
                 .requestMatchers("/api/v1/auth/register").permitAll()
                 .requestMatchers("/api/v1/auth/login").permitAll()
                 .requestMatchers("/api/v1/auth/refresh").permitAll()
+                .requestMatchers("/api/v1/auth/reset-password").permitAll()
+                .requestMatchers("/api/v1/auth/forgot-password").permitAll()
+                 .requestMatchers("/api/v1/auth/resend-otp").permitAll()
+                 .requestMatchers("/api/v1/auth/otp").permitAll()
                 // /api/v1/auth/logout and /api/v1/auth/me require a valid token (authenticated)
 
                 // Upload pipeline — INSTRUCTOR or ADMIN only

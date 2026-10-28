@@ -5,6 +5,7 @@ import FCAJ.SecureLearn.Request.ConfirmRequest;
 import FCAJ.SecureLearn.Request.LoginRequest;
 import FCAJ.SecureLearn.Request.PasswordChangeRequest;
 import FCAJ.SecureLearn.Request.RegisterRequest;
+import FCAJ.SecureLearn.Request.ResetPasswordRequest;
 import FCAJ.SecureLearn.Service.AuthService;
 import FCAJ.SecureLearn.Service.LogService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -171,6 +172,55 @@ public class AuthController {
                     .body(Map.of("error", "Update password fail"));
         }
     }
+    
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgetPassword(@RequestBody Map<String,String> email){
+        if (email.isEmpty()) {
+            return ResponseEntity.status(401).body(Map.of("error", "Email was not provided"));
+        }
+        try{
+            authService.forgetPassword(email.get("email"));
+            return ResponseEntity.ok("An OTP is sent to your email");
+        }catch (IllegalArgumentException e) {
+            return ResponseEntity.status(401).body(Map.of("error", e.getMessage()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "Update password fail" + e.getMessage()));
+        }   
+    }
+    
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest request){
+        if(request.getEmail().isEmpty()){
+            return ResponseEntity.status(401).body(Map.of("error", "Email was not provided"));
+        }
+        if(request.getNewPassword().isEmpty()){
+            return ResponseEntity.status(401).body(Map.of("error", "Password was not provided"));
+        }
+        if(request.getOtp().isEmpty()){
+            return ResponseEntity.status(401).body(Map.of("error", "One time password was not provided"));
+        }
+        
+        try{
+            authService.resetPassword(request.getOtp(), request.getEmail(), request.getNewPassword());
+            return ResponseEntity.ok("Successfully change password. Please log in again");
+        }catch (IllegalArgumentException e) {
+            return ResponseEntity.status(401).body(Map.of("error", e.getMessage()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "Update password fail"));
+        }   
+    }
+    
+    @PostMapping("/resend-otp")
+    public ResponseEntity<?> resendCode(@RequestBody Map<String,String> email){
+         if(email.isEmpty()){
+            return ResponseEntity.status(401).body(Map.of("error", "Email was not provided"));
+        }
+         authService.resendOtp(email.get("email"));
+         return ResponseEntity.ok("OTP has been resend");
+    }
+    
     
     @GetMapping("/me")
     public ResponseEntity<?> me(@AuthenticationPrincipal Jwt jwt) {
