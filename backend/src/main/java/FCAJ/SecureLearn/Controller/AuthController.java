@@ -174,18 +174,18 @@ public class AuthController {
     }
     
     @PostMapping("/forgot-password")
-    public ResponseEntity<?> forgetPassword(@RequestBody String email){
+    public ResponseEntity<?> forgetPassword(@RequestBody Map<String,String> email){
         if (email.isEmpty()) {
             return ResponseEntity.status(401).body(Map.of("error", "Email was not provided"));
         }
         try{
-            authService.forgetPassword(email);
+            authService.forgetPassword(email.get("email"));
             return ResponseEntity.ok("An OTP is sent to your email");
         }catch (IllegalArgumentException e) {
             return ResponseEntity.status(401).body(Map.of("error", e.getMessage()));
         } catch (RuntimeException e) {
             return ResponseEntity.internalServerError()
-                    .body(Map.of("error", "Update password fail"));
+                    .body(Map.of("error", "Update password fail" + e.getMessage()));
         }   
     }
     
@@ -194,7 +194,7 @@ public class AuthController {
         if(request.getEmail().isEmpty()){
             return ResponseEntity.status(401).body(Map.of("error", "Email was not provided"));
         }
-        if(request.getPassword().isEmpty()){
+        if(request.getNewPassword().isEmpty()){
             return ResponseEntity.status(401).body(Map.of("error", "Password was not provided"));
         }
         if(request.getOtp().isEmpty()){
@@ -202,7 +202,7 @@ public class AuthController {
         }
         
         try{
-            authService.resetPassword(request.getOtp(), request.getEmail(), request.getPassword());
+            authService.resetPassword(request.getOtp(), request.getEmail(), request.getNewPassword());
             return ResponseEntity.ok("Successfully change password. Please log in again");
         }catch (IllegalArgumentException e) {
             return ResponseEntity.status(401).body(Map.of("error", e.getMessage()));
@@ -213,11 +213,11 @@ public class AuthController {
     }
     
     @PostMapping("/resend-otp")
-    public ResponseEntity<?> resendCode(@RequestBody String email){
+    public ResponseEntity<?> resendCode(@RequestBody Map<String,String> email){
          if(email.isEmpty()){
             return ResponseEntity.status(401).body(Map.of("error", "Email was not provided"));
         }
-         authService.resendOtp(email);
+         authService.resendOtp(email.get("email"));
          return ResponseEntity.ok("OTP has been resend");
     }
     
