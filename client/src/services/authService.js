@@ -15,6 +15,8 @@
  * =============================================================================
  */
 
+import { getDeviceFingerprint } from './fingerprintService';
+
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
 
 // Storage key — keep in sync with AuthContext
@@ -55,10 +57,21 @@ async function handleResponse(res) {
  * @returns {Promise<{ message: string, email: string }>}
  */
 export async function register({ fullName, email, password, role }) {
+  const deviceFingerprint = await getDeviceFingerprint();
   const res = await fetch(`${BASE_URL}/auth/register`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fullName, email, password, role: 'student' }),
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Device-Fingerprint': deviceFingerprint,
+    },
+    body: JSON.stringify({
+      fullName,
+      email,
+      password,
+      role: role || 'student',
+      device_fingerprint: deviceFingerprint,
+      deviceFingerprint,
+    }),
   });
   return handleResponse(res);
 }
@@ -70,10 +83,14 @@ export async function register({ fullName, email, password, role }) {
  * @returns {Promise<{ message?: string } | string>}
  */
 export async function verifyRegisterOtp({ email, otp }) {
+  const deviceFingerprint = await getDeviceFingerprint();
   const res = await fetch(`${BASE_URL}/auth/otp`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, otp }),
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Device-Fingerprint': deviceFingerprint,
+    },
+    body: JSON.stringify({ email, otp, device_fingerprint: deviceFingerprint, deviceFingerprint }),
   });
   return handleResponse(res);
 }
@@ -85,9 +102,13 @@ export async function verifyRegisterOtp({ email, otp }) {
  * @returns {Promise<{ message?: string }>}
  */
 export async function resendOtp({ email }) {
+  const deviceFingerprint = await getDeviceFingerprint();
   const res = await fetch(`${BASE_URL}/auth/resend-otp`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Device-Fingerprint': deviceFingerprint,
+    },
     body: JSON.stringify({ email }),
   });
   return handleResponse(res);
@@ -102,9 +123,13 @@ export async function resendOtp({ email }) {
  * @returns {Promise<{ message?: string }>}
  */
 export async function forgotPassword({ email }) {
+  const deviceFingerprint = await getDeviceFingerprint();
   const res = await fetch(`${BASE_URL}/auth/forgot-password`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Device-Fingerprint': deviceFingerprint,
+    },
     body: JSON.stringify({ email }),
   });
   return handleResponse(res);
@@ -117,9 +142,13 @@ export async function forgotPassword({ email }) {
  * @returns {Promise<{ message?: string }>}
  */
 export async function resetPassword({ email, otp, newPassword }) {
+  const deviceFingerprint = await getDeviceFingerprint();
   const res = await fetch(`${BASE_URL}/auth/reset-password`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Device-Fingerprint': deviceFingerprint,
+    },
     body: JSON.stringify({ email, otp, newPassword }),
   });
   return handleResponse(res);
@@ -130,14 +159,24 @@ export async function resetPassword({ email, otp, newPassword }) {
 
 /**
  * Authenticates with Cognito USER_PASSWORD_AUTH.
+ * Sends `device_fingerprint` in both Header (`X-Device-Fingerprint`) and Request Body.
  * @param {{ email: string, password: string }} credentials
  * @returns {Promise<{ accessToken: string, idToken: string, refreshToken: string, expiresIn: number }>}
  */
 export async function login({ email, password }) {
+  const deviceFingerprint = await getDeviceFingerprint();
   const res = await fetch(`${BASE_URL}/auth/login`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Device-Fingerprint': deviceFingerprint,
+    },
+    body: JSON.stringify({
+      email,
+      password,
+      device_fingerprint: deviceFingerprint,
+      deviceFingerprint,
+    }),
   });
   return handleResponse(res);
 }
@@ -158,11 +197,13 @@ export async function logout(tokenOverride) {
   }
 
   try {
+    const deviceFingerprint = await getDeviceFingerprint();
     const res = await fetch(`${BASE_URL}/auth/logout`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
+        'X-Device-Fingerprint': deviceFingerprint,
       },
     });
     return handleResponse(res);
@@ -201,10 +242,19 @@ export async function refreshToken(params = {}) {
     throw new Error('Refresh token and email are required for /api/v1/auth/refresh');
   }
 
+  const deviceFingerprint = await getDeviceFingerprint();
   const res = await fetch(`${BASE_URL}/auth/refresh`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refreshToken: rToken, email }),
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Device-Fingerprint': deviceFingerprint,
+    },
+    body: JSON.stringify({
+      refreshToken: rToken,
+      email,
+      device_fingerprint: deviceFingerprint,
+      deviceFingerprint,
+    }),
   });
   const data = await handleResponse(res);
 
@@ -238,9 +288,13 @@ export async function me(tokenOverride) {
   const token = tokenOverride || getAccessToken();
   if (!token) throw new Error('Not authenticated');
 
+  const deviceFingerprint = await getDeviceFingerprint();
   const res = await fetch(`${BASE_URL}/auth/me`, {
     method: 'GET',
-    headers: { 'Authorization': `Bearer ${token}` },
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'X-Device-Fingerprint': deviceFingerprint,
+    },
   });
   return handleResponse(res);
 }

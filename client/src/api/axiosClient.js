@@ -1,8 +1,10 @@
 import axios from 'axios';
+import { getDeviceFingerprint } from '../services/fingerprintService';
 
 /**
  * Axios Client tập trung cho toàn bộ ứng dụng SecureLearn
  * - Tự động đính kèm JWT Bearer Token vào Header
+ * - Tự động đính kèm X-Device-Fingerprint vào Header mọi request
  * - Tự động định tuyến baseURL theo biến môi trường
  * - Tự động refresh token khi gặp mã lỗi 401 qua POST /api/v1/auth/refresh
  */
@@ -18,9 +20,9 @@ const axiosClient = axios.create({
   timeout: 10000000,
 });
 
-// Request Interceptor: Gắn token xác thực
+// Request Interceptor: Gắn token xác thực & Device Fingerprint
 axiosClient.interceptors.request.use(
-  (config) => {
+  async (config) => {
     try {
       if (typeof sessionStorage !== 'undefined') {
         const stored = sessionStorage.getItem(STORAGE_KEY);
@@ -34,6 +36,16 @@ axiosClient.interceptors.request.use(
     } catch (e) {
       console.error('Không thể đọc auth token từ SessionStorage:', e);
     }
+
+    try {
+      const fingerprint = await getDeviceFingerprint();
+      if (fingerprint) {
+        config.headers['X-Device-Fingerprint'] = fingerprint;
+      }
+    } catch (e) {
+      console.warn('Không thể tạo device_fingerprint:', e);
+    }
+
     return config;
   },
   (error) => Promise.reject(error)
