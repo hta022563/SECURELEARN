@@ -3,21 +3,18 @@ import Hls from 'hls.js';
 import {
   fetchSignedUrl,
   fetchContentKey,
-  generateClientECDHKeyPair,
-  exportPublicKeyRaw,
-  mockExchangeKeysApi,
-  deriveAndDecryptContentKey,
 } from '../services/cryptoService';
+import { getDeviceFingerprint, getCachedDeviceFingerprint } from '../services/fingerprintService';
 
 const STORAGE_KEY = 'securelearn_auth_user';
+
 /**
  * Custom Hook: useSecureHls
  *
- * Đảm nhiệm toàn bộ luồng DRM bảo mật cho video HLS:
- * 1. Lấy URL luồng theo videoId và studentId.
- * 2. Chặn request tải key mã hóa qua HLS.js Fragment Loader.
- * 3. Thực hiện trao đổi khóa ECDH (P-256) bằng Web Crypto API.
- * 4. Giải mã khóa AES-128 trong bộ nhớ và cấp cho HLS.js.
+ * Đảm nhiệm toàn bộ luồng DRM bảo mật cho video HLS từ Backend thật:
+ * 1. Khởi tạo `device_fingerprint` thật của người dùng qua FingerprintJS.
+ * 2. Lấy URL luồng phát từ Backend (`/api/v1/lesson/{id}/playback`).
+ * 3. Đính kèm JWT và `X-Device-Fingerprint` khi tải Manifest & Key giải mã AES-128.
  */
 export function useSecureHls(videoId, studentId, videoRef, courseId = null) {
   const [isLoading, setIsLoading] = useState(true);
@@ -48,6 +45,7 @@ export function useSecureHls(videoId, studentId, videoRef, courseId = null) {
 
     const initSecurePlayback = async () => {
       try {
+        await getDeviceFingerprint();
         const { streamUrl } = await fetchSignedUrl(videoId, studentId, courseId);
         if (isCancelled) return;
 
@@ -90,31 +88,7 @@ export function useSecureHls(videoId, studentId, videoRef, courseId = null) {
               (async () => {
                 const startTime = performance.now();
                 try {
-                  let rawAes128KeyBuffer;
-                  const isBackendKeyUrl =
-                    typeof context.url === 'string' &&
-                    (context.url.includes('/api/v1/lesson/') || context.url.includes('/key'));
-
-                  if (isBackendKeyUrl) {
-                    // Lấy khóa AES-128 thật từ Backend PlaybackController (Spring Boot / Cloudflare R2)
-                    rawAes128KeyBuffer = await fetchContentKey(context.url);
-                  } else {
-                    // Fallback giả lập ECDH cho bài giảng mock/offline
-                    const clientKeyPair = await generateClientECDHKeyPair();
-                    const clientPublicKeyB64 = await exportPublicKeyRaw(clientKeyPair.publicKey);
-                    const exchangeResponse = await mockExchangeKeysApi({
-                      videoId,
-                      studentId,
-                      clientPublicKeyB64,
-                      keyUri: context.url,
-                    });
-                    rawAes128KeyBuffer = await deriveAndDecryptContentKey(
-                      clientKeyPair,
-                      exchangeResponse.serverPublicKey,
-                      exchangeResponse.encryptedKey,
-                      exchangeResponse.iv
-                    );
-                  }
+                  const rawAes128KeyBuffer = await fetchContentKey(context.url);
 
                   if (isCancelled) return;
                   setSecurityStatus('Khóa AES-128 đã nạp an toàn vào bộ nhớ. Sẵn sàng phát!');
@@ -155,9 +129,17 @@ export function useSecureHls(videoId, studentId, videoRef, courseId = null) {
             xhr.withCredentials = false;
             if (url.includes('/api/v1/lesson/')) {
               xhr.open('GET', url, true);
-              const user = JSON.parse(sessionStorage.getItem(STORAGE_KEY));
-              if(user?.token) {
-              xhr.setRequestHeader('Authorization', `Bearer ${user.token}`);
+              try {
+                const user = JSON.parse(sessionStorage.getItem(STORAGE_KEY));
+                if (user?.token) {
+                  xhr.setRequestHeader('Authorization', `Bearer ${user.token}`);
+                }
+              } catch {
+                // Ignore
+              }
+              const fp = getCachedDeviceFingerprint();
+              if (fp) {
+                xhr.setRequestHeader('X-Device-Fingerprint', fp);
               }
             }
           },

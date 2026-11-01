@@ -42,12 +42,12 @@ export default function AdminUserManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
 
-  // State Modal 1: Tạo Người Dùng Mới
+  // State Modal 1: Tạo Tài Khoản Giảng Viên Mới (Admin chỉ tạo Giảng viên, Học viên tự đăng ký)
   const [showAddModal, setShowAddModal] = useState(false);
   const [newFullName, setNewFullName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const [newRole, setNewRole] = useState('Student');
+  const [newRole, setNewRole] = useState('Instructor');
   const [submitting, setSubmitting] = useState(false);
 
   // State Modal 2: Cấp Quyền Khóa Học (Entitlements)
@@ -127,13 +127,13 @@ export default function AdminUserManagement() {
   }, [usersList, searchTerm, roleFilter]);
 
   // =========================================================================
-  // XỬ LÝ 1: TẠO NGƯỜI DÙNG MỚI (POST /api/v1/admin/register)
+  // XỬ LÝ 1: TẠO TÀI KHOẢN GIẢNG VIÊN (POST /api/v1/admin/register)
   // =========================================================================
   const handleOpenAddModal = () => {
     setNewFullName('');
     setNewEmail('');
     setNewPassword('');
-    setNewRole('Student');
+    setNewRole('Instructor');
     setShowAddModal(true);
   };
 
@@ -158,11 +158,11 @@ export default function AdminUserManagement() {
         fullName: newFullName.trim() || emailTrimmed.split('@')[0],
         email: emailTrimmed,
         password: newPassword,
-        role: newRole,
+        role: 'instructor',
       });
 
       showToast(
-        res?.message || `Đã tạo tài khoản "${emailTrimmed}" (${newRole}) thành công!`,
+        res?.message || `Đã tạo tài khoản Giảng viên "${emailTrimmed}" thành công!`,
         'success',
         'Thành công'
       );
@@ -344,7 +344,7 @@ export default function AdminUserManagement() {
             className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium shadow-sm transition"
           >
             <UserPlus size={18} />
-            <span>Thêm Người Dùng</span>
+            <span>Thêm Giảng Viên</span>
           </button>
         </div>
       </div>
@@ -407,7 +407,7 @@ export default function AdminUserManagement() {
                       <Users className="h-10 w-10 text-gray-300" />
                       <p className="font-medium text-gray-600 dark:text-gray-300">Không tìm thấy người dùng nào</p>
                       <p className="text-xs text-gray-400">
-                        {searchTerm ? 'Thử thay đổi từ khóa tìm kiếm' : 'Nhấn "Thêm Người Dùng" để tạo tài khoản mới qua API'}
+                        {searchTerm ? 'Thử thay đổi từ khóa tìm kiếm' : 'Nhấn "Thêm Giảng Viên" để tạo tài khoản mới qua API'}
                       </p>
                     </div>
                   </td>
@@ -504,14 +504,14 @@ export default function AdminUserManagement() {
         </div>
       </div>
 
-      {/* MODAL 1: Tạo Người Dùng Mới (POST /api/v1/admin/register) */}
+      {/* MODAL 1: Tạo Tài Khoản Giảng Viên Mới (POST /api/v1/admin/register) */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in">
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 border border-gray-100 dark:border-slate-800">
             <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-slate-800">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                 <UserPlus className="h-5 w-5 text-indigo-600" />
-                <span>Tạo Tài Khoản Mới</span>
+                <span>Tạo Tài Khoản Giảng Viên</span>
               </h3>
               <button
                 onClick={() => setShowAddModal(false)}
@@ -524,7 +524,7 @@ export default function AdminUserManagement() {
             <form onSubmit={handleCreateUser} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Họ và Tên
+                  Họ và Tên Giảng Viên
                 </label>
                 <input
                   type="text"
@@ -544,14 +544,14 @@ export default function AdminUserManagement() {
                   required
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
-                  placeholder="user@example.com"
+                  placeholder="instructor@example.com"
                   className="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 bg-transparent rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Mật khẩu *
+                  Mật khẩu khởi tạo *
                 </label>
                 <input
                   type="password"
@@ -570,14 +570,13 @@ export default function AdminUserManagement() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Vai trò hệ thống
                 </label>
-                <select
-                  value={newRole}
-                  onChange={(e) => setNewRole(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 bg-transparent rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                >
-                  <option value="Student">Student (Học viên)</option>
-                  <option value="Instructor">Instructor (Giảng viên)</option>
-                </select>
+                <div className="flex items-center gap-2.5 px-3 py-2.5 border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/50 dark:bg-indigo-950/30 rounded-lg text-sm text-indigo-700 dark:text-indigo-300 font-semibold">
+                  <Briefcase size={16} className="shrink-0" />
+                  <span>Instructor (Giảng viên)</span>
+                </div>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  * Tài khoản Học viên (Student) sẽ do người học tự đăng ký qua cổng đăng ký và xác thực OTP.
+                </p>
               </div>
 
               <div className="flex justify-end gap-2 pt-3 border-t border-gray-100 dark:border-slate-800">

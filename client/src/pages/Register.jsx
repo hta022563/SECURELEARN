@@ -31,12 +31,11 @@ export default function Register() {
   // Step state: 'form' | 'otp'
   const [step, setStep] = useState('form');
 
-  // Form State
+  // Form State (Chỉ dành cho Học viên - Student; Giảng viên do Admin cấp)
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState('Student'); // 'Student' | 'Instructor'
 
   // OTP State
   const [otp, setOtp] = useState('');
@@ -115,7 +114,7 @@ export default function Register() {
         fullName,
         email: email.trim().toLowerCase(),
         password,
-        role: role.toLowerCase(),
+        role: 'student',
       });
 
       showToast(
@@ -237,15 +236,13 @@ export default function Register() {
                       setFullName(e.target.value);
                       if (errors.fullName) setErrors({ ...errors, fullName: null });
                     }}
-                    className={`w-full rounded-2xl border ${
-                      errors.fullName
-                        ? 'border-rose-500 bg-rose-50/20'
-                        : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60'
-                    } px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 ${
-                      errors.fullName
+                    className={`w-full rounded-2xl border ${errors.fullName
+                      ? 'border-rose-500 bg-rose-50/20'
+                      : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60'
+                      } px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 ${errors.fullName
                         ? 'focus:ring-rose-500/20 focus:border-rose-500'
                         : 'focus:ring-blue-500/20 focus:border-blue-500'
-                    } transition-all`}
+                      } transition-all`}
                   />
                 </div>
                 {errors.fullName && (
@@ -269,15 +266,13 @@ export default function Register() {
                     setEmail(e.target.value);
                     if (errors.email) setErrors({ ...errors, email: null });
                   }}
-                  className={`w-full rounded-2xl border ${
-                    errors.email
-                      ? 'border-rose-500 bg-rose-50/20'
-                      : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60'
-                  } px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 ${
-                    errors.email
+                  className={`w-full rounded-2xl border ${errors.email
+                    ? 'border-rose-500 bg-rose-50/20'
+                    : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60'
+                    } px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 ${errors.email
                       ? 'focus:ring-rose-500/20 focus:border-rose-500'
                       : 'focus:ring-blue-500/20 focus:border-blue-500'
-                  } transition-all`}
+                    } transition-all`}
                 />
                 {errors.email && (
                   <div className="flex items-center gap-1.5 text-rose-500 text-xs mt-1.5">
@@ -300,15 +295,13 @@ export default function Register() {
                     setPassword(e.target.value);
                     if (errors.password) setErrors({ ...errors, password: null });
                   }}
-                  className={`w-full rounded-2xl border ${
-                    errors.password
-                      ? 'border-rose-500 bg-rose-50/20'
-                      : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60'
-                  } px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 ${
-                    errors.password
+                  className={`w-full rounded-2xl border ${errors.password
+                    ? 'border-rose-500 bg-rose-50/20'
+                    : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60'
+                    } px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 ${errors.password
                       ? 'focus:ring-rose-500/20 focus:border-rose-500'
                       : 'focus:ring-blue-500/20 focus:border-blue-500'
-                  } transition-all`}
+                    } transition-all`}
                 />
                 {errors.password && (
                   <div className="flex items-center gap-1.5 text-rose-500 text-xs mt-1.5">
@@ -332,15 +325,13 @@ export default function Register() {
                     if (errors.confirmPassword)
                       setErrors({ ...errors, confirmPassword: null });
                   }}
-                  className={`w-full rounded-2xl border ${
-                    errors.confirmPassword
-                      ? 'border-rose-500 bg-rose-50/20'
-                      : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60'
-                  } px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 ${
-                    errors.confirmPassword
+                  className={`w-full rounded-2xl border ${errors.confirmPassword
+                    ? 'border-rose-500 bg-rose-50/20'
+                    : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60'
+                    } px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 ${errors.confirmPassword
                       ? 'focus:ring-rose-500/20 focus:border-rose-500'
                       : 'focus:ring-blue-500/20 focus:border-blue-500'
-                  } transition-all`}
+                    } transition-all`}
                 />
                 {errors.confirmPassword && (
                   <div className="flex items-center gap-1.5 text-rose-500 text-xs mt-1.5">
@@ -350,59 +341,17 @@ export default function Register() {
                 )}
               </div>
 
-              {/* Chọn Vai Trò (Role: Student / Instructor) */}
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80 space-y-2">
-                <span className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Vai trò tài khoản bạn muốn đăng ký:
-                </span>
-                <div className="grid grid-cols-2 gap-3 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setRole('Student')}
-                    className={`flex items-center gap-2.5 p-3 rounded-xl border text-left text-xs transition-all cursor-pointer ${
-                      role === 'Student'
-                        ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-500 text-blue-700 dark:text-blue-300 font-bold shadow-xs'
-                        : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300'
-                    }`}
-                  >
-                    <GraduationCap
-                      className={`h-4 w-4 ${
-                        role === 'Student'
-                          ? 'text-blue-600 dark:text-blue-400'
-                          : 'text-slate-400'
-                      }`}
-                    />
-                    <div>
-                      <div>Học Viên</div>
-                      <div className="text-[10px] font-normal text-slate-500 dark:text-slate-400">
-                        Student
-                      </div>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setRole('Instructor')}
-                    className={`flex items-center gap-2.5 p-3 rounded-xl border text-left text-xs transition-all cursor-pointer ${
-                      role === 'Instructor'
-                        ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-500 text-blue-700 dark:text-blue-300 font-bold shadow-xs'
-                        : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300'
-                    }`}
-                  >
-                    <Briefcase
-                      className={`h-4 w-4 ${
-                        role === 'Instructor'
-                          ? 'text-blue-600 dark:text-blue-400'
-                          : 'text-slate-400'
-                      }`}
-                    />
-                    <div>
-                      <div>Giảng Viên</div>
-                      <div className="text-[10px] font-normal text-slate-500 dark:text-slate-400">
-                        Instructor
-                      </div>
-                    </div>
-                  </button>
+              {/* Thông tin Vai Trò (Chỉ Học Viên tự đăng ký; Giảng Viên do Admin tạo) */}
+              <div className="p-3.5 rounded-2xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200/70 dark:border-blue-900/50 flex items-start gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-xs mt-0.5">
+                  <GraduationCap className="h-4 w-4" />
+                </div>
+                <div className="text-xs space-y-0.5">
+                  <div className="font-bold text-slate-800 dark:text-slate-200">
+                    Đăng ký tài khoản Học Viên (Student)
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                    Cổng đăng ký trực tuyến chỉ dành cho Học viên </p>
                 </div>
               </div>
 

@@ -83,7 +83,7 @@ export async function createAdminUser({ fullName, email, password, role }) {
     fullName: fullName || email.split('@')[0],
     email: email.trim().toLowerCase(),
     password,
-    role: (role || 'student').toLowerCase(),
+    role: (role || 'instructor').toLowerCase(),
   });
 }
 
