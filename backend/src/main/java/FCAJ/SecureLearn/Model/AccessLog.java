@@ -26,17 +26,51 @@ public class AccessLog {
    
     private String logId;
     String userEmail;
-    LocalDateTime accessedTime;
+    LocalDateTime timstamp;
     ActionType actionType;
-    String ipAddress;
+    String ipAddress, userAgent, device_fingerprint; 
+    int downloadInterval, statusCode;
     UUID lessonId;
+
+    public String getUserAgent() {
+        return userAgent;
+    }
+
+    public void setUserAgent(String userAgent) {
+        this.userAgent = userAgent;
+    }
+
+    public String getDevice_fingerprint() {
+        return device_fingerprint;
+    }
+
+    public void setDevice_fingerprint(String device_fingerprint) {
+        this.device_fingerprint = device_fingerprint;
+    }
+
+    public int getDownloadInterval() {
+        return downloadInterval;
+    }
+
+    public void setDownloadInterval(int downloadInterval) {
+        this.downloadInterval = downloadInterval;
+    }
+
+    public int getStatusCode() {
+        return statusCode;
+    }
+
+    public void setStatusCode(int statusCode) {
+        this.statusCode = statusCode;
+    }
+    
     public AccessLog() {
     }
 
     public AccessLog(String logId, String userId, LocalDateTime accessedTime, ActionType actionType, String ipAddress) {
         this.logId = logId;
         this.userEmail = userId;
-        this.accessedTime = accessedTime;
+        this.timstamp = accessedTime;
         this.actionType = actionType;
         this.ipAddress = ipAddress;
     }
@@ -44,7 +78,7 @@ public class AccessLog {
     public AccessLog(String logId, String userEmail, LocalDateTime accessedTime, ActionType actionType, String ipAddress, UUID lessonId) {
         this.logId = logId;
         this.userEmail = userEmail;
-        this.accessedTime = accessedTime;
+        this.timstamp = accessedTime;
         this.actionType = actionType;
         this.ipAddress = ipAddress;
         this.lessonId = lessonId;
@@ -69,12 +103,12 @@ public class AccessLog {
     }
     
     @DynamoDbSecondarySortKey(indexNames = "LogInADay")
-    public LocalDateTime getAccessedTime() {
-        return accessedTime;
+    public LocalDateTime getTimstamp() {
+        return timstamp;
     }
 
-    public void setAccessedTime(LocalDateTime accessedTime) {
-        this.accessedTime = accessedTime;
+    public void setTimstamp(LocalDateTime timstamp) {
+        this.timstamp = timstamp;
     }
     
     @DynamoDbSecondaryPartitionKey(indexNames = "LogInADay")
