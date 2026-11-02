@@ -4,6 +4,7 @@
  */
 package FCAJ.SecureLearn.Controller;
 
+import FCAJ.SecureLearn.Configuration.LogAnnotationClass;
 import FCAJ.SecureLearn.Model.ActionType;
 import FCAJ.SecureLearn.Request.LoginRequest;
 import FCAJ.SecureLearn.Request.RegisterRequest;
@@ -13,7 +14,6 @@ import FCAJ.SecureLearn.Response.UserPage;
 import FCAJ.SecureLearn.Service.AuthService;
 import FCAJ.SecureLearn.Service.LogService;
 import jakarta.servlet.http.HttpServletRequest;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import org.springframework.http.ResponseEntity;
@@ -44,6 +44,7 @@ public class AdminController {
         this.logService = logService;
     }
     @PostMapping("/register")
+    @LogAnnotationClass(ActionType.ADMIN_REGISTER)
     public ResponseEntity<?> register(@RequestBody RegisterRequest request, HttpServletRequest servletRequest, @AuthenticationPrincipal Jwt jwt) {
         if (request.getEmail() == null || request.getEmail().isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Email is required."));
@@ -59,7 +60,6 @@ public class AdminController {
                     request.getPassword(),
                     request.getRole()
             );
-            logService.createLog(jwt.getClaimAsString("username"),ActionType.ADMIN_REGISTER, LocalDateTime.now(), servletRequest.getRemoteAddr());
             return ResponseEntity.ok(Map.of(
                     "message", "Account created successfully. You can now log in.",
                     "email", request.getEmail().trim().toLowerCase()
@@ -73,6 +73,7 @@ public class AdminController {
     }
     
     @PostMapping("/update")
+    @LogAnnotationClass(ActionType.ADMIN_UPDATE)
     public ResponseEntity<?> updateUser(@RequestBody LoginRequest request, HttpServletRequest servletRequest, @AuthenticationPrincipal Jwt jwt){
         if (request.getEmail() == null || request.getEmail().isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Email is required."));
@@ -82,7 +83,6 @@ public class AdminController {
         }
         try{
             authService.updateAccountByAdmin(request.getEmail(), request.getPassword());
-            logService.createLog(jwt.getClaimAsString("username"),ActionType.ADMIN_UPDATE, LocalDateTime.now(), servletRequest.getRemoteAddr());
             return ResponseEntity.ok(Map.of("message", "Successfully update user password"));
         }catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -93,13 +93,13 @@ public class AdminController {
     }
     
     @DeleteMapping("/delete")
+    @LogAnnotationClass(ActionType.ADMIN_DELETE)
     public ResponseEntity<?> deleteUser (@RequestBody String email, HttpServletRequest servletRequest, @AuthenticationPrincipal Jwt jwt){
         if(email == null || email.isBlank()){
             return ResponseEntity.badRequest().body(Map.of("error","User Email is required"));
         }
         try{
             authService.deleteAccount(email);
-            logService.createLog(jwt.getClaimAsString("username"),ActionType.ADMIN_DELETE, LocalDateTime.now(), servletRequest.getRemoteAddr());
             return ResponseEntity.ok(Map.of("message", "Successfully delete"));
         }catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));

@@ -1,5 +1,6 @@
 package FCAJ.SecureLearn.Controller;
 
+import FCAJ.SecureLearn.Configuration.LogAnnotationClass;
 import FCAJ.SecureLearn.Model.ActionType;
 import FCAJ.SecureLearn.Service.AuthService;
 import FCAJ.SecureLearn.Service.LogService;
@@ -36,6 +37,7 @@ public class PlaybackController {
     }
 
     @GetMapping("/playback")
+    @LogAnnotationClass(ActionType.PLAYBACK)
     public ResponseEntity<?> createPlayback(
             @PathVariable UUID id,
             HttpServletRequest servletRequest,
@@ -44,7 +46,6 @@ public class PlaybackController {
                 .build()
                 .toUriString();
         PlaybackService.PlaybackDetails details = playbackService.createPlayback(id, contextUrl,jwt.getClaimAsString("username"));
-        logService.createLog(jwt.getClaimAsString("username"), ActionType.PLAYBACK, LocalDateTime.now(), servletRequest.getRemoteAddr());
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(Map.of("playbackUrl", details.playbackUrl(), "expiresAt", details.expiresAt()));

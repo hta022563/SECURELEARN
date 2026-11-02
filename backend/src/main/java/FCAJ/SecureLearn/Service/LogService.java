@@ -42,14 +42,8 @@ public class LogService {
         logTable = enhancedClient.table("AccessLog", TableSchema.fromBean(AccessLog.class));
     }
 
-    // Takes the Cognito username from the JWT and logs under the user's email
-    public void createLog(String username, ActionType actionType, LocalDateTime accessedTime, String ipAddress){
-        createLogWithEmail(authService.getEmailByUsername(username), actionType, accessedTime, ipAddress);
-    }
-
-    // Use when the email is already known (e.g. login) to skip the Cognito lookup
-    public void createLogWithEmail(String userId, ActionType actionType, LocalDateTime accessedTime, String ipAddress){
-        QueryConditional userQuery = QueryConditional.keyEqualTo(Key.builder().addPartitionValue(userId).build());
+    public void createLog(String email, ActionType actionType, LocalDateTime accessedTime, String ipAddress, String userAgent, String deviceFingerprint, int statusCode){
+        QueryConditional userQuery = QueryConditional.keyEqualTo(Key.builder().addPartitionValue(email).build());
         PageIterable<AccessLog> logList = logTable.query(userQuery);
         int count = 1;
         switch(actionType){
@@ -60,7 +54,7 @@ public class LogService {
                         }
                     }
                     String logId = "ACC" + String.format("%04d", count);
-                    AccessLog newLog = new AccessLog(logId, userId, accessedTime,actionType, ipAddress);
+                    AccessLog newLog = new AccessLog(logId, email, accessedTime,actionType, ipAddress,userAgent,deviceFingerprint, statusCode);
                     logTable.putItem(newLog);
                 }
                 
@@ -71,7 +65,7 @@ public class LogService {
                         }
                     }
                     String logId = "VID" + String.format("%04d", count);
-                    AccessLog newLog = new AccessLog(logId, userId, accessedTime,actionType, ipAddress);
+                    AccessLog newLog = new AccessLog(logId, email, accessedTime,actionType, ipAddress,userAgent,deviceFingerprint, statusCode);
                     logTable.putItem(newLog);
                 }
                 
@@ -82,7 +76,7 @@ public class LogService {
                         }
                     }
                     String logId = "ADM" + String.format("%04d", count);
-                    AccessLog newLog = new AccessLog(logId, userId, accessedTime,actionType, ipAddress);
+                    AccessLog newLog = new AccessLog(logId, email, accessedTime,actionType, ipAddress,userAgent,deviceFingerprint, statusCode);
                     logTable.putItem(newLog);
                 }
                 
@@ -93,7 +87,7 @@ public class LogService {
                         }
                     }
                     String logId = "COU" + String.format("%04d", count);
-                    AccessLog newLog = new AccessLog(logId, userId, accessedTime,actionType, ipAddress);
+                    AccessLog newLog = new AccessLog(logId, email, accessedTime,actionType, ipAddress,userAgent,deviceFingerprint, statusCode);
                     logTable.putItem(newLog);
                 }
                 
@@ -104,9 +98,10 @@ public class LogService {
                         }
                     }
                     String logId = "UNK" + String.format("%04d", count);
-                    AccessLog newLog = new AccessLog(logId, userId, accessedTime,actionType, ipAddress);
+                    AccessLog newLog = new AccessLog(logId, email, accessedTime,actionType, ipAddress,userAgent,deviceFingerprint, statusCode);
                     logTable.putItem(newLog);
                 }
+
     }
     }
     

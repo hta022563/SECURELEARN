@@ -1,5 +1,6 @@
 package FCAJ.SecureLearn.Controller;
 
+import FCAJ.SecureLearn.Configuration.LogAnnotationClass;
 import FCAJ.SecureLearn.Model.ActionType;
 import FCAJ.SecureLearn.Request.ConfirmRequest;
 import FCAJ.SecureLearn.Request.LoginRequest;
@@ -89,6 +90,7 @@ public class AuthController {
     }
    
     @PostMapping("/login")
+    @LogAnnotationClass(ActionType.LOGIN)
     public ResponseEntity<?> login(@RequestBody LoginRequest request, HttpServletRequest servletRequest) {
         if (request.getEmail() == null || request.getEmail().isBlank()
                 || request.getPassword() == null || request.getPassword().isBlank()) {
@@ -100,8 +102,7 @@ public class AuthController {
                     request.getEmail().trim().toLowerCase(),
                     request.getPassword()
             );
-            logService.createLogWithEmail(request.getEmail().trim().toLowerCase(), ActionType.LOGIN, LocalDateTime.now(),servletRequest.getRemoteAddr());
-            logService.getLogInDay(ActionType.LOGIN);
+            servletRequest.setAttribute("username", request.getEmail().trim().toLowerCase());
             return ResponseEntity.ok(Map.of(
                     "accessToken",  result.accessToken(),
                     "idToken",      result.idToken(),
