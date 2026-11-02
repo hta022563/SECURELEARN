@@ -19,5 +19,6 @@ public enum ActionType {
     CHAPTER_DELETION,
     VIDEO_DELETION,
     MANIFEST_REQUEST,
+    SEGMENT_REQUEST,
     KEY_REQUEST
 }

@@ -94,6 +94,7 @@ public class SecurityConfiguration {
                 .requestMatchers(HttpMethod.GET, "/api/v1/lesson/*/manifest").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/lesson/*/key").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/lesson/*/playback").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/v1/lesson/*/segment/*").authenticated()
 
                 // Rules 4–5: public read endpoints
                 .requestMatchers(HttpMethod.GET,  "/api/v1/allcourses").permitAll()

@@ -26,7 +26,7 @@ public class AccessLog {
    
     private String logId;
     String userEmail;
-    LocalDateTime timstamp;
+    LocalDateTime accessedTime;
     ActionType actionType;
     String ipAddress, userAgent, device_fingerprint; 
     int downloadInterval, statusCode;
@@ -70,7 +70,7 @@ public class AccessLog {
     public AccessLog(String logId, String userId, LocalDateTime accessedTime, ActionType actionType, String ipAddress) {
         this.logId = logId;
         this.userEmail = userId;
-        this.timstamp = accessedTime;
+        this.accessedTime = accessedTime;
         this.actionType = actionType;
         this.ipAddress = ipAddress;
     }
@@ -78,7 +78,7 @@ public class AccessLog {
     public AccessLog(String logId, String userEmail, LocalDateTime accessedTime, ActionType actionType, String ipAddress, UUID lessonId) {
         this.logId = logId;
         this.userEmail = userEmail;
-        this.timstamp = accessedTime;
+        this.accessedTime = accessedTime;
         this.actionType = actionType;
         this.ipAddress = ipAddress;
         this.lessonId = lessonId;
@@ -103,12 +103,12 @@ public class AccessLog {
     }
     
     @DynamoDbSecondarySortKey(indexNames = "LogInADay")
-    public LocalDateTime getTimstamp() {
-        return timstamp;
+    public LocalDateTime getAccessedTime() {
+        return accessedTime;
     }
 
-    public void setTimstamp(LocalDateTime timstamp) {
-        this.timstamp = timstamp;
+    public void setAccessedTime(LocalDateTime accessedTime) {
+        this.accessedTime = accessedTime;
     }
     
     @DynamoDbSecondaryPartitionKey(indexNames = "LogInADay")

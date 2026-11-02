@@ -6,6 +6,7 @@ package FCAJ.SecureLearn.Service;
 
 import FCAJ.SecureLearn.Model.AccessLog;
 import FCAJ.SecureLearn.Model.ActionType;
+import static FCAJ.SecureLearn.Model.ActionType.KEY_REQUEST;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -126,6 +127,16 @@ public class LogService {
                     logTable.putItem(newLog);
                 }
                 case KEY_REQUEST ->{
+                    for(AccessLog log : logList.items()){
+                        if(log.getLogId().startsWith("VID")){
+                            count ++;
+                        }
+                    }
+                    String logId = "VID" + String.format("%04d", count);
+                    AccessLog newLog = new AccessLog(logId, userId, accessedTime,actionType, ipAddress, lessonId);
+                    logTable.putItem(newLog);
+                }
+                case SEGMENT_REQUEST ->{
                     for(AccessLog log : logList.items()){
                         if(log.getLogId().startsWith("VID")){
                             count ++;
