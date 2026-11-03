@@ -4,6 +4,7 @@
  */
 package FCAJ.SecureLearn.Model;
 
+import FCAJ.SecureLearn.Configuration.LogAnnotationClass;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -28,11 +29,95 @@ public class AccessLog {
     String userEmail;
     LocalDateTime accessedTime;
     ActionType actionType;
-    String ipAddress;
+    String ipAddress, userAgent, device_fingerprint; 
+    int downloadInterval, statusCode, segmentCount;
     UUID lessonId;
+
+    public int getSegmentCount() {
+        return segmentCount;
+    }
+
+    public void setSegmentCount(int segmentCount) {
+        this.segmentCount = segmentCount;
+    }
+    
+
+    public String getUserAgent() {
+        return userAgent;
+    }
+
+    public void setUserAgent(String userAgent) {
+        this.userAgent = userAgent;
+    }
+
+    public String getDevice_fingerprint() {
+        return device_fingerprint;
+    }
+
+    public void setDevice_fingerprint(String device_fingerprint) {
+        this.device_fingerprint = device_fingerprint;
+    }
+
+    public int getDownloadInterval() {
+        return downloadInterval;
+    }
+
+    public void setDownloadInterval(int downloadInterval) {
+        this.downloadInterval = downloadInterval;
+    }
+
+    public int getStatusCode() {
+        return statusCode;
+    }
+
+    public void setStatusCode(int statusCode) {
+        this.statusCode = statusCode;
+    }
+    
+    
     public AccessLog() {
     }
 
+    public AccessLog(String logId, String userEmail, LocalDateTime accessedTime, ActionType actionType, String ipAddress, String userAgent, String device_fingerprint, int statusCode, int segmentCount, UUID lessonId) {
+        this.logId = logId;
+        this.userEmail = userEmail;
+        this.accessedTime = accessedTime;
+        this.actionType = actionType;
+        this.ipAddress = ipAddress;
+        this.userAgent = userAgent;
+        this.device_fingerprint = device_fingerprint;
+        this.statusCode = statusCode;
+        this.segmentCount = segmentCount;
+        this.lessonId = lessonId;
+    }
+    
+    
+    public AccessLog(String logId, String userEmail, LocalDateTime accessedTime, ActionType actionType, String ipAddress, String userAgent, String device_fingerprint, int statusCode) {
+        this.logId = logId;
+        this.userEmail = userEmail;
+        this.accessedTime = accessedTime;
+        this.actionType = actionType;
+        this.ipAddress = ipAddress;
+        this.userAgent = userAgent;
+        this.device_fingerprint = device_fingerprint;
+        this.statusCode = statusCode;
+    }
+
+    
+    public AccessLog(String logId, String userEmail, LocalDateTime accessedTime, ActionType actionType, String ipAddress, String userAgent, String device_fingerprint, int statusCode, UUID lessonId) {
+        this.logId = logId;
+        this.userEmail = userEmail;
+        this.accessedTime = accessedTime;
+        this.actionType = actionType;
+        this.ipAddress = ipAddress;
+        this.userAgent = userAgent;
+        this.device_fingerprint = device_fingerprint;
+        this.statusCode = statusCode;
+        this.lessonId = lessonId;
+    }
+    
+    
+    
     public AccessLog(String logId, String userId, LocalDateTime accessedTime, ActionType actionType, String ipAddress) {
         this.logId = logId;
         this.userEmail = userId;

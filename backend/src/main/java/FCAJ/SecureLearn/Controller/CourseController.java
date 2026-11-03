@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import FCAJ.SecureLearn.Configuration.LogAnnotationClass;
 import FCAJ.SecureLearn.Model.ActionType;
 import FCAJ.SecureLearn.Model.Course;
 import FCAJ.SecureLearn.Model.Chapter;
@@ -107,9 +108,9 @@ public class CourseController {
      * DELETE /api/v1/course/{id}
      */
     @DeleteMapping("/course/{id}")
+    @LogAnnotationClass(ActionType.COURSE_DELETION)
     public ResponseEntity<?> deleteCourse(@PathVariable UUID id, HttpServletRequest servletRequest, @AuthenticationPrincipal Jwt jwt){
         courseService.deleteCourse(id);
-        logService.createLog(jwt.getClaimAsString("username"), ActionType.COURSE_DELETION, LocalDateTime.now(), servletRequest.getRemoteAddr());
         return ResponseEntity.ok().body(Map.of("success", "Course deleted successfully"));
     }
     
@@ -158,9 +159,9 @@ public class CourseController {
      * DELETE /api/v1/chapter/{id}
      */
     @DeleteMapping("/chapter/{id}")
+    @LogAnnotationClass(ActionType.CHAPTER_DELETION)
     public ResponseEntity<?> deleteChapter(@PathVariable UUID id, HttpServletRequest servletRequest, @AuthenticationPrincipal Jwt jwt){
         chapterService.deleteChapter(id);
-        logService.createLog(jwt.getClaimAsString("username"), ActionType.CHAPTER_DELETION, LocalDateTime.now(), servletRequest.getRemoteAddr());
         return ResponseEntity.ok().body(Map.of("success", "Chapter deleted successfully"));
     }
     
@@ -211,9 +212,9 @@ public class CourseController {
      * DELETE /api/v1/lesson/{id}
      */
     @DeleteMapping("/lesson/{id}")
+    @LogAnnotationClass(ActionType.VIDEO_DELETION)
     public ResponseEntity<?> deleteLesson(@PathVariable UUID id, HttpServletRequest servletRequest, @AuthenticationPrincipal Jwt jwt){
         lessonService.deleteLesson(id);
-        logService.createLog(jwt.getClaimAsString("username"), ActionType.VIDEO_DELETION, LocalDateTime.now(), servletRequest.getRemoteAddr());
         return ResponseEntity.ok().body(Map.of("success", "Lesson deleted successfully"));
     }
 }
