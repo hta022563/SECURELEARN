@@ -52,6 +52,7 @@ public class PlaybackController {
     }
 
     @GetMapping(value = "/manifest", produces = "application/vnd.apple.mpegurl")
+    @LogAnnotationClass(ActionType.MANIFEST_REQUEST)
     public ResponseEntity<String> getManifest(
             @PathVariable UUID id,
             @RequestParam String token,
@@ -61,7 +62,7 @@ public class PlaybackController {
             .build()
             .toUriString();
         String manifest = playbackService.getSignedManifest(id, token, contextUrl, jwt.getClaimAsString("username"));
-        logService.createVideoLog(jwt.getClaimAsString("username"), ActionType.MANIFEST_REQUEST, LocalDateTime.now(),servletRequest.getRemoteAddr(), id);
+       
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType("application/vnd.apple.mpegurl"))
                 .cacheControl(CacheControl.noStore())
@@ -69,20 +70,20 @@ public class PlaybackController {
     }
 
     @GetMapping(value = "/key", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
+    @LogAnnotationClass(ActionType.KEY_REQUEST)
     public ResponseEntity<byte[]> getContentKey(
             @PathVariable UUID id,
             @RequestParam String token,
             @AuthenticationPrincipal Jwt jwt,
             HttpServletRequest servletRequest) {
-        logService.createVideoLog(jwt.getClaimAsString("username"), ActionType.KEY_REQUEST, LocalDateTime.now(),servletRequest.getRemoteAddr(), id);
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(playbackService.getContentKey(id, token, jwt.getClaimAsString("username")));
     }
     
     @GetMapping("/segment/{segmentId}")
+    @LogAnnotationClass(ActionType.SEGMENT_REQUEST)
     public ResponseEntity<?> segmentRequest(@PathVariable UUID id,@PathVariable int segmentId, @RequestParam String token, @AuthenticationPrincipal Jwt jwt, HttpServletRequest servletRequest){
-        logService.createVideoLog(jwt.getClaimAsString("username"), ActionType.SEGMENT_REQUEST, LocalDateTime.now(), servletRequest.getRemoteAddr(), id);
         String segmentUrl = playbackService.getSegmentURL(segmentId, id, token, jwt.getClaimAsString("username"));
         return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(segmentUrl)).build();
     }

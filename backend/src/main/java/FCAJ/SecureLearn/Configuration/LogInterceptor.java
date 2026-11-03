@@ -10,6 +10,8 @@ import FCAJ.SecureLearn.Service.LogService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.LocalDateTime;
+import java.util.Map;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
@@ -18,6 +20,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.web.servlet.HandlerMapping;
 
 /**
  *
@@ -47,14 +50,26 @@ public class LogInterceptor implements HandlerInterceptor {
         if(username == null){
             return;
         }
+        Integer segmentId = 0;
+        UUID lessonId = null;
         String email = authService.getEmailByUsername(username);
-        
+        Map<String,String> pathVariable = (Map<String,String>) request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
         ActionType actionType = annotation.value();
         String ipAddress = request.getRemoteAddr();
         String userAgent = headerOrUnknown(request, "User-Agent");
         String deviceFingerprint = headerOrUnknown(request, "X-Device-Fingerprint");
         try{
-            logService.createLog(username, actionType, LocalDateTime.now(), ipAddress, userAgent, deviceFingerprint, response.getStatus());
+            if(pathVariable.get("id") != null){
+        lessonId = UUID.fromString(pathVariable.get("id"));
+        }
+        if(pathVariable.get("segmentId") != null){
+        segmentId = Integer.valueOf(pathVariable.get("segmentId"));
+        }
+            if(segmentId != null && lessonId != null){
+            logService.createLog(email, actionType, LocalDateTime.now(), ipAddress, userAgent, deviceFingerprint, response.getStatus(),segmentId,lessonId);
+        }else if(lessonId != null){
+            logService.createLog(email, actionType, LocalDateTime.now(), ipAddress, userAgent, deviceFingerprint, response.getStatus(), lessonId);
+        }else logService.createLog(username, actionType, LocalDateTime.now(), ipAddress, userAgent, deviceFingerprint, response.getStatus());
         }catch(RuntimeException e){
             logger.warn("Failed to write access log for {} {}", actionType, request.getRequestURI(), e);
         }

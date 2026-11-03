@@ -6,13 +6,13 @@ package FCAJ.SecureLearn.Service;
 
 import FCAJ.SecureLearn.Model.AccessLog;
 import FCAJ.SecureLearn.Model.ActionType;
-import static FCAJ.SecureLearn.Model.ActionType.KEY_REQUEST;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.time.Month;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.core.pagination.sync.SdkIterable;
@@ -23,8 +23,6 @@ import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.enhanced.dynamodb.model.Page;
 import software.amazon.awssdk.enhanced.dynamodb.model.PageIterable;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
-import software.amazon.awssdk.regions.Region;
-import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 
 /**
  *
@@ -35,117 +33,65 @@ public class LogService {
    private final DynamoDbEnhancedClient enhancedClient;
    private final AuthService authService;
     final DynamoDbTable<AccessLog> logTable;
-    
+
+    private static final String UNKNOWN_PREFIX = "UNK";
+    private static final Map<ActionType, String> LOG_PREFIX = new EnumMap<>(ActionType.class);
+
+    static {
+        LOG_PREFIX.put(ActionType.LOGIN, "ACC");
+
+        LOG_PREFIX.put(ActionType.PLAYBACK, "VID");
+        LOG_PREFIX.put(ActionType.MANIFEST_REQUEST, "VID");
+        LOG_PREFIX.put(ActionType.KEY_REQUEST, "VID");
+        LOG_PREFIX.put(ActionType.SEGMENT_REQUEST, "VID");
+
+        LOG_PREFIX.put(ActionType.ADMIN_REGISTER, "ADM");
+        LOG_PREFIX.put(ActionType.ADMIN_DELETE, "ADM");
+        LOG_PREFIX.put(ActionType.ADMIN_UPDATE, "ADM");
+
+        LOG_PREFIX.put(ActionType.COURSE_DELETION, "COU");
+        LOG_PREFIX.put(ActionType.CHAPTER_DELETION, "COU");
+        LOG_PREFIX.put(ActionType.VIDEO_DELETION, "COU");
+    }
+
     public LogService(DynamoDbEnhancedClient enhancedClient, AuthService authService) {
         this.enhancedClient = enhancedClient;
         this.authService = authService;
         logTable = enhancedClient.table("AccessLog", TableSchema.fromBean(AccessLog.class));
     }
 
-    public void createLog(String email, ActionType actionType, LocalDateTime accessedTime, String ipAddress, String userAgent, String deviceFingerprint, int statusCode){
+    private String generateLogId(String email, ActionType actionType){
+        String prefix = LOG_PREFIX.getOrDefault(actionType, UNKNOWN_PREFIX);
         QueryConditional userQuery = QueryConditional.keyEqualTo(Key.builder().addPartitionValue(email).build());
         PageIterable<AccessLog> logList = logTable.query(userQuery);
         int count = 1;
-        switch(actionType){
-                case LOGIN ->{
-                    for(AccessLog log : logList.items()){
-                        if(log.getLogId().startsWith("ACC")){
-                            count ++;
-                        }
-                    }
-                    String logId = "ACC" + String.format("%04d", count);
-                    AccessLog newLog = new AccessLog(logId, email, accessedTime,actionType, ipAddress,userAgent,deviceFingerprint, statusCode);
-                    logTable.putItem(newLog);
-                }
-                
-                case PLAYBACK -> {
-                    for(AccessLog log : logList.items()){
-                        if(log.getLogId().startsWith("VID")){
-                            count ++;
-                        }
-                    }
-                    String logId = "VID" + String.format("%04d", count);
-                    AccessLog newLog = new AccessLog(logId, email, accessedTime,actionType, ipAddress,userAgent,deviceFingerprint, statusCode);
-                    logTable.putItem(newLog);
-                }
-                
-                case ADMIN_REGISTER,ADMIN_DELETE, ADMIN_UPDATE -> {
-                    for(AccessLog log : logList.items()){
-                        if(log.getLogId().startsWith("ADM")){
-                            count ++;
-                        }
-                    }
-                    String logId = "ADM" + String.format("%04d", count);
-                    AccessLog newLog = new AccessLog(logId, email, accessedTime,actionType, ipAddress,userAgent,deviceFingerprint, statusCode);
-                    logTable.putItem(newLog);
-                }
-                
-                case COURSE_DELETION, CHAPTER_DELETION,VIDEO_DELETION ->{
-                    for(AccessLog log : logList.items()){
-                        if(log.getLogId().startsWith("COU")){
-                            count ++;
-                        }
-                    }
-                    String logId = "COU" + String.format("%04d", count);
-                    AccessLog newLog = new AccessLog(logId, email, accessedTime,actionType, ipAddress,userAgent,deviceFingerprint, statusCode);
-                    logTable.putItem(newLog);
-                }
-                
-                default ->{
-                    for(AccessLog log : logList.items()){
-                        if(log.getLogId().startsWith("UNK")){
-                            count ++;
-                        }
-                    }
-                    String logId = "UNK" + String.format("%04d", count);
-                    AccessLog newLog = new AccessLog(logId, email, accessedTime,actionType, ipAddress,userAgent,deviceFingerprint, statusCode);
-                    logTable.putItem(newLog);
-                }
+        for(AccessLog log : logList.items()){
+            if(log.getLogId().startsWith(prefix)){
+                count ++;
+            }
+        }
+        return prefix + String.format("%04d", count);
+    }
 
+    public void createLog(String email, ActionType actionType, LocalDateTime accessedTime, String ipAddress, String userAgent, String deviceFingerprint, int statusCode){
+        String logId = generateLogId(email, actionType);
+        AccessLog newLog = new AccessLog(logId, email, accessedTime,actionType, ipAddress,userAgent,deviceFingerprint, statusCode);
+        logTable.putItem(newLog);
     }
+
+    public void createLog(String email, ActionType actionType, LocalDateTime accessedTime, String ipAddress, String userAgent, String deviceFingerprint, int statusCode, UUID lessonId){
+        String logId = generateLogId(email, actionType);
+        AccessLog newLog = new AccessLog(logId, email, accessedTime,actionType, ipAddress,userAgent,deviceFingerprint, statusCode, lessonId);
+        logTable.putItem(newLog);
     }
-    
-    public void createVideoLog(String username, ActionType actionType, LocalDateTime accessedTime, String ipAddress, UUID lessonId){
-        String userId = authService.getEmailByUsername(username);
-        QueryConditional userQuery = QueryConditional.keyEqualTo(Key.builder().addPartitionValue(userId).build());
-        PageIterable<AccessLog> logList = logTable.query(userQuery);
-        int count = 1;
-        switch(actionType){
-                case MANIFEST_REQUEST ->{
-                    for(AccessLog log : logList.items()){
-                        if(log.getLogId().startsWith("VID")){
-                            count ++;
-                        }
-                    }
-                    String logId = "VID" + String.format("%04d", count);
-                    AccessLog newLog = new AccessLog(logId, userId, accessedTime,actionType, ipAddress, lessonId);
-                    logTable.putItem(newLog);
-                }
-                case KEY_REQUEST ->{
-                    for(AccessLog log : logList.items()){
-                        if(log.getLogId().startsWith("VID")){
-                            count ++;
-                        }
-                    }
-                    String logId = "VID" + String.format("%04d", count);
-                    AccessLog newLog = new AccessLog(logId, userId, accessedTime,actionType, ipAddress, lessonId);
-                    logTable.putItem(newLog);
-                }
-                case SEGMENT_REQUEST ->{
-                    for(AccessLog log : logList.items()){
-                        if(log.getLogId().startsWith("VID")){
-                            count ++;
-                        }
-                    }
-                    String logId = "VID" + String.format("%04d", count);
-                    AccessLog newLog = new AccessLog(logId, userId, accessedTime,actionType, ipAddress, lessonId);
-                    logTable.putItem(newLog);
-                }
-                
-        }       
+
+    public void createLog(String email, ActionType actionType, LocalDateTime accessedTime, String ipAddress, String userAgent, String deviceFingerprint, int statusCode,int segmentCount, UUID lessonId){
+        String logId = generateLogId(email, actionType);
+        AccessLog newLog = new AccessLog(logId, email, accessedTime,actionType, ipAddress,userAgent,deviceFingerprint, statusCode,segmentCount,lessonId);
+        logTable.putItem(newLog);
     }
-    
- 
+
+
    public List<AccessLog> getLogInDay(ActionType actionType){
        LocalDateTime startOfDay = LocalDateTime.of(LocalDate.now(), LocalTime.MIN);
        LocalDateTime endOfDay = LocalDateTime.of(LocalDate.now(), LocalTime.MAX);
