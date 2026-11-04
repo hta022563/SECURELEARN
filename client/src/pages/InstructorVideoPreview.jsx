@@ -187,31 +187,31 @@ export default function InstructorVideoPreview() {
     return allLectures.find((l) => l.ID === activeLectureId) || allLectures[0] || null;
   }, [allLectures, activeLectureId]);
 
-  const currentIdx = allLectures.findIndex((l) => l.ID === activeLectureId);
+  const currentIdx = allLectures.findIndex((l) => (l.ID || l.id) === activeLectureId);
   const hasPrev = currentIdx > 0;
   const hasNext = currentIdx >= 0 && currentIdx < allLectures.length - 1;
 
-  const previewPath = (id) => (lang ? `/${lang}/instructor/preview/${id}` : `/instructor/preview/${id}`);
+  const handleSelectLecture = (id) => {
+    setActiveLectureId(id);
+    window.scrollTo({ top: 120, behavior: 'smooth' });
+  };
 
   const handlePrevLecture = () => {
     if (hasPrev) {
       const prev = allLectures[currentIdx - 1];
-      setActiveLectureId(prev.ID);
-      navigate(previewPath(prev.ID), { replace: true });
+      if (prev?.ID || prev?.id) {
+        handleSelectLecture(prev.ID || prev.id);
+      }
     }
   };
 
   const handleNextLecture = () => {
     if (hasNext) {
       const next = allLectures[currentIdx + 1];
-      setActiveLectureId(next.ID);
-      navigate(previewPath(next.ID), { replace: true });
+      if (next?.ID || next?.id) {
+        handleSelectLecture(next.ID || next.id);
+      }
     }
-  };
-
-  const handleSelectLecture = (id) => {
-    setActiveLectureId(id);
-    navigate(previewPath(id), { replace: true });
   };
 
   return (
@@ -303,9 +303,9 @@ export default function InstructorVideoPreview() {
                 <Loader2 className="h-10 w-10 animate-spin text-blue-500 mb-3" />
                 <p className="text-xs sm:text-sm text-slate-300 font-medium">Đang tải video bài giảng...</p>
               </div>
-            ) : activeLecture && activeLecture.ID ? (
+            ) : activeLecture && (activeLecture.ID || activeLecture.id) ? (
               <SecureVideoPlayer
-                videoId={activeLecture.ID}
+                videoId={activeLecture.id || activeLecture.ID}
                 courseId={currentCourse?.ID || currentCourse?.id}
                 videoUrl={activeLecture.videoURL || activeLecture.videoUrl}
                 studentId={`INS-${user?.name || user?.userId || 'INSTRUCTOR'}`}

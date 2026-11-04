@@ -550,7 +550,12 @@ export default function InstructorVideos() {
                   <button
                     type="button"
                     title={t('instructor.view')}
-                    onClick={() => navigate(`/${lang}/instructor/preview/${course.ID || course.id}`)}
+                    onClick={() => {
+                      const cId = course.ID || course.id;
+                      const firstLesson = course.structuredChapters?.flatMap((c) => c.videos)?.[0];
+                      const targetId = firstLesson?.ID || firstLesson?.id || cId;
+                      navigate(`/${lang}/instructor/preview/${targetId}`);
+                    }}
                     className="p-2 rounded-full border border-slate-200 dark:border-slate-700 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-all cursor-pointer"
                   >
                     <Play className="h-3.5 w-3.5" />

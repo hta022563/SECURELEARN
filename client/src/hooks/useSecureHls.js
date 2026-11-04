@@ -33,18 +33,6 @@ export function useSecureHls(videoId, studentId, videoRef, courseId = null) {
       return;
     }
 
-    const isDirect = Boolean(
-      typeof videoId === 'string' &&
-        (videoId.startsWith('http://') || videoId.startsWith('https://') || videoId.startsWith('blob:'))
-    );
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-    if (!isDirect && !uuidRegex.test(videoId)) {
-      setIsLoading(false);
-      setError(`Mã bài giảng không hợp lệ ("${videoId}"). Vui lòng chọn bài giảng hợp lệ.`);
-      return;
-    }
-
     setIsLoading(true);
     setError(null);
     setIsReady(false);

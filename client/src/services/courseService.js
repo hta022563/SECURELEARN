@@ -532,11 +532,15 @@ export async function getCourseWithLessons(courseOrLessonId) {
 
     const allFlattenedLessons = chaptersWithLessons.flatMap((ch) => ch.lessons);
 
+    // Nếu targetLessonId chưa có (do input truyền vào là Course ID): tự động lấy bài học đầu tiên của khóa học
+    const resolvedTargetLessonId =
+      targetLessonId || allFlattenedLessons[0]?.id || allFlattenedLessons[0]?.ID || null;
+
     return {
       course,
       chapters: chaptersWithLessons,
       lessons: allFlattenedLessons,
-      targetLessonId,
+      targetLessonId: resolvedTargetLessonId,
     };
   } catch (err) {
     console.warn('[courseService] getCourseWithLessons lỗi:', err.message);

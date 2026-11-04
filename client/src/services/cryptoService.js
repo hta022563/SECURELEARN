@@ -8,13 +8,14 @@
 import apiClient from '../api/axiosClient.js';
 import { getLessonPlayback } from './playbackService.js';
 import { getDeviceFingerprint } from './fingerprintService.js';
+import { getCourseWithLessons, getCourseById } from './courseService.js';
 
 /**
  * Lấy URL luồng video phát bảo mật từ Backend PlaybackController (Spring Boot / Cloudflare R2)
  * Endpoint Backend:
  * - GET /api/v1/lesson/{id}/playback (Tạo phiên phát & cấp token / presigned URL)
  */
-export async function fetchSignedUrl(videoId) {
+export async function fetchSignedUrl(videoId, studentId = null, courseId = null) {
   if (!videoId) {
     throw new Error('400: Thiếu thông tin định danh Video/Lesson ID.');
   }
@@ -27,20 +28,77 @@ export async function fetchSignedUrl(videoId) {
     throw new Error('410: Signed URL bài giảng đã hết hạn truy cập.');
   }
 
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  let effectiveLessonId = videoId;
+
+  // 0. Nếu videoId là ID mẫu cũ ('v-001') hoặc không phải UUID: tự động phân giải mềm sang bài giảng đầu tiên
+  if (
+    typeof effectiveLessonId === 'string' &&
+    !effectiveLessonId.startsWith('http://') &&
+    !effectiveLessonId.startsWith('https://') &&
+    !effectiveLessonId.startsWith('blob:') &&
+    !uuidRegex.test(effectiveLessonId)
+  ) {
+    try {
+      console.warn(`[cryptoService] videoId ("${effectiveLessonId}") là ID cứng/mẫu cũ. Đang tự động phân giải sang bài giảng thực tế từ Backend...`);
+      const defaultCourse = await getCourseWithLessons(null);
+      const fallbackId =
+        defaultCourse?.targetLessonId ||
+        defaultCourse?.lessons?.[0]?.id ||
+        defaultCourse?.lessons?.[0]?.ID;
+      if (fallbackId && uuidRegex.test(fallbackId)) {
+        effectiveLessonId = fallbackId;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // 1. Tự động bảo vệ nếu videoId là Course ID: Tự động chuyển đổi sang Lesson ID thực tế của khóa học
+  let isCourse = Boolean(courseId && String(effectiveLessonId).toLowerCase() === String(courseId).toLowerCase());
+  if (!isCourse && uuidRegex.test(effectiveLessonId)) {
+    try {
+      const maybeCourse = await getCourseById(effectiveLessonId);
+      if (maybeCourse && (maybeCourse.id || maybeCourse.ID)) {
+        isCourse = true;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  if (isCourse) {
+    console.warn(`[cryptoService] videoId ("${effectiveLessonId}") là Course ID. Tự động chuyển đổi sang Lesson ID của khóa học...`);
+    try {
+      const courseDetails = await getCourseWithLessons(effectiveLessonId);
+      const firstLessonId =
+        courseDetails?.targetLessonId ||
+        courseDetails?.lessons?.[0]?.id ||
+        courseDetails?.lessons?.[0]?.ID;
+      if (firstLessonId && String(firstLessonId).toLowerCase() !== String(effectiveLessonId).toLowerCase()) {
+        effectiveLessonId = firstLessonId;
+      } else {
+        throw new Error(`Khóa học "${effectiveLessonId}" hiện chưa có video bài giảng nào.`);
+      }
+    } catch (resolveErr) {
+      throw new Error(`Không thể phát video: ${resolveErr.message}`);
+    }
+  }
+
   // 1. Nếu videoId là một URL trực tiếp hợp lệ từ Backend (http://, https://, blob:)
   if (
-    typeof videoId === 'string' &&
-    (videoId.startsWith('http://') || videoId.startsWith('https://') || videoId.startsWith('blob:'))
+    typeof effectiveLessonId === 'string' &&
+    (effectiveLessonId.startsWith('http://') || effectiveLessonId.startsWith('https://') || effectiveLessonId.startsWith('blob:'))
   ) {
     return {
-      streamUrl: videoId,
+      streamUrl: effectiveLessonId,
       expiresAt: Date.now() + 3600000,
     };
   }
 
   // 2. Gọi PlaybackController Backend: GET /api/v1/lesson/{id}/playback
   try {
-    const playbackData = await getLessonPlayback(videoId);
+    const playbackData = await getLessonPlayback(effectiveLessonId);
     if (playbackData?.playbackUrl) {
       return {
         streamUrl: playbackData.playbackUrl,
@@ -51,12 +109,12 @@ export async function fetchSignedUrl(videoId) {
     if (playbackErr.message?.includes('403') || playbackErr.message?.includes('401')) {
       throw playbackErr;
     }
-    console.warn(`[cryptoService] Gọi /lesson/${videoId}/playback không thành công, thử tra cứu metadata:`, playbackErr.message);
+    console.warn(`[cryptoService] Gọi /lesson/${effectiveLessonId}/playback không thành công, thử tra cứu metadata:`, playbackErr.message);
   }
 
   // 3. Tra cứu Lesson metadata từ Backend: GET /api/v1/lesson/{id}
   try {
-    const res = await apiClient.get(`/lesson/${videoId}`);
+    const res = await apiClient.get(`/lesson/${effectiveLessonId}`);
     const stream = res?.url || res?.videoURL || res?.videoUrl;
     if (stream && (stream.startsWith('http://') || stream.startsWith('https://') || stream.startsWith('blob:'))) {
       return {
@@ -65,10 +123,10 @@ export async function fetchSignedUrl(videoId) {
       };
     }
   } catch (e) {
-    console.warn(`[cryptoService] Không tìm thấy bài học qua GET /lesson/${videoId}:`, e.message);
+    console.warn(`[cryptoService] Không tìm thấy bài học qua GET /lesson/${effectiveLessonId}:`, e.message);
   }
 
-  throw new Error(`404: Không tìm thấy đường dẫn video cho bài giảng "${videoId}" trên hệ thống Backend.`);
+  throw new Error(`404: Không tìm thấy đường dẫn video cho bài giảng "${effectiveLessonId}" trên hệ thống Backend.`);
 }
 
 /**
