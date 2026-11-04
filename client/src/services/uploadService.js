@@ -1,5 +1,5 @@
 import axios from 'axios';
-import apiClient from '../api/axiosClient';
+import apiClient from '../api/axiosClient.js';
 
 /**
  * =============================================================================
@@ -50,31 +50,79 @@ export async function getPresignedUploadUrl({ fileName, contentType, courseId })
 /**
  * Bước 2: Tải trực tiếp file video lên Cloudflare R2 qua Presigned PUT URL
  * 
+ * Sử dụng native XMLHttpRequest để:
+ * - Không bị Axios chèn các header mặc định (như Accept: application/json...) làm sai lệch chữ ký SigV4 của Cloudflare R2.
+ * - Chỉ gửi duy nhất header Content-Type khớp với chữ ký được Backend cấp.
+ * - Cung cấp sự kiện onprogress byte chính xác tuyệt đối.
+ * 
  * @param {string} uploadUrl URL Presigned từ Bước 1
  * @param {File} file Đối tượng File video từ trình duyệt
  * @param {Function} [onProgress] Callback nhận tiến độ thực: (percent, loadedBytes, totalBytes)
  * @param {string} [contentType] MIME type đã đăng ký với Backend khi tạo Presigned URL
  * @returns {Promise<void>}
  */
-export async function uploadFileToR2(uploadUrl, file, onProgress, contentType) {
-  const mimeType = contentType || file.type || 'video/mp4';
+export function uploadFileToR2(uploadUrl, file, onProgress, contentType) {
+  const mimeType = contentType || file?.type || 'video/mp4';
 
-  // Khởi tạo instance Axios cô lập, không chứa header chung của apiClient (như Authorization, X-Device-Fingerprint)
-  // và không serialize file binary để đảm bảo chữ ký SigV4 của Cloudflare R2 khớp 100%
-  const cleanAxios = axios.create({
-    transformRequest: [(data) => data],
-  });
+  // 1. Môi trường Browser: Sử dụng native XMLHttpRequest
+  // Tránh việc Axios tự chèn thêm các header mặc định (như Accept...) làm lệch chữ ký AWS SigV4 của Cloudflare R2
+  if (typeof XMLHttpRequest !== 'undefined') {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', uploadUrl, true);
+      xhr.setRequestHeader('Content-Type', mimeType);
 
-  await cleanAxios.put(uploadUrl, file, {
+      if (xhr.upload && typeof onProgress === 'function') {
+        xhr.upload.onprogress = (progressEvent) => {
+          if (progressEvent.lengthComputable && progressEvent.total > 0) {
+            const percent = Math.min(100, Math.round((progressEvent.loaded * 100) / progressEvent.total));
+            onProgress(percent, progressEvent.loaded, progressEvent.total);
+          }
+        };
+      }
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve();
+        } else {
+          reject(
+            new Error(
+              `Upload lên Cloudflare R2 thất bại (Mã HTTP ${xhr.status}: ${xhr.statusText || 'Bad Request'}). Vui lòng kiểm tra R2 API Key và CORS trên Cloudflare Bucket.`
+            )
+          );
+        }
+      };
+
+      xhr.onerror = () => {
+        reject(
+          new Error(
+            'Không thể kết nối đến Cloudflare R2 (Lỗi mạng hoặc bị chặn bởi CORS). Vui lòng thêm origin http://localhost:3000 vào CORS Policy của R2 Bucket.'
+          )
+        );
+      };
+
+      xhr.ontimeout = () => {
+        reject(new Error('Quá thời gian kết nối tải lên Cloudflare R2 (Timeout).'));
+      };
+
+      xhr.send(file);
+    });
+  }
+
+  // 2. Fallback cho môi trường Node.js / Test Runners: Sử dụng fetch
+  return fetch(uploadUrl, {
+    method: 'PUT',
     headers: {
       'Content-Type': mimeType,
     },
-    onUploadProgress: (progressEvent) => {
-      if (typeof onProgress === 'function' && progressEvent.total) {
-        const percent = Math.min(100, Math.round((progressEvent.loaded * 100) / progressEvent.total));
-        onProgress(percent, progressEvent.loaded, progressEvent.total);
-      }
-    },
+    body: file,
+  }).then((res) => {
+    if (!res.ok) {
+      throw new Error(`Upload lên Cloudflare R2 thất bại (HTTP ${res.status}: ${res.statusText})`);
+    }
+    if (typeof onProgress === 'function' && file?.size) {
+      onProgress(100, file.size, file.size);
+    }
   });
 }
 
@@ -87,9 +135,10 @@ export async function uploadFileToR2(uploadUrl, file, onProgress, contentType) {
  * @param {string} params.description Mô tả bài giảng
  * @param {string} params.chapterId UUID chương học
  * @param {string} params.courseId UUID khóa học
+ * @param {string} [params.lessonId] UUID bài học hiện tại (nếu là thao tác thay thế video)
  * @returns {Promise<{ lessonId: string, playlistUrl: string }>}
  */
-export async function processVideoOnBackend({ objectKey, title, description, chapterId, courseId }) {
+export async function processVideoOnBackend({ objectKey, title, description, chapterId, courseId, lessonId }) {
   const payload = {
     objectKey,
     title: title || 'Bài giảng mới',
@@ -97,6 +146,10 @@ export async function processVideoOnBackend({ objectKey, title, description, cha
     chapterId,
     courseId,
   };
+
+  if (lessonId) {
+    payload.lessonId = lessonId;
+  }
 
   const response = await apiClient.post('/upload/process', payload);
   return {
@@ -142,6 +195,7 @@ export async function uploadVideoPipeline(file, metadata, callbacks = {}) {
     description: metadata.description || `Bài giảng ${metadata.title}`,
     chapterId: metadata.chapterId,
     courseId: metadata.courseId,
+    lessonId: metadata.lessonId || null,
   });
 
   return {
