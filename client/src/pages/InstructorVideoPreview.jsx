@@ -16,6 +16,7 @@ import {
   ChevronDown,
   ChevronUp,
   Layers,
+  Loader2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import SecureVideoPlayer from '../components/SecureVideoPlayer';
@@ -52,7 +53,8 @@ function formatBytes(bytes) {
  * =============================================================================
  */
 export default function InstructorVideoPreview() {
-  const { videoId } = useParams();
+  const { lang, videoId } = useParams();
+  const currentLang = lang || 'vi';
   const navigate = useNavigate();
   const { user } = useAuth();
   const [showReuploadModal, setShowReuploadModal] = useState(false);
@@ -72,17 +74,27 @@ export default function InstructorVideoPreview() {
 
   // Nạp dữ liệu từ Backend API
   const [backendData, setBackendData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
+    setIsLoading(true);
     getCourseWithLessons(videoId)
       .then((res) => {
         if (isMounted && res) {
           setBackendData(res);
+          if (res.targetLessonId) {
+            setActiveLectureId(res.targetLessonId);
+          }
         }
       })
       .catch((err) => {
         console.warn('[InstructorVideoPreview] Lỗi tải từ Backend API:', err);
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       });
 
     return () => {
@@ -179,11 +191,13 @@ export default function InstructorVideoPreview() {
   const hasPrev = currentIdx > 0;
   const hasNext = currentIdx >= 0 && currentIdx < allLectures.length - 1;
 
+  const previewPath = (id) => (lang ? `/${lang}/instructor/preview/${id}` : `/instructor/preview/${id}`);
+
   const handlePrevLecture = () => {
     if (hasPrev) {
       const prev = allLectures[currentIdx - 1];
       setActiveLectureId(prev.ID);
-      navigate(`/instructor/preview/${prev.ID}`, { replace: true });
+      navigate(previewPath(prev.ID), { replace: true });
     }
   };
 
@@ -191,13 +205,13 @@ export default function InstructorVideoPreview() {
     if (hasNext) {
       const next = allLectures[currentIdx + 1];
       setActiveLectureId(next.ID);
-      navigate(`/instructor/preview/${next.ID}`, { replace: true });
+      navigate(previewPath(next.ID), { replace: true });
     }
   };
 
   const handleSelectLecture = (id) => {
     setActiveLectureId(id);
-    navigate(`/instructor/preview/${id}`, { replace: true });
+    navigate(previewPath(id), { replace: true });
   };
 
   return (
@@ -208,7 +222,7 @@ export default function InstructorVideoPreview() {
           <div>
             <div className="flex items-center gap-2 text-xs text-slate-400 mb-1.5">
               <Link
-                to="/instructor/videos"
+                to={lang ? `/${lang}/instructor/videos` : '/instructor/videos'}
                 className="inline-flex items-center gap-1 text-slate-500 dark:text-slate-400 hover:text-blue-600 no-underline font-medium"
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
@@ -245,7 +259,7 @@ export default function InstructorVideoPreview() {
           <div className="flex items-center gap-2 flex-wrap">
             <button
               type="button"
-              onClick={() => navigate('/instructor/videos')}
+              onClick={() => navigate(lang ? `/${lang}/instructor/videos` : '/instructor/videos')}
               className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 dark:border-blue-900 px-3.5 py-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50"
             >
               <Edit className="h-3.5 w-3.5" />
@@ -262,7 +276,9 @@ export default function InstructorVideoPreview() {
             <button
               type="button"
               onClick={() =>
-                navigate('/instructor/upload', { state: { courseId: currentCourse?.ID } })
+                navigate(lang ? `/${lang}/instructor/upload` : '/instructor/upload', {
+                  state: { courseId: currentCourse?.ID || currentCourse?.id },
+                })
               }
               className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 px-4 py-1.5 text-xs font-semibold text-white shadow-xs"
             >
@@ -279,14 +295,51 @@ export default function InstructorVideoPreview() {
         <div className="lg:col-span-8 space-y-5">
           {/* TRÌNH PHÁT VIDEO CHÍNH */}
           <div>
-            <SecureVideoPlayer
-              videoId={activeLecture?.ID || currentCourse?.ID || 'v-001'}
-              courseId={currentCourse?.ID}
-              videoUrl={activeLecture?.videoURL || activeLecture?.videoUrl}
-              studentId={`INS-${user?.name || user?.userId || 'INSTRUCTOR'}`}
-              title={activeLecture?.Title || currentCourse?.Title || 'Video Bài Giảng'}
-              embedded={true}
-            />
+            {isLoading ? (
+              <div
+                className="relative w-full rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-slate-900 flex flex-col items-center justify-center p-6 text-white shadow-xl"
+                style={{ aspectRatio: '16 / 9', minHeight: '260px' }}
+              >
+                <Loader2 className="h-10 w-10 animate-spin text-blue-500 mb-3" />
+                <p className="text-xs sm:text-sm text-slate-300 font-medium">Đang tải video bài giảng...</p>
+              </div>
+            ) : activeLecture && activeLecture.ID ? (
+              <SecureVideoPlayer
+                videoId={activeLecture.ID}
+                courseId={currentCourse?.ID || currentCourse?.id}
+                videoUrl={activeLecture.videoURL || activeLecture.videoUrl}
+                studentId={`INS-${user?.name || user?.userId || 'INSTRUCTOR'}`}
+                title={activeLecture.Title || currentCourse?.Title || 'Video Bài Giảng'}
+                embedded={true}
+              />
+            ) : (
+              <div
+                className="relative w-full rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-slate-900 flex flex-col items-center justify-center text-center p-6 text-white shadow-xl"
+                style={{ aspectRatio: '16 / 9', minHeight: '260px' }}
+              >
+                <div className="h-14 w-14 rounded-2xl bg-blue-950/80 text-blue-400 flex items-center justify-center mb-3">
+                  <Play className="h-7 w-7" />
+                </div>
+                <h4 className="text-base font-bold mb-1">Chưa Có Bài Giảng Nào</h4>
+                <p className="text-xs text-slate-400 max-w-sm mb-4">
+                  {currentCourse?.Title
+                    ? `Khóa học "${currentCourse.Title}" hiện chưa có video bài giảng nào.`
+                    : 'Chưa có thông tin khóa học hoặc bài giảng.'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate(lang ? `/${lang}/instructor/upload` : '/instructor/upload', {
+                      state: { courseId: currentCourse?.ID || currentCourse?.id },
+                    })
+                  }
+                  className="inline-flex items-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 text-xs font-semibold shadow-md transition-all cursor-pointer"
+                >
+                  <UploadCloud className="h-4 w-4" />
+                  <span>Tải Lên Video Ngay</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* THANH ĐIỀU HƯỚNG BÀI HỌC NHANH */}

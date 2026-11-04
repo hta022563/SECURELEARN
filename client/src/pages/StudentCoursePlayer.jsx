@@ -365,14 +365,31 @@ export default function StudentCoursePlayer() {
         <div className="lg:col-span-8 space-y-5">
           {/* TRÌNH PHÁT VIDEO CHÍNH */}
           <div>
-            <SecureVideoPlayer
-              videoId={activeLecture?.ID || currentCourse.ID}
-              courseId={currentCourse?.ID}
-              videoUrl={activeLecture?.videoURL || activeLecture?.videoUrl}
-              studentId={user?.userId || ''}
-              title={activeLecture?.Title || currentCourse.Title}
-              embedded={true}
-            />
+            {activeLecture && activeLecture.ID ? (
+              <SecureVideoPlayer
+                videoId={activeLecture.ID}
+                courseId={currentCourse?.ID}
+                videoUrl={activeLecture?.videoURL || activeLecture?.videoUrl}
+                studentId={user?.userId || ''}
+                title={activeLecture?.Title || currentCourse.Title}
+                embedded={true}
+              />
+            ) : (
+              <div
+                className="relative w-full rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-slate-900 flex flex-col items-center justify-center text-center p-6 text-white shadow-xl"
+                style={{ aspectRatio: '16 / 9', minHeight: '260px' }}
+              >
+                <div className="h-14 w-14 rounded-2xl bg-blue-950/80 text-blue-400 flex items-center justify-center mb-3">
+                  <Play className="h-7 w-7" />
+                </div>
+                <h4 className="text-base font-bold mb-1">Chưa Có Bài Giảng Nào</h4>
+                <p className="text-xs text-slate-400 max-w-sm">
+                  {currentCourse?.Title
+                    ? `Khóa học "${currentCourse.Title}" hiện chưa có video bài giảng nào khả dụng.`
+                    : 'Không tìm thấy thông tin bài giảng.'}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* THANH ĐIỀU HƯỚNG BÀI HỌC */}

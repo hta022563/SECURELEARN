@@ -113,7 +113,7 @@ export default function RolePortalLayout({ role }) {
             {
               id: 'preview',
               title: t('navbar.preview_video', 'Xem Trước Bài Giảng'),
-              path: `/${lang}/instructor/preview/v-001`,
+              path: `/${lang}/instructor/preview`,
               icon: Eye,
             },
             {
@@ -143,7 +143,7 @@ export default function RolePortalLayout({ role }) {
             {
               id: 'player',
               title: t('navbar.continue_learning', 'Trình phát bài giảng'),
-              path: `/${lang}/student/player/v-001`,
+              path: `/${lang}/student/player`,
               icon: PlayCircle,
             },
             {

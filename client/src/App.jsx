@@ -141,7 +141,7 @@ export default function App() {
                         <Route path="portal" element={<Navigate to="../courses" replace relative="path" />} />
                         <Route path="courses" element={<MyCourses />} />
                         <Route path="player/:videoId" element={<StudentCoursePlayer />} />
-                        <Route path="player" element={<Navigate to="../player/v-001" replace relative="path" />} />
+                        <Route path="player" element={<StudentCoursePlayer />} />
                         <Route path="profile" element={<UserProfile />} />
                       </Route>
 
@@ -162,7 +162,7 @@ export default function App() {
                         <Route path="videos" element={<InstructorVideos />} />
                         <Route path="upload" element={<UploadVideo />} />
                         <Route path="preview/:videoId" element={<InstructorVideoPreview />} />
-                        <Route path="preview" element={<Navigate to="../preview/v-001" replace relative="path" />} />
+                        <Route path="preview" element={<InstructorVideoPreview />} />
                         <Route path="profile" element={<UserProfile />} />
                       </Route>
 

@@ -470,14 +470,43 @@ export async function deleteLesson(id) {
 
 /**
  * Lấy toàn bộ cây nội dung khóa học: Khóa học -> Các chương -> Các bài học từ Backend
+ * Hỗ trợ linh hoạt khi đầu vào là Course ID, Lesson ID, hoặc undefined / fallback
  */
-export async function getCourseWithLessons(courseId) {
+export async function getCourseWithLessons(courseOrLessonId) {
   try {
-    const course = await getCourseById(courseId);
-    if (!course) {
-      return { course: null, chapters: [], lessons: [] };
+    let course = null;
+    let targetLessonId = null;
+
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const isPotentialUuid = Boolean(courseOrLessonId && uuidRegex.test(courseOrLessonId));
+
+    if (isPotentialUuid) {
+      // 1. Thử tra cứu xem courseOrLessonId có phải là ID của khóa học không
+      course = await getCourseById(courseOrLessonId);
+
+      // 2. Nếu không tìm thấy khóa học, kiểm tra xem có phải là ID của một bài giảng không
+      if (!course) {
+        const lesson = await getLessonById(courseOrLessonId);
+        if (lesson && (lesson.courseId || lesson.course_id)) {
+          targetLessonId = lesson.id || lesson.ID;
+          course = await getCourseById(lesson.courseId || lesson.course_id);
+        }
+      }
     }
 
+    // 3. Nếu không có ID hợp lệ, hoặc ID là 'v-001' / không tìm thấy: tự động lấy khóa học đầu tiên có trên Backend
+    if (!course) {
+      const allCourses = await getCourses();
+      if (allCourses && allCourses.length > 0) {
+        course = allCourses[0];
+      }
+    }
+
+    if (!course) {
+      return { course: null, chapters: [], lessons: [], targetLessonId: null };
+    }
+
+    const courseId = course.id || course.ID;
     const fetchedChapters = await getChapters(courseId);
 
     // Nạp song song danh sách bài học của tất cả các chương từ Backend
@@ -487,7 +516,7 @@ export async function getCourseWithLessons(courseId) {
         const mappedLessons = lessons.map((l) => ({
           ...l,
           chapterId: chap.id,
-          courseId: course.id,
+          courseId: courseId,
           chapterTitle: chap.title,
           chapterNumber: idx + 1,
         }));
@@ -507,10 +536,11 @@ export async function getCourseWithLessons(courseId) {
       course,
       chapters: chaptersWithLessons,
       lessons: allFlattenedLessons,
+      targetLessonId,
     };
   } catch (err) {
     console.warn('[courseService] getCourseWithLessons lỗi:', err.message);
-    return { course: null, chapters: [], lessons: [] };
+    return { course: null, chapters: [], lessons: [], targetLessonId: null };
   }
 }
 

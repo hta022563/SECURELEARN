@@ -147,7 +147,7 @@ export default function UserPortal({ defaultRole }) {
             {
               title: t('navbar.preview_video', 'Xem Trước Bài Giảng'),
               desc: t('navbar.preview_video_desc', 'Xem trước video với Watermark động'),
-              path: `/${lang}/instructor/preview/v-001`,
+              path: `/${lang}/instructor/preview`,
               icon: Eye,
               iconColor: 'text-indigo-600 bg-indigo-50 dark:bg-indigo-950/60 dark:text-indigo-400',
               highlight: 'Dynamic Overlay',
@@ -186,7 +186,7 @@ export default function UserPortal({ defaultRole }) {
             {
               title: t('navbar.continue_learning', 'Trình phát bài giảng'),
               desc: t('navbar.continue_learning_desc', 'Xem video DRM với Watermark động'),
-              path: `/${lang}/student/player/v-001`,
+              path: `/${lang}/student/player`,
               icon: PlayCircle,
               iconColor: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-400',
               highlight: 'Bảo Vệ Bản Quyền',

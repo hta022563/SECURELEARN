@@ -4,7 +4,7 @@ import {
   fetchSignedUrl,
   fetchContentKey,
 } from '../services/cryptoService';
-import { getDeviceFingerprint, getCachedDeviceFingerprint } from '../services/fingerprintService';
+import { getDeviceFingerprint, getCachedDeviceFingerprint } from '../services/fingerprintService.js';
 
 const STORAGE_KEY = 'securelearn_auth_user';
 
@@ -30,6 +30,18 @@ export function useSecureHls(videoId, studentId, videoRef, courseId = null) {
       setIsLoading(false);
       setIsReady(true);
       setSecurityStatus('Sẵn sàng phát video');
+      return;
+    }
+
+    const isDirect = Boolean(
+      typeof videoId === 'string' &&
+        (videoId.startsWith('http://') || videoId.startsWith('https://') || videoId.startsWith('blob:'))
+    );
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    if (!isDirect && !uuidRegex.test(videoId)) {
+      setIsLoading(false);
+      setError(`Mã bài giảng không hợp lệ ("${videoId}"). Vui lòng chọn bài giảng hợp lệ.`);
       return;
     }
 
@@ -128,7 +140,6 @@ export function useSecureHls(videoId, studentId, videoRef, courseId = null) {
           xhrSetup: (xhr, url) => {
             xhr.withCredentials = false;
             if (url.includes('/api/v1/lesson/')) {
-              xhr.open('GET', url, true);
               try {
                 const user = JSON.parse(sessionStorage.getItem(STORAGE_KEY));
                 if (user?.token) {

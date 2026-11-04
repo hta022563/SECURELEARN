@@ -53,12 +53,21 @@ export async function getPresignedUploadUrl({ fileName, contentType, courseId })
  * @param {string} uploadUrl URL Presigned từ Bước 1
  * @param {File} file Đối tượng File video từ trình duyệt
  * @param {Function} [onProgress] Callback nhận tiến độ thực: (percent, loadedBytes, totalBytes)
+ * @param {string} [contentType] MIME type đã đăng ký với Backend khi tạo Presigned URL
  * @returns {Promise<void>}
  */
-export async function uploadFileToR2(uploadUrl, file, onProgress) {
-  await axios.put(uploadUrl, file, {
+export async function uploadFileToR2(uploadUrl, file, onProgress, contentType) {
+  const mimeType = contentType || file.type || 'video/mp4';
+
+  // Khởi tạo instance Axios cô lập, không chứa header chung của apiClient (như Authorization, X-Device-Fingerprint)
+  // và không serialize file binary để đảm bảo chữ ký SigV4 của Cloudflare R2 khớp 100%
+  const cleanAxios = axios.create({
+    transformRequest: [(data) => data],
+  });
+
+  await cleanAxios.put(uploadUrl, file, {
     headers: {
-      'Content-Type': file.type || 'video/mp4',
+      'Content-Type': mimeType,
     },
     onUploadProgress: (progressEvent) => {
       if (typeof onProgress === 'function' && progressEvent.total) {
@@ -110,15 +119,17 @@ export async function processVideoOnBackend({ objectKey, title, description, cha
 export async function uploadVideoPipeline(file, metadata, callbacks = {}) {
   const { onUploadProgress, onProcessing } = callbacks;
 
+  const contentType = file.type || 'video/mp4';
+
   // 1. Xin Presigned URL từ Backend Spring Boot
   const { uploadUrl, objectKey } = await getPresignedUploadUrl({
     fileName: file.name,
-    contentType: file.type || 'video/mp4',
+    contentType,
     courseId: metadata.courseId,
   });
 
   // 2. Upload file trực tiếp lên R2 với thanh tiến độ thực từ bytes truyền đi
-  await uploadFileToR2(uploadUrl, file, onUploadProgress);
+  await uploadFileToR2(uploadUrl, file, onUploadProgress, contentType);
 
   // 3. Thông báo Backend chạy pipeline FFmpeg -> HLS và lưu DB
   if (typeof onProcessing === 'function') {

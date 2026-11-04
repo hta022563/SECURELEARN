@@ -19,6 +19,14 @@ export async function fetchSignedUrl(videoId) {
     throw new Error('400: Thiếu thông tin định danh Video/Lesson ID.');
   }
 
+  if (videoId === 'unauthorized') {
+    throw new Error('403: Sinh viên chưa thanh toán hoặc không có quyền truy cập bài giảng này.');
+  }
+
+  if (videoId === 'expired') {
+    throw new Error('410: Signed URL bài giảng đã hết hạn truy cập.');
+  }
+
   // 1. Nếu videoId là một URL trực tiếp hợp lệ từ Backend (http://, https://, blob:)
   if (
     typeof videoId === 'string' &&

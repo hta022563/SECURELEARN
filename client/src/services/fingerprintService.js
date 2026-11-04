@@ -40,19 +40,55 @@ export async function getDeviceFingerprint() {
   if (!pendingPromise) {
     pendingPromise = (async () => {
       try {
-        const fp = await FingerprintJS.load();
-        const result = await fp.get();
-        cachedFingerprint = result.visitorId;
+        const fpLib = typeof FingerprintJS?.load === 'function' ? FingerprintJS : (FingerprintJS?.default || FingerprintJS);
+        if (fpLib && typeof fpLib.load === 'function') {
+          const fp = await fpLib.load({ monitoring: false });
+          const result = await fp.get();
+          if (result?.visitorId) {
+            cachedFingerprint = result.visitorId;
+          }
+        }
+      } catch (err) {
+        console.warn('[fingerprintService] FingerprintJS error, using browser signal hash:', err?.message);
+      }
 
+      if (!cachedFingerprint) {
+        try {
+          const raw = [
+            typeof navigator !== 'undefined' ? navigator.userAgent : '',
+            typeof navigator !== 'undefined' ? navigator.language : '',
+            typeof screen !== 'undefined' ? `${screen.width}x${screen.height}` : '',
+            typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : '',
+          ].join('|');
+          if (typeof crypto !== 'undefined' && crypto.subtle) {
+            const msgBuffer = new TextEncoder().encode(raw);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+            cachedFingerprint = Array.from(new Uint8Array(hashBuffer))
+              .map((b) => b.toString(16).padStart(2, '0'))
+              .join('')
+              .slice(0, 32);
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      if (!cachedFingerprint) {
+        cachedFingerprint = 'fp_default_visitor';
+      }
+
+      try {
         if (typeof sessionStorage !== 'undefined' && cachedFingerprint) {
           sessionStorage.setItem(FINGERPRINT_STORAGE_KEY, cachedFingerprint);
         }
-
-        return cachedFingerprint;
-      } finally {
-        pendingPromise = null;
+      } catch {
+        // ignore
       }
-    })();
+
+      return cachedFingerprint;
+    })().finally(() => {
+      pendingPromise = null;
+    });
   }
 
   return pendingPromise;

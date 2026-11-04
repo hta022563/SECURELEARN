@@ -115,13 +115,20 @@ export function useVideoUpload() {
       }
     } catch (err) {
       if (!isMountedRef.current) return;
-      console.error('[Upload Error - Backend API]', err);
+      console.error('[Upload Error - Backend / R2 API]', err);
       setStatus(UPLOAD_STATUS.ERROR);
-      const errorMsg =
+
+      let errorMsg =
         err.response?.data?.error ||
         err.response?.data?.message ||
         err.message ||
-        'Không thể kết nối hoặc tải video lên Backend (http://localhost:8080).';
+        'Không thể kết nối hoặc tải video lên Backend.';
+
+      // Bắt lỗi Network Error khi trình duyệt PUT trực tiếp lên Cloudflare R2
+      if (err.message === 'Network Error' || err.code === 'ERR_NETWORK') {
+        errorMsg = 'Lỗi kết nối khi tải video trực tiếp lên Cloudflare R2 (400 Bad Request / CORS).';
+      }
+
       setError(errorMsg);
     }
   }, []);
