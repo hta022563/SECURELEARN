@@ -31,7 +31,7 @@ public class CourseService {
         this.courseRepo = courseRepo;
     }
 
-    public void addNewCourse(String title, String description, String instructor, float prices, LocalDateTime creationTime, LocalDateTime lastUpdatedTime){
+    public void addNewCourse(String title, String description, String instructor, long prices, LocalDateTime creationTime, LocalDateTime lastUpdatedTime){
         Course newCourse = new Course(title, description, prices, instructor, creationTime, lastUpdatedTime);
         courseRepo.save(newCourse);
     }
@@ -45,7 +45,7 @@ public class CourseService {
         return courseRepo.findByTitleContaining(title);
     }
     
-    public void updateCourse(UUID id, String title, String description, String instructor, float prices, LocalDateTime lastUpdatedTime){
+    public void updateCourse(UUID id, String title, String description, String instructor, long prices, LocalDateTime lastUpdatedTime){
         Course updatedCourse = courseRepo.findById(id).orElseThrow();
         updatedCourse.setTitle(title);
         updatedCourse.setDescription(description);
