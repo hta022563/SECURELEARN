@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getDeviceFingerprint } from '../services/fingerprintService';
+import { getDeviceFingerprint } from '../services/fingerprintService.js';
 
 /**
  * Axios Client tập trung cho toàn bộ ứng dụng SecureLearn

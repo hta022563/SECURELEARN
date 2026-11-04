@@ -15,9 +15,9 @@
  * =============================================================================
  */
 
-import { getDeviceFingerprint } from './fingerprintService';
+import { getDeviceFingerprint } from './fingerprintService.js';
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
+const BASE_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || 'http://localhost:8080/api/v1';
 
 // Storage key — keep in sync with AuthContext
 const STORAGE_KEY = 'securelearn_auth_user';

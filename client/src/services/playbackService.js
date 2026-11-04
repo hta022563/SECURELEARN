@@ -38,6 +38,11 @@ export async function getLessonPlayback(lessonId) {
     throw new Error('400: Lesson ID không được để trống.');
   }
 
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(lessonId)) {
+    throw new Error(`400: Lesson ID không đúng định dạng UUID ("${lessonId}"). Vui lòng chọn bài giảng hợp lệ.`);
+  }
+
   try {
     const response = await apiClient.get(`/lesson/${lessonId}/playback`);
     
