@@ -11,6 +11,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -48,6 +49,9 @@ public class Course {
     
     @OneToMany(mappedBy="course", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Chapter> chapter = new ArrayList();
+    
+    @OneToMany(mappedBy="course", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Enrollment> enrollment = new ArrayList();
     
     public Course() {
     }
