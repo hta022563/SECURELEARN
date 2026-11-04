@@ -10,12 +10,12 @@ package FCAJ.SecureLearn.Request;
  */
 public class CourseCreationRequest {
     String title, description, instructor;
-    float prices;
+    long prices;
 
     public CourseCreationRequest() {
     }
 
-    public CourseCreationRequest(String title, String description, String instructor, float prices) {
+    public CourseCreationRequest(String title, String description, String instructor, long prices) {
         this.title = title;
         this.description = description;
         this.instructor = instructor;
@@ -46,11 +46,11 @@ public class CourseCreationRequest {
         this.instructor = instructor;
     }
 
-    public float getPrices() {
+    public long getPrices() {
         return prices;
     }
 
-    public void setPrices(float prices) {
+    public void setPrices(long prices) {
         this.prices = prices;
     }
     

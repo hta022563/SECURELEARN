@@ -36,7 +36,7 @@ public class Course {
     private String description;
     
     @Column(nullable = false)
-    private float price;
+    private long price;
     
     @Column(nullable = false, length = 200)
     private String instructor;
@@ -56,7 +56,7 @@ public class Course {
     public Course() {
     }
     
-    public Course(String title, String description, float price, String instructor, LocalDateTime creationTime, LocalDateTime lastUpdateTime) {
+    public Course(String title, String description, long price, String instructor, LocalDateTime creationTime, LocalDateTime lastUpdateTime) {
         this.title = title;
         this.description = description;
         this.price = price;
@@ -89,11 +89,11 @@ public class Course {
         this.description = description;
     }
 
-    public float getPrice() {
+    public long getPrice() {
         return price;
     }
 
-    public void setPrice(float price) {
+    public void setPrice(long price) {
         this.price = price;
     }
 
