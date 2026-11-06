@@ -17,6 +17,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 @Service
 public class PlaybackService {
+
     private final LessonRepo lessonRepo;
     private final R2Service r2Service;
     private final PlaybackTokenService tokenService;
@@ -60,7 +61,7 @@ public class PlaybackService {
                     System.currentTimeMillis() + Duration.ofSeconds(segmentUrlTtlSeconds).toMillis());
         }
 
-        PlaybackTokenService.IssuedToken token = tokenService.issue(lessonId,username);
+        PlaybackTokenService.IssuedToken token = tokenService.issue(lessonId, username);
         String manifestUrl = UriComponentsBuilder.fromUriString(contextUrl)
                 .path("/api/v1/lesson/{lessonId}/manifest")
                 .queryParam("token", token.value())
@@ -71,7 +72,7 @@ public class PlaybackService {
     }
 
     @Transactional
-    public String getSignedManifest(UUID lessonId, String token, String contextUrl, String username){
+    public String getSignedManifest(UUID lessonId, String token, String contextUrl, String username) {
         if (!tokenService.isValid(lessonId, token, username)) {
             throw new AccessDeniedException("Playback token is invalid or expired");
         }
@@ -91,17 +92,17 @@ public class PlaybackService {
             } else if (!trimmed.isEmpty() && !trimmed.startsWith("#")) {
                 String segmentKey = resolveSegmentKey(trimmed, parentKey);
                 int start = segmentKey.lastIndexOf("segment_"), end = segmentKey.lastIndexOf(".ts");
-                if(start == -1 || end ==-1){
-                  throw new IllegalArgumentException("Weird file name");
+                if (start == -1 || end == -1) {
+                    throw new IllegalArgumentException("Weird file name");
                 }
                 start += 8;
-                int index = Integer.parseInt(segmentKey.substring(start,end));
+                int index = Integer.parseInt(segmentKey.substring(start, end));
                 String signedSegment = UriComponentsBuilder.fromUriString(contextUrl)
-                .path("/api/v1/lesson/{lessonId}/segment/{segmentIndex}")
-                .queryParam("token", token)
-                .buildAndExpand(lessonId, index)
-                .encode()
-                .toUriString();
+                        .path("/api/v1/lesson/{lessonId}/segment/{segmentIndex}")
+                        .queryParam("token", token)
+                        .buildAndExpand(lessonId, index)
+                        .encode()
+                        .toUriString();
                 rewritten.append(signedSegment);
             } else {
                 rewritten.append(line);
@@ -110,8 +111,8 @@ public class PlaybackService {
         }
         return rewritten.toString();
     }
-    
-    public String getSegmentURL(int segmentIndex, UUID lessonId, String token, String username){
+
+    public String getSegmentURL(int segmentIndex, UUID lessonId, String token, String username) {
         if (!tokenService.isValid(lessonId, token, username)) {
             throw new AccessDeniedException("Playback token is invalid or expired");
         }
@@ -120,15 +121,15 @@ public class PlaybackService {
         if (!playlistKey.endsWith(".m3u8")) {
             throw new EntityNotFoundException("HLS playlist not found");
         }
-        if(segmentIndex < 0){
-            throw new IllegalArgumentException ("Video Index is invalid");
+        if (segmentIndex < 0) {
+            throw new IllegalArgumentException("Video Index is invalid");
         }
         String parentKey = playlistKey.substring(0, playlistKey.lastIndexOf('/') + 1);
         String r2Key = parentKey + String.format("segment_%03d.ts", segmentIndex);
         URL segmentURL = r2Service.generatePresignedGetUrl(bucketName, r2Key, Duration.ofSeconds(60));
         return segmentURL.toString();
     }
-    
+
     public byte[] getContentKey(UUID lessonId, String token, String username) {
         if (!tokenService.isValid(lessonId, token, username)) {
             throw new AccessDeniedException("Playback token is invalid or expired");
@@ -230,5 +231,6 @@ public class PlaybackService {
     }
 
     public record PlaybackDetails(String playbackUrl, long expiresAt) {
+
     }
 }
