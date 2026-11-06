@@ -61,4 +61,8 @@ public class CourseService {
         courseRepo.delete(targetCourse);
     }
     
+    public long getCoursePrice(UUID id){
+        return courseRepo.findById(id).orElseThrow().getPrice();
+    }
+    
 }
