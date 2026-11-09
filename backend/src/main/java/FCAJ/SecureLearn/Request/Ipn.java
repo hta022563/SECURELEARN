@@ -15,11 +15,11 @@ public record Ipn(
     long amount,
     String orderInfo,
     String orderType,
-    int transId,
+    long transId,
     int resultCode,
     String message,
     String payType,
-    int responseTime,
+    long responseTime,
     String extraData,
     String signature
 ){}

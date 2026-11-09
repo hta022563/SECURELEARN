@@ -5,6 +5,7 @@
 package FCAJ.SecureLearn.Service;
 
 import FCAJ.SecureLearn.Model.Course;
+import FCAJ.SecureLearn.Model.CurrentOrders;
 import FCAJ.SecureLearn.Repositories.CourseRepo;
 import FCAJ.SecureLearn.Request.Ipn;
 import FCAJ.SecureLearn.Request.MomoCreatePaymentRequest;
@@ -12,6 +13,7 @@ import FCAJ.SecureLearn.Response.MomoPaymentCreationResponse;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import javax.crypto.Mac;
@@ -30,32 +32,35 @@ import org.springframework.web.client.RestClient;
 public class MomoService {
 
     private final CourseRepo courseRepo;
-    @Value("${momo.endpoint}")
-    private String endpoint;
-    @Value("${momo.partnerCode}")
-    private String partnerCode;
-    @Value("${momo.accessKey}")
-    private String accessKey;
-    @Value("${momo.secretKey}")
-    private String secretKey;
+    private final EnrollmentService enrollmentService;
+    private String endpoint, partnerCode, accessKey, secretKey;
+    RestClient defaultClient;
 
-    public MomoService(String endpoint, String partnerCode, String accessKey, String secretKey, CourseRepo courseRepo) {
+    public MomoService(@Value(value = "${momo.endpoint}")
+            String endpoint, @Value(value = "${momo.partnerCode}")
+                    String partnerCode, @Value(value = "${momo.accessKey}")
+                            String accessKey, @Value(value = "${momo.secretKey}")
+                                    String secretKey, CourseRepo courseRepo, EnrollmentService enrollmentService) {
         this.endpoint = endpoint;
         this.partnerCode = partnerCode;
         this.accessKey = accessKey;
         this.secretKey = secretKey;
         this.courseRepo = courseRepo;
+        defaultClient = RestClient.builder().baseUrl(endpoint).build();
+        this.enrollmentService = enrollmentService;
     }
-    RestClient defaultClient = RestClient.builder().baseUrl(endpoint).build();
 
-    public ResponseEntity<MomoPaymentCreationResponse> createPaymentRequest(UUID id, Map<String, String> userMap, Map<String,UUID> courseMap, String email) {
+    public ResponseEntity<MomoPaymentCreationResponse> createPaymentRequest(UUID id, Map<String, String> userMap, Map<String, UUID> courseMap, String email) {
         Course enrollingCourse = courseRepo.findById(id).orElseThrow();
         String requestId = UUID.randomUUID().toString();
         String requestType = "captureWallet";
         String orderInfo = "Enrolling in " + enrollingCourse.getTitle() + " by " + enrollingCourse.getInstructor();
         String extraData = "";
-        String redirectUrl = "http://localhost:8080/payment/momo/return";
-        String ipnUrl = "http://localhost:8080/api/momo/ipn";
+        String redirectUrl = "http://localhost:3000";
+        String ipnUrl = "http://backend:8080/api/momo/ipn";
+        if(enrollmentService.checkEnrollemnt(email, id)){
+            throw new IllegalArgumentException("User have already enrolled in this course");
+        }
         userMap.put(requestId, email);
         courseMap.put(requestId, id);
         try {
@@ -71,8 +76,8 @@ public class MomoService {
                     + "&requestType=" + requestType;
             MomoPaymentCreationResponse response;
             MomoCreatePaymentRequest paymentrequest = new MomoCreatePaymentRequest(partnerCode, requestId, enrollingCourse.getPrice(), requestId, orderInfo, redirectUrl, ipnUrl, requestType, extraData, "vi", encode(secretKey, rawSignature));
-            
-            return defaultClient.post().uri("/momo/v2/gateway/api/create").body(paymentrequest).retrieve().toEntity(MomoPaymentCreationResponse.class);
+
+            return defaultClient.post().uri("/v2/gateway/api/create").body(paymentrequest).retrieve().toEntity(MomoPaymentCreationResponse.class);
         } catch (Exception e) {
             return null;
         }
@@ -93,7 +98,7 @@ public class MomoService {
                 + "&partnerCode=" + partnerCode
                 + "&payType=" + ipn.payType()
                 + "&requestId=" + ipn.requestId()
-                + "&requestType=" + ipn.responseTime()
+                + "&responseTime=" + ipn.responseTime()
                 + "&resultCode=" + ipn.resultCode()
                 + "&transId=" + ipn.transId();
         String encodedSignature = encode(secretKey, rawSignature);
