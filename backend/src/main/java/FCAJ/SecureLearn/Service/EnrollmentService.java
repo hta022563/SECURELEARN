@@ -62,4 +62,8 @@ public class EnrollmentService {
         Enrollment targetEnrollment = enrollmentRepo.findById(id).orElseThrow();
         enrollmentRepo.delete(targetEnrollment);
     }
+    
+    public boolean checkEnrollemnt(String email, UUID id){
+        return enrollmentRepo.findByEmailAndCourseId(email, id) != null;
+    }
 }

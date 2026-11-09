@@ -69,6 +69,9 @@ public class CourseController {
      */
     @PostMapping("/course")
     public ResponseEntity<?> createCourse(@RequestBody CourseCreationRequest request){
+        if(request.getPrices() < 1000 || request.getPrices() > 50000000){
+            return ResponseEntity.badRequest().body("Prices must be between 1000 - 50000000");
+        }
        courseService.addNewCourse(request.getTitle(), request.getDescription(), request.getInstructor(), request.getPrices(), LocalDateTime.now(), LocalDateTime.now());
        return ResponseEntity.ok().body(Map.of("success", "Course added successfully"));
     }

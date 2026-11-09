@@ -5,6 +5,7 @@
 package FCAJ.SecureLearn.Controller;
 
 import FCAJ.SecureLearn.Model.Course;
+import FCAJ.SecureLearn.Model.CurrentOrders;
 import FCAJ.SecureLearn.Repositories.CourseRepo;
 import FCAJ.SecureLearn.Request.Ipn;
 import FCAJ.SecureLearn.Request.MomoCreatePaymentRequest;
@@ -13,6 +14,9 @@ import FCAJ.SecureLearn.Service.AuthService;
 import FCAJ.SecureLearn.Service.CourseService;
 import FCAJ.SecureLearn.Service.EnrollmentService;
 import FCAJ.SecureLearn.Service.MomoService;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,8 +40,8 @@ public class PaymentController {
     private final MomoService momoService;
     private final EnrollmentService enrollmentService;
     private final AuthService authService;
-    private Map<String, String> userMap;
-    private Map<String, UUID> courseMap;
+    private Map<String, String> userMap = new HashMap<>();
+    private Map<String, UUID> courseMap = new HashMap<>();
     
     public PaymentController(MomoService momoService, EnrollmentService enrollmentService, AuthService authService) {
         this.momoService = momoService;
@@ -49,10 +53,10 @@ public class PaymentController {
     @PostMapping("api/v1/enrollment/{id}")
     public ResponseEntity<?> createPayment(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
         try {
-            return momoService.createPaymentRequest(id, userMap, courseMap, jwt.getClaimAsString("username"));
+            return momoService.createPaymentRequest(id, userMap, courseMap, authService.getEmailByUsername(jwt.getClaimAsString("username")));
 
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("It didnt work");
+            return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
@@ -62,7 +66,9 @@ public class PaymentController {
             return ResponseEntity.badRequest().build();
         }
         if (ipn.resultCode() == 0) {
-            enrollmentService.createEnrollment(authService.getEmailByUsername(userMap.get(ipn.orderId())), courseMap.get(ipn.orderId()));
+            enrollmentService.createEnrollment(userMap.get(ipn.orderId()), courseMap.get(ipn.orderId()));
+            userMap.remove(ipn.orderId());
+            courseMap.remove(ipn.orderId());
         }
         return ResponseEntity.noContent().build();
     }

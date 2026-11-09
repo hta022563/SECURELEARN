@@ -22,4 +22,6 @@ public interface EnrollmentRepo extends CrudRepository<Enrollment, UUID> {
     List<Enrollment> findByEmail(String email);
 
     List<Enrollment> findByCourseId(UUID id);
+    
+    Enrollment findByEmailAndCourseId(String email, UUID id);
 }
