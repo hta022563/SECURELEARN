@@ -11,6 +11,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -35,7 +36,7 @@ public class Course {
     private String description;
     
     @Column(nullable = false)
-    private float price;
+    private long price;
     
     @Column(nullable = false, length = 200)
     private String instructor;
@@ -49,10 +50,13 @@ public class Course {
     @OneToMany(mappedBy="course", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Chapter> chapter = new ArrayList();
     
+    @OneToMany(mappedBy="course", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Enrollment> enrollment = new ArrayList();
+    
     public Course() {
     }
     
-    public Course(String title, String description, float price, String instructor, LocalDateTime creationTime, LocalDateTime lastUpdateTime) {
+    public Course(String title, String description, long price, String instructor, LocalDateTime creationTime, LocalDateTime lastUpdateTime) {
         this.title = title;
         this.description = description;
         this.price = price;
@@ -85,11 +89,11 @@ public class Course {
         this.description = description;
     }
 
-    public float getPrice() {
+    public long getPrice() {
         return price;
     }
 
-    public void setPrice(float price) {
+    public void setPrice(long price) {
         this.price = price;
     }
 

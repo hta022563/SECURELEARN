@@ -54,6 +54,20 @@ services:
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?Set AWS_ACCESS_KEY_ID in the .env file}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?Set AWS_SECRET_ACCESS_KEY in the .env file}
 
+      # MoMo (points at the local pay-sandbox service by default)
+      MOMO_URL: ${MOMO_URL:-http://paySandbox:4242/momo}
+      MOMO_PARTNER_CODE: ${MOMO_PARTNER_CODE:?Set MOMO_PARTNER_CODE in the .env file}
+      MOMO_ACCESS_KEY: ${MOMO_ACCESS_KEY:?Set MOMO_ACCESS_KEY in the .env file}
+      MOMO_SECRET_KEY: ${MOMO_SECRET_KEY:?Set MOMO_SECRET_KEY in the .env file}
+
+  # Local MoMo/VNPay/ZaloPay/Stripe simulator (dev only, never deploy)
+  paySandbox:
+    image: node:22-alpine
+    container_name: paySandbox
+    restart: unless-stopped
+    command: npx --yes pay-sandbox@0.1.2 --host 0.0.0.0
+    ports:
+      - "127.0.0.1:4242:4242"
 volumes:
   postgres-data:
     driver: local
