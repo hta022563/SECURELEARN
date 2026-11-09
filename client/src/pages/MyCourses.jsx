@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getCourses } from '../services/courseService';
+import { fetchMyEnrollments } from '../services/entitlementService';
 
 /**
  * Component: MyCourses
@@ -31,14 +32,30 @@ export default function MyCourses() {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
-  // Hàm gọi API lấy danh sách khóa học
+  // Hàm gọi API lấy danh sách khóa học đã đăng ký qua GET /api/v1/enrollment/me
   const fetchStudentCourses = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const allCourses = await getCourses();
-      if (Array.isArray(allCourses) && allCourses.length > 0) {
+      const [enrollmentRes, allCourses] = await Promise.all([
+        fetchMyEnrollments(user),
+        getCourses(),
+      ]);
+
+      const enrolledIds = enrollmentRes?.courseIds || [];
+      const enrollmentRecords = enrollmentRes?.enrollments || [];
+      const isFullAccess = Boolean(enrollmentRes?.isFullAccessRole);
+
+      const courseMap = new Map();
+      if (Array.isArray(allCourses)) {
+        allCourses.forEach((c) => {
+          const cid = String(c.ID || c.id || '').trim().toLowerCase();
+          if (cid) courseMap.set(cid, c);
+        });
+      }
+
+      if (isFullAccess && Array.isArray(allCourses)) {
         const formatted = allCourses.map((course) => ({
           id: course.ID || course.id,
           title: course.Title || course.title,
@@ -50,6 +67,46 @@ export default function MyCourses() {
           creationTime: course['Creation Time'] || course.createdAt,
           price: course.Price ?? course.price,
         }));
+        setCourses(formatted);
+      } else if (enrolledIds.length > 0) {
+        const formatted = enrolledIds
+          .map((enrolledId) => {
+            const normId = String(enrolledId).trim().toLowerCase();
+            const matchedCourse = courseMap.get(normId);
+            const matchedEnrollment = enrollmentRecords.find(
+              (en) => String(en.courseId).trim().toLowerCase() === normId
+            );
+            const fallbackCourse = matchedEnrollment?.course || null;
+            const sourceCourse = matchedCourse || fallbackCourse;
+
+            if (!sourceCourse && !matchedEnrollment) return null;
+
+            return {
+              id: sourceCourse?.ID || sourceCourse?.id || enrolledId,
+              title:
+                sourceCourse?.Title ||
+                sourceCourse?.title ||
+                `Khóa học #${String(enrolledId).slice(0, 8)}`,
+              description: sourceCourse?.Description || sourceCourse?.description || '',
+              owner:
+                sourceCourse?.Owner ||
+                sourceCourse?.owner ||
+                sourceCourse?.instructor ||
+                sourceCourse?.Instructor ||
+                '',
+              status: matchedEnrollment?.status || 'Active',
+              joinDate:
+                matchedEnrollment?.enrollmentDate ||
+                sourceCourse?.['Creation Time'] ||
+                sourceCourse?.createdAt ||
+                null,
+              completionDate: matchedEnrollment?.completionDate || null,
+              creationTime: sourceCourse?.['Creation Time'] || sourceCourse?.createdAt || null,
+              price: sourceCourse?.Price ?? sourceCourse?.price ?? sourceCourse?.prices ?? null,
+            };
+          })
+          .filter(Boolean);
+
         setCourses(formatted);
       } else {
         setCourses([]);

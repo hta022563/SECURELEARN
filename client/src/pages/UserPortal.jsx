@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { Link, useParams, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -27,6 +27,7 @@ import {
   ArrowUpRight,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { fetchMyEnrollments } from '../services/entitlementService';
 
 /**
  * =============================================================================
@@ -41,6 +42,23 @@ export default function UserPortal({ defaultRole }) {
   const { lang = 'vi' } = useParams();
   const location = useLocation();
   const { t } = useTranslation();
+  const [enrolledCount, setEnrolledCount] = useState(0);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (user) {
+      fetchMyEnrollments(user)
+        .then((res) => {
+          if (isMounted && res?.courseIds) {
+            setEnrolledCount(res.courseIds.length);
+          }
+        })
+        .catch(() => {});
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
 
   // Xác định vai trò hiển thị (ưu tiên role người dùng đăng nhập hoặc role truyền từ route)
   let activeRole = defaultRole || user?.role || 'Student';
@@ -169,7 +187,7 @@ export default function UserPortal({ defaultRole }) {
           gradientBg: 'from-blue-500/10 via-blue-500/5 to-transparent',
           icon: GraduationCap,
           stats: [
-            { label: t('portal.stat_enrolled', 'Khóa học đã đăng ký'), value: '3', sub: 'Đang theo học', icon: BookOpen, color: 'text-blue-600' },
+            { label: t('portal.stat_enrolled', 'Khóa học đã đăng ký'), value: String(enrolledCount), sub: 'Đang theo học', icon: BookOpen, color: 'text-blue-600' },
             { label: t('portal.stat_hours', 'Thời lượng học tập'), value: '18.5h', sub: 'Tháng này', icon: Zap, color: 'text-amber-500' },
             { label: t('portal.stat_progress', 'Tiến độ hoàn thành'), value: '68%', sub: 'Tăng 12% so với tuần trước', icon: Activity, color: 'text-emerald-600' },
             { label: t('portal.stat_certs', 'Chứng chỉ hoàn tất'), value: '2', sub: 'Đã xác thực chữ ký số', icon: CheckCircle2, color: 'text-indigo-600' },
@@ -181,7 +199,7 @@ export default function UserPortal({ defaultRole }) {
               path: `/${lang}/student/courses`,
               icon: BookOpen,
               iconColor: 'text-blue-600 bg-blue-50 dark:bg-blue-950/60 dark:text-blue-400',
-              highlight: '3 Khóa Đang Học',
+              highlight: `${enrolledCount} Khóa Đang Học`,
             },
             {
               title: t('navbar.continue_learning', 'Trình phát bài giảng'),

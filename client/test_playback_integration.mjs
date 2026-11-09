@@ -2,7 +2,16 @@ import assert from 'node:assert/strict';
 import { buildManifestUrl, getLessonPlayback } from './src/services/playbackService.js';
 import { getLessonPlayback as reExportedPlayback } from './src/services/courseService.js';
 import { fetchSignedUrl } from './src/services/cryptoService.js';
-import { checkCourseAccess, grantCourseEntitlement, revokeCourseEntitlement } from './src/services/entitlementService.js';
+import {
+  checkCourseAccess,
+  grantCourseEntitlement,
+  revokeCourseEntitlement,
+  fetchMyEnrollments,
+  enrollInCourse,
+  recordCourseEnrollment,
+  setStoredEnrollments,
+} from './src/services/entitlementService.js';
+import apiClient from './src/api/axiosClient.js';
 
 let passedTests = 0;
 let totalTests = 0;
@@ -156,10 +165,87 @@ test('checkCourseAccess cho phép toàn quyền Instructor/Admin', () => {
   assert.equal(resInstructor.reason, 'ROLE_OVERRIDE');
 });
 
-test('checkCourseAccess cho phép Student đã đăng nhập', () => {
+test('checkCourseAccess chặn Student chưa đăng ký khóa học (NOT_ENROLLED)', () => {
+  setStoredEnrollments('u-student', []);
   const resStudent = checkCourseAccess({ role: 'student', userId: 'u-student' }, 'c-001');
-  assert.equal(resStudent.hasAccess, true);
-  assert.equal(resStudent.reason, 'GRANTED');
+  assert.equal(resStudent.hasAccess, false);
+  assert.equal(resStudent.reason, 'NOT_ENROLLED');
+});
+
+test('checkCourseAccess cho phép Student đã đăng ký khóa học (qua enrolledIdsOverride hoặc cache)', () => {
+  const resOverride = checkCourseAccess({ role: 'student', userId: 'u-student' }, 'c-001', ['c-001']);
+  assert.equal(resOverride.hasAccess, true);
+  assert.equal(resOverride.reason, 'GRANTED');
+
+  recordCourseEnrollment({ role: 'student', userId: 'u-student' }, 'c-002');
+  const resCached = checkCourseAccess({ role: 'student', userId: 'u-student' }, 'c-002');
+  assert.equal(resCached.hasAccess, true);
+  assert.equal(resCached.reason, 'GRANTED');
+});
+
+await testAsync('fetchMyEnrollments gọi GET /enrollment/me và cập nhật quyền truy cập cho Student', async () => {
+  setStoredEnrollments('u-student-me', []);
+  const origGet = apiClient.get;
+  let calledUrl = null;
+  apiClient.get = async (url) => {
+    calledUrl = url;
+    return {
+      data: {
+        data: [
+          { id: 'enroll-1', courseId: 'course-uuid-101', status: 'ACTIVE' },
+          { id: 'enroll-2', course: { id: 'course-uuid-202', title: 'Rust Security' }, status: 'COMPLETED' },
+          { id: 'enroll-3', courseId: 'course-uuid-303', status: 'UNPAID' }, // Chưa thanh toán -> không cấp quyền
+        ],
+      },
+    };
+  };
+
+  try {
+    const student = { role: 'student', userId: 'u-student-me' };
+    const result = await fetchMyEnrollments(student);
+    assert.equal(calledUrl, '/enrollment/me');
+    assert.deepEqual(result.courseIds, ['course-uuid-101', 'course-uuid-202']);
+
+    assert.equal(checkCourseAccess(student, 'course-uuid-101').hasAccess, true);
+    assert.equal(checkCourseAccess(student, 'course-uuid-202').hasAccess, true);
+    assert.equal(checkCourseAccess(student, 'course-uuid-303').hasAccess, false);
+  } finally {
+    apiClient.get = origGet;
+  }
+});
+
+await testAsync('enrollInCourse gọi /enrollment/{id} và trả về thông tin thanh toán', async () => {
+  const origPost = apiClient.post;
+  const origGet = apiClient.get;
+  let calledPostUrl = null;
+  apiClient.post = async (url) => {
+    calledPostUrl = url;
+    return {
+      data: {
+        data: {
+          courseId: 'course-uuid-999',
+          paymentUrl: 'https://pay.securelearn.vn/checkout/999',
+          qrCode: 'https://img.vietqr.io/image/999.png',
+          amount: 500000,
+          orderCode: 'ORD-999',
+          status: 'PENDING',
+        },
+      },
+    };
+  };
+  apiClient.get = async () => ({ data: [] });
+
+  try {
+    const student = { role: 'student', userId: 'u-student-pay' };
+    const paymentRes = await enrollInCourse('course-uuid-999', student);
+    assert.equal(calledPostUrl, '/enrollment/course-uuid-999');
+    assert.equal(paymentRes.paymentUrl, 'https://pay.securelearn.vn/checkout/999');
+    assert.equal(paymentRes.qrCode, 'https://img.vietqr.io/image/999.png');
+    assert.equal(paymentRes.isImmediateSuccess, false);
+  } finally {
+    apiClient.post = origPost;
+    apiClient.get = origGet;
+  }
 });
 
 await testAsync('grantCourseEntitlement ném lỗi 400 nếu thiếu params', async () => {
