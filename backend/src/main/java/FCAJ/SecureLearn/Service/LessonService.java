@@ -1,24 +1,19 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package FCAJ.SecureLearn.Service;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.UUID;
-
-import jakarta.persistence.EntityNotFoundException;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import FCAJ.SecureLearn.Model.Chapter;
 import FCAJ.SecureLearn.Model.Course;
 import FCAJ.SecureLearn.Model.Lesson;
-import FCAJ.SecureLearn.Response.LessonResponse;
 import FCAJ.SecureLearn.Repositories.ChapterRepo;
 import FCAJ.SecureLearn.Repositories.CourseRepo;
 import FCAJ.SecureLearn.Repositories.LessonRepo;
+import FCAJ.SecureLearn.Response.LessonResponse;
+import jakarta.persistence.EntityNotFoundException;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.UUID;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  *
@@ -39,20 +34,24 @@ public class LessonService {
     @Transactional(readOnly = true)
     public void validateUploadTarget(UUID chapterId, UUID courseId, UUID lessonIdToReplace) {
         if (!courseRepo.existsById(courseId)) {
-            throw new EntityNotFoundException("Course not found");
+            throw new EntityNotFoundException("Upload rejected: no course found with id " + courseId);
         }
         if (lessonIdToReplace != null) {
-            Lesson lesson = lessonRepo.findById(lessonIdToReplace)
-                    .orElseThrow(() -> new EntityNotFoundException("Lesson not found"));
-            requireChapterBelongsToCourse(lesson.getChapter(), courseId);
-            if (chapterId != null && !chapterId.equals(lesson.getChapter().getId())) {
-                throw new EntityNotFoundException("Lesson does not belong to the supplied chapter");
+            Lesson lessonToReplace = lessonRepo.findById(lessonIdToReplace)
+                    .orElseThrow(() -> new EntityNotFoundException(
+                            "Upload rejected: no lesson found with id " + lessonIdToReplace));
+            requireChapterBelongsToCourse(lessonToReplace.getChapter(), courseId);
+            if (chapterId != null && !chapterId.equals(lessonToReplace.getChapter().getId())) {
+                throw new EntityNotFoundException("Upload rejected: lesson " + lessonIdToReplace
+                        + " belongs to chapter " + lessonToReplace.getChapter().getId()
+                        + ", not the supplied chapter " + chapterId);
             }
             return;
         }
-        Chapter chapter = chapterRepo.findById(chapterId)
-                .orElseThrow(() -> new EntityNotFoundException("Chapter not found"));
-        requireChapterBelongsToCourse(chapter, courseId);
+        Chapter targetChapter = chapterRepo.findById(chapterId)
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Upload rejected: no chapter found with id " + chapterId));
+        requireChapterBelongsToCourse(targetChapter, courseId);
     }
 
     /**
@@ -61,34 +60,28 @@ public class LessonService {
      * immediately after the video is processed.
      */
     @Transactional
-    public UUID addLessonReturningId(UUID chapter_id, String title, String description, String url, UUID course_id){
-        Chapter chapter = chapterRepo.findById(chapter_id).orElseThrow();
-        Course course = courseRepo.findById(course_id).orElseThrow();
-        requireChapterBelongsToCourse(chapter, course_id);
-        course.setLastUpdateTime(LocalDateTime.now());
-        courseRepo.save(course);
-        Lesson newLesson = new Lesson(chapter, title, description, url);
+    public UUID addLessonReturningId(UUID chapterId, String title, String description, String videoUrl, UUID courseId) {
+        Chapter parentChapter = findChapter(chapterId, "add lesson");
+        Course parentCourse = findCourse(courseId, "add lesson");
+        requireChapterBelongsToCourse(parentChapter, courseId);
+        parentCourse.setLastUpdateTime(LocalDateTime.now());
+        courseRepo.save(parentCourse);
+        Lesson newLesson = new Lesson(parentChapter, title, description, videoUrl);
         return lessonRepo.save(newLesson).getId();
     }
 
     @Transactional
-    public void addLesson(UUID chapter_id, String title, String description, String url, UUID course_id){
-        Chapter chapter = chapterRepo.findById(chapter_id).orElseThrow();
-        Course course = courseRepo.findById(course_id).orElseThrow();
-        requireChapterBelongsToCourse(chapter, course_id);
-        course.setLastUpdateTime(LocalDateTime.now());
-        courseRepo.save(course);
-        Lesson newLesson = new Lesson(chapter, title, description, url);
-        lessonRepo.save(newLesson);
+    public void addLesson(UUID chapterId, String title, String description, String videoUrl, UUID courseId) {
+        addLessonReturningId(chapterId, title, description, videoUrl, courseId);
     }
-    
-    public void deleteLesson(UUID lesson_id){
-        Lesson targetLesson = lessonRepo.findById(lesson_id).orElseThrow();
-        lessonRepo.delete(targetLesson);
+
+    public void deleteLesson(UUID lessonId) {
+        Lesson lessonToDelete = findLesson(lessonId, "delete lesson");
+        lessonRepo.delete(lessonToDelete);
     }
-    
-    public List<Lesson> getLessonInChapter(UUID chapter_id){
-        return lessonRepo.findByChapterId(chapter_id);
+
+    public List<Lesson> getLessonsInChapter(UUID chapterId) {
+        return lessonRepo.findByChapterId(chapterId);
     }
 
     @Transactional(readOnly = true)
@@ -97,34 +90,52 @@ public class LessonService {
                 .map(LessonResponse::from)
                 .toList();
     }
-    
-    public Lesson getLessonInfo(UUID lesson_id){
-        return lessonRepo.findById(lesson_id).orElseThrow();
+
+    public Lesson getLessonInfo(UUID lessonId) {
+        return findLesson(lessonId, "get lesson info");
     }
 
     @Transactional(readOnly = true)
     public LessonResponse getLessonResponse(UUID lessonId) {
-        return lessonRepo.findById(lessonId)
-                .map(LessonResponse::from)
-                .orElseThrow();
+        return LessonResponse.from(findLesson(lessonId, "get lesson"));
     }
-    
+
     @Transactional
-    public void updateLesson(UUID course_id,UUID lesson_id, String title, String description, String url){
-        Lesson updatedLesson = lessonRepo.findById(lesson_id).orElseThrow();
-        Course course = courseRepo.findById(course_id).orElseThrow();
-        requireChapterBelongsToCourse(updatedLesson.getChapter(), course_id);
-        course.setLastUpdateTime(LocalDateTime.now());
-        courseRepo.save(course);
-        updatedLesson.setTitle(title);
-        updatedLesson.setDescription(description);
-        updatedLesson.setUrl(url);
-        lessonRepo.save(updatedLesson);
+    public void updateLesson(UUID courseId, UUID lessonId, String title, String description, String videoUrl) {
+        Lesson lessonToUpdate = findLesson(lessonId, "update lesson");
+        Course parentCourse = findCourse(courseId, "update lesson " + lessonId);
+        requireChapterBelongsToCourse(lessonToUpdate.getChapter(), courseId);
+        parentCourse.setLastUpdateTime(LocalDateTime.now());
+        courseRepo.save(parentCourse);
+        lessonToUpdate.setTitle(title);
+        lessonToUpdate.setDescription(description);
+        lessonToUpdate.setUrl(videoUrl);
+        lessonRepo.save(lessonToUpdate);
     }
 
     private void requireChapterBelongsToCourse(Chapter chapter, UUID courseId) {
         if (chapter.getCourse() == null || !courseId.equals(chapter.getCourse().getId())) {
-            throw new EntityNotFoundException("Chapter does not belong to the supplied course");
+            UUID actualCourseId = chapter.getCourse() == null ? null : chapter.getCourse().getId();
+            throw new EntityNotFoundException("Chapter " + chapter.getId() + " belongs to course "
+                    + actualCourseId + ", not the supplied course " + courseId);
         }
+    }
+
+    private Lesson findLesson(UUID lessonId, String action) {
+        return lessonRepo.findById(lessonId)
+                .orElseThrow(() -> new NoSuchElementException(
+                        "Cannot " + action + ": no lesson found with id " + lessonId));
+    }
+
+    private Chapter findChapter(UUID chapterId, String action) {
+        return chapterRepo.findById(chapterId)
+                .orElseThrow(() -> new NoSuchElementException(
+                        "Cannot " + action + ": no chapter found with id " + chapterId));
+    }
+
+    private Course findCourse(UUID courseId, String action) {
+        return courseRepo.findById(courseId)
+                .orElseThrow(() -> new NoSuchElementException(
+                        "Cannot " + action + ": no course found with id " + courseId));
     }
 }

@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package FCAJ.SecureLearn.Repositories;
 
 import FCAJ.SecureLearn.Model.Lesson;
@@ -15,6 +11,6 @@ import org.springframework.stereotype.Repository;
  * @author ngoct
  */
 @Repository
-public interface LessonRepo extends CrudRepository<Lesson, UUID>{
-        List<Lesson> findByChapterId(UUID chapter_id);
+public interface LessonRepo extends CrudRepository<Lesson, UUID> {
+    List<Lesson> findByChapterId(UUID chapterId);
 }

@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.UriComponentsBuilder;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 
 @Service
 public class PlaybackService {
@@ -74,12 +75,12 @@ public class PlaybackService {
     @Transactional
     public String getSignedManifest(UUID lessonId, String token, String contextUrl, String username) {
         if (!tokenService.isValid(lessonId, token, username)) {
-            throw new AccessDeniedException("Playback token is invalid or expired");
+            throw new AccessDeniedException("Playback token for lesson " + lessonId + " is invalid, expired, or belongs to another user");
         }
         Lesson lesson = getLesson(lessonId);
         String playlistKey = validateObjectKey(normalizeLocation(lesson));
         if (!playlistKey.endsWith(".m3u8")) {
-            throw new EntityNotFoundException("HLS playlist not found");
+            throw new EntityNotFoundException("Lesson " + lessonId + " has no HLS playlist (expected .m3u8, got \"" + playlistKey + "\")");
         }
 
         String playlist = r2Service.readObjectAsString(bucketName, playlistKey);
@@ -91,16 +92,17 @@ public class PlaybackService {
                 rewritten.append(rewriteKeyUri(line, lessonId, token, contextUrl));
             } else if (!trimmed.isEmpty() && !trimmed.startsWith("#")) {
                 String segmentKey = resolveSegmentKey(trimmed, parentKey);
-                int start = segmentKey.lastIndexOf("segment_"), end = segmentKey.lastIndexOf(".ts");
-                if (start == -1 || end == -1) {
-                    throw new IllegalArgumentException("Weird file name");
+                int numberStart = segmentKey.lastIndexOf("segment_");
+                int numberEnd = segmentKey.lastIndexOf(".ts");
+                if (numberStart == -1 || numberEnd == -1) {
+                    throw new IllegalArgumentException("HLS segment \"" + segmentKey + "\" does not match the expected segment_NNN.ts naming");
                 }
-                start += 8;
-                int index = Integer.parseInt(segmentKey.substring(start, end));
+                numberStart += "segment_".length();
+                int segmentIndex = Integer.parseInt(segmentKey.substring(numberStart, numberEnd));
                 String signedSegment = UriComponentsBuilder.fromUriString(contextUrl)
                         .path("/api/v1/lesson/{lessonId}/segment/{segmentIndex}")
                         .queryParam("token", token)
-                        .buildAndExpand(lessonId, index)
+                        .buildAndExpand(lessonId, segmentIndex)
                         .encode()
                         .toUriString();
                 rewritten.append(signedSegment);
@@ -112,39 +114,47 @@ public class PlaybackService {
         return rewritten.toString();
     }
 
-    public String getSegmentURL(int segmentIndex, UUID lessonId, String token, String username) {
+    // Proxies the segment through the backend (instead of redirecting to a presigned R2 URL)
+    // so the browser never talks to R2 directly: no R2 CORS issues, and every segment hit is logged here.
+    public byte[] getSegmentBytes(int segmentIndex, UUID lessonId, String token, String username) {
         if (!tokenService.isValid(lessonId, token, username)) {
-            throw new AccessDeniedException("Playback token is invalid or expired");
+            throw new AccessDeniedException("Playback token for lesson " + lessonId + " is invalid, expired, or belongs to another user");
         }
         Lesson lesson = getLesson(lessonId);
         String playlistKey = validateObjectKey(normalizeLocation(lesson));
         if (!playlistKey.endsWith(".m3u8")) {
-            throw new EntityNotFoundException("HLS playlist not found");
+            throw new EntityNotFoundException("Lesson " + lessonId + " has no HLS playlist (expected .m3u8, got \"" + playlistKey + "\")");
         }
         if (segmentIndex < 0) {
-            throw new IllegalArgumentException("Video Index is invalid");
+            throw new IllegalArgumentException("Segment index must be 0 or greater, got " + segmentIndex);
         }
         String parentKey = playlistKey.substring(0, playlistKey.lastIndexOf('/') + 1);
         String r2Key = parentKey + String.format("segment_%03d.ts", segmentIndex);
-        URL segmentURL = r2Service.generatePresignedGetUrl(bucketName, r2Key, Duration.ofSeconds(60));
-        return segmentURL.toString();
+        try {
+            return r2Service.readObjectAsBytes(bucketName, r2Key);
+        } catch (IllegalStateException e) {
+            if (e.getCause() instanceof NoSuchKeyException) {
+                throw new EntityNotFoundException("Segment " + segmentIndex + " not found for lesson " + lessonId);
+            }
+            throw e;
+        }
     }
 
     public byte[] getContentKey(UUID lessonId, String token, String username) {
         if (!tokenService.isValid(lessonId, token, username)) {
-            throw new AccessDeniedException("Playback token is invalid or expired");
+            throw new AccessDeniedException("Playback token for lesson " + lessonId + " is invalid, expired, or belongs to another user");
         }
         Lesson lesson = getLesson(lessonId);
         String playlistKey = validateObjectKey(normalizeLocation(lesson));
         if (!playlistKey.endsWith(".m3u8")) {
-            throw new EntityNotFoundException("HLS playlist not found");
+            throw new EntityNotFoundException("Lesson " + lessonId + " has no HLS playlist (expected .m3u8, got \"" + playlistKey + "\")");
         }
         String keyObjectKey = playlistKey.substring(0, playlistKey.lastIndexOf('/') + 1) + "content.key";
-        byte[] key = r2Service.readObjectAsBytes(bucketName, keyObjectKey);
-        if (key.length != 16) {
-            throw new IllegalStateException("Stored HLS AES-128 key must be exactly 16 bytes");
+        byte[] contentKey = r2Service.readObjectAsBytes(bucketName, keyObjectKey);
+        if (contentKey.length != 16) {
+            throw new IllegalStateException("Stored HLS AES-128 key for lesson " + lessonId + " must be 16 bytes, got " + contentKey.length);
         }
-        return key;
+        return contentKey;
     }
 
     private String rewriteKeyUri(String line, UUID lessonId, String token, String contextUrl) {
@@ -172,7 +182,7 @@ public class PlaybackService {
 
     private Lesson getLesson(UUID lessonId) {
         return lessonRepo.findById(lessonId)
-                .orElseThrow(() -> new EntityNotFoundException("Lesson not found"));
+                .orElseThrow(() -> new EntityNotFoundException("No lesson found with id " + lessonId));
     }
 
     private String normalizeLocation(Lesson lesson) {
@@ -184,7 +194,7 @@ public class PlaybackService {
             return oldObjectKey;
         }
         if (location == null || location.isBlank()) {
-            throw new EntityNotFoundException("Lesson has no video location");
+            throw new EntityNotFoundException("Lesson " + lesson.getId() + " has no video location set");
         }
         return location;
     }
@@ -197,11 +207,11 @@ public class PlaybackService {
         if (objectKey.startsWith("/") || objectKey.contains("\\")
                 || !objectKey.startsWith("hls/") && !objectKey.startsWith("videos/")) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Lesson does not reference a supported R2 object");
+                    "Lesson video key \"" + objectKey + "\" is not under hls/ or videos/");
         }
         for (String part : objectKey.split("/")) {
             if (part.equals("..") || part.equals(".")) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid R2 object key");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "R2 object key \"" + objectKey + "\" contains a . or .. path segment");
             }
         }
         return objectKey;

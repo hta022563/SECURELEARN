@@ -8,9 +8,7 @@ import FCAJ.SecureLearn.Request.PasswordChangeRequest;
 import FCAJ.SecureLearn.Request.RegisterRequest;
 import FCAJ.SecureLearn.Request.ResetPasswordRequest;
 import FCAJ.SecureLearn.Service.AuthService;
-import FCAJ.SecureLearn.Service.LogService;
 import jakarta.servlet.http.HttpServletRequest;
-import java.time.LocalDateTime;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -38,14 +36,11 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
-    private final LogService logService;
 
-    public AuthController(AuthService authService, LogService logService) {
+    public AuthController(AuthService authService) {
         this.authService = authService;
-        this.logService = logService;
     }
 
-   
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
         if (request.getEmail() == null || request.getEmail().isBlank()) {
@@ -55,40 +50,39 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("error", "Password must be at least 8 characters."));
         }
 
+        String normalizedEmail = request.getEmail().trim().toLowerCase();
         try {
-            if(request.getRole().equalsIgnoreCase("student")){
-            authService.register(
-                    request.getFullName(),
-                    request.getEmail().trim().toLowerCase(),
-                    request.getPassword(),
-                    request.getRole()
-            );
+            if (!"student".equalsIgnoreCase(request.getRole())) {
+                return ResponseEntity.badRequest().body(Map.of("message",
+                        "Cannot self-register as role '" + request.getRole()
+                                + "'. Please contact an admin to create instructor or admin accounts."));
+            }
+            authService.register(request.getFullName(), normalizedEmail, request.getPassword(), request.getRole());
             return ResponseEntity.ok(Map.of(
                     "message", "Account created successfully. You can now log in.",
-                    "email", request.getEmail().trim().toLowerCase()
-            ));
-            }else return ResponseEntity.badRequest().body(Map.of("message","Cannot register account, please contact admin if you want to add instructor or admin"));
+                    "email", normalizedEmail));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (RuntimeException e) {
             return ResponseEntity.internalServerError()
-                    .body(Map.of("error", "Registration failed. Please try again." + e.getMessage()));
+                    .body(Map.of("error", "Registration of " + normalizedEmail + " failed: " + e.getMessage()));
         }
     }
-    
+
     @PostMapping("/otp")
-    public ResponseEntity<?> confirmSignUp(@RequestBody ConfirmRequest request){
-        if(request.getEmail() == null){
+    public ResponseEntity<?> confirmSignUp(@RequestBody ConfirmRequest request) {
+        if (request.getEmail() == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "Email is required."));
         }
-        try{
+        try {
             authService.registerConfirmation(request.getOtp(), request.getEmail());
             return ResponseEntity.ok("Signup complete. Your account is registered");
-        }catch (RuntimeException e){
-            return ResponseEntity.internalServerError().body(Map.of("error","Registration failed. Please try again" + e.getMessage()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "Sign-up confirmation failed: " + e.getMessage()));
         }
     }
-   
+
     @PostMapping("/login")
     @LogAnnotationClass(ActionType.LOGIN)
     public ResponseEntity<?> login(@RequestBody LoginRequest request, HttpServletRequest servletRequest) {
@@ -97,27 +91,25 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("error", "Email and password are required."));
         }
 
+        String normalizedEmail = request.getEmail().trim().toLowerCase();
         try {
-            AuthenticationResultType result = authService.login(
-                    request.getEmail().trim().toLowerCase(),
-                    request.getPassword()
-            );
-            servletRequest.setAttribute("username", request.getEmail().trim().toLowerCase());
+            AuthenticationResultType tokens = authService.login(normalizedEmail, request.getPassword());
+            // LogInterceptor reads this attribute because there is no JWT yet during login
+            servletRequest.setAttribute("username", normalizedEmail);
             return ResponseEntity.ok(Map.of(
-                    "accessToken",  result.accessToken(),
-                    "idToken",      result.idToken(),
-                    "refreshToken", result.refreshToken(),
-                    "expiresIn",    result.expiresIn()   // seconds until accessToken expires (typically 3600)
+                    "accessToken",  tokens.accessToken(),
+                    "idToken",      tokens.idToken(),
+                    "refreshToken", tokens.refreshToken(),
+                    "expiresIn",    tokens.expiresIn()   // seconds until accessToken expires (typically 3600)
             ));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(401).body(Map.of("error", e.getMessage()));
         } catch (RuntimeException e) {
             return ResponseEntity.internalServerError()
-                    .body(Map.of("error", "Login failed. Please try again." + e.getMessage()));
+                    .body(Map.of("error", "Login for " + normalizedEmail + " failed: " + e.getMessage()));
         }
     }
 
-    
     @PostMapping("/logout")
     public ResponseEntity<?> logout(@AuthenticationPrincipal Jwt jwt) {
         if (jwt != null) {
@@ -137,92 +129,93 @@ public class AuthController {
         }
 
         try {
-            AuthenticationResultType result = authService.refreshToken(refreshToken, email);
+            AuthenticationResultType tokens = authService.refreshToken(refreshToken, email);
             return ResponseEntity.ok(Map.of(
-                    "accessToken", result.accessToken(),
-                    "idToken",     result.idToken(),
-                    "expiresIn",   result.expiresIn()
+                    "accessToken", tokens.accessToken(),
+                    "idToken",     tokens.idToken(),
+                    "expiresIn",   tokens.expiresIn()
             ));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(401).body(Map.of("error", e.getMessage()));
         } catch (RuntimeException e) {
             return ResponseEntity.internalServerError()
-                    .body(Map.of("error", "Token refresh failed."));
+                    .body(Map.of("error", "Token refresh for " + email + " failed: " + e.getMessage()));
         }
     }
-    
+
     @PostMapping("/password")
-    public ResponseEntity<?> changePassword(@RequestBody PasswordChangeRequest request){
+    public ResponseEntity<?> changePassword(@RequestBody PasswordChangeRequest request) {
         if (request.getAccessToken() == null || request.getAccessToken().isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Email is required."));
+            return ResponseEntity.badRequest().body(Map.of("error", "accessToken is required."));
         }
         if (request.getOldPassword() == null || request.getOldPassword().length() < 8) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Password must be at least 8 characters."));
+            return ResponseEntity.badRequest().body(Map.of("error", "Old password must be at least 8 characters."));
         }
         if (request.getNewPassword() == null || request.getNewPassword().length() < 8) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Password must be at least 8 characters."));
+            return ResponseEntity.badRequest().body(Map.of("error", "New password must be at least 8 characters."));
         }
-        try{
+        try {
             authService.updateAccountByUser(request.getAccessToken(), request.getNewPassword(), request.getOldPassword());
-            return ResponseEntity.ok(Map.of("message", "Change password successfully"));
-        }
-        catch (IllegalArgumentException e) {
+            return ResponseEntity.ok(Map.of("message", "Password changed successfully"));
+        } catch (IllegalArgumentException e) {
             return ResponseEntity.status(401).body(Map.of("error", e.getMessage()));
         } catch (RuntimeException e) {
             return ResponseEntity.internalServerError()
-                    .body(Map.of("error", "Update password fail"));
+                    .body(Map.of("error", "Password change failed: " + e.getMessage()));
         }
     }
-    
+
     @PostMapping("/forgot-password")
-    public ResponseEntity<?> forgetPassword(@RequestBody Map<String,String> email){
-        if (email.isEmpty()) {
+    public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> body) {
+        String email = body.get("email");
+        if (email == null || email.isBlank()) {
             return ResponseEntity.status(401).body(Map.of("error", "Email was not provided"));
         }
-        try{
-            authService.forgetPassword(email.get("email"));
+        try {
+            authService.forgotPassword(email);
             return ResponseEntity.ok("An OTP is sent to your email");
-        }catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException e) {
             return ResponseEntity.status(401).body(Map.of("error", e.getMessage()));
         } catch (RuntimeException e) {
             return ResponseEntity.internalServerError()
-                    .body(Map.of("error", "Update password fail" + e.getMessage()));
-        }   
+                    .body(Map.of("error", "Forgot-password request for " + email + " failed: " + e.getMessage()));
+        }
     }
-    
+
     @PostMapping("/reset-password")
-    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest request){
-        if(request.getEmail().isEmpty()){
+    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest request) {
+        if (request.getEmail() == null || request.getEmail().isEmpty()) {
             return ResponseEntity.status(401).body(Map.of("error", "Email was not provided"));
         }
-        if(request.getNewPassword().isEmpty()){
-            return ResponseEntity.status(401).body(Map.of("error", "Password was not provided"));
+        if (request.getNewPassword() == null || request.getNewPassword().isEmpty()) {
+            return ResponseEntity.status(401).body(Map.of("error", "New password was not provided"));
         }
-        if(request.getOtp().isEmpty()){
-            return ResponseEntity.status(401).body(Map.of("error", "One time password was not provided"));
+        if (request.getOtp() == null || request.getOtp().isEmpty()) {
+            return ResponseEntity.status(401).body(Map.of("error", "One-time password was not provided"));
         }
-        
-        try{
+
+        try {
             authService.resetPassword(request.getOtp(), request.getEmail(), request.getNewPassword());
-            return ResponseEntity.ok("Successfully change password. Please log in again");
-        }catch (IllegalArgumentException e) {
+            return ResponseEntity.ok("Password changed successfully. Please log in again");
+        } catch (IllegalArgumentException e) {
             return ResponseEntity.status(401).body(Map.of("error", e.getMessage()));
         } catch (RuntimeException e) {
             return ResponseEntity.internalServerError()
-                    .body(Map.of("error", "Update password fail"));
-        }   
+                    .body(Map.of("error", "Password reset for " + request.getEmail() + " failed: " + e.getMessage()));
+        }
     }
-    
+
     @PostMapping("/resend-otp")
-    public ResponseEntity<?> resendCode(@RequestBody Map<String,String> email){
-         if(email.isEmpty()){
+    public ResponseEntity<?> resendOtp(@RequestBody Map<String, String> body) {
+        String email = body.get("email");
+        if (email == null || email.isBlank()) {
             return ResponseEntity.status(401).body(Map.of("error", "Email was not provided"));
         }
-         authService.resendOtp(email.get("email"));
-         return ResponseEntity.ok("OTP has been resend");
+        authService.resendOtp(email);
+        return ResponseEntity.ok("OTP has been resent");
     }
-    
-    
+
+
     @GetMapping("/me")
     public ResponseEntity<?> me(@AuthenticationPrincipal Jwt jwt) {
         if (jwt == null) {
@@ -241,5 +234,5 @@ public class AuthController {
                 "roles",  groups != null ? groups : List.of()
         ));
     }
-    
+
 }

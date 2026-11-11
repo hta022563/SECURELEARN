@@ -23,34 +23,34 @@ public class WebCorsConfiguration {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        
+
         // Parse allowed origins from properties
         List<String> origins = Arrays.asList(allowedOrigins.split(","));
         configuration.setAllowedOrigins(origins);
-        
+
         // Allow all HTTP methods (GET, POST, PUT, DELETE, etc.)
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-        
+
         // Allow all headers
         configuration.setAllowedHeaders(Arrays.asList("*"));
-        
+
         // Allow credentials (cookies, authorization headers)
         configuration.setAllowCredentials(true);
-        
+
         // Cache preflight response for 1 hour
         configuration.setMaxAge(3600L);
-        
+
         // Expose headers that frontend can access
         configuration.setExposedHeaders(Arrays.asList(
-            "Authorization", 
-            "Content-Type", 
+            "Authorization",
+            "Content-Type",
             "X-Total-Count"
         ));
-        
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         // Apply CORS configuration to all API endpoints
         source.registerCorsConfiguration("/**", configuration);
-        
+
         return source;
     }
 }

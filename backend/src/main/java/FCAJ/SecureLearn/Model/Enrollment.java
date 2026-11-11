@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package FCAJ.SecureLearn.Model;
 
 
@@ -35,11 +31,11 @@ public class Enrollment {
     private UUID id;
     @Column(nullable = false)
     String email;
-    
+
     @ManyToOne(fetch = LAZY)
     @JoinColumn(name = "course_id")
     private Course course;
-    
+
     @Enumerated(EnumType.STRING)
     Status currentStatus;
     LocalDateTime enrollmentDate;
@@ -56,7 +52,7 @@ public class Enrollment {
         this.completionDate = completionDate;
     }
 
-   
+
     public UUID getId() {
         return id;
     }
@@ -105,5 +101,5 @@ public class Enrollment {
         this.completionDate = completionDate;
     }
 
-    
+
 }

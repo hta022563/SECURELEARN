@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package FCAJ.SecureLearn.Repositories;
 
 import FCAJ.SecureLearn.Model.Enrollment;
@@ -21,7 +17,7 @@ public interface EnrollmentRepo extends CrudRepository<Enrollment, UUID> {
 
     List<Enrollment> findByEmail(String email);
 
-    List<Enrollment> findByCourseId(UUID id);
-    
-    Enrollment findByEmailAndCourseId(String email, UUID id);
+    List<Enrollment> findByCourseId(UUID courseId);
+
+    Enrollment findByEmailAndCourseId(String email, UUID courseId);
 }

@@ -46,23 +46,38 @@ public class AuthService {
                 .build();
     }
 
-    
-    public void adminRegister(String fullName, String email, String password, String role){
-        try{
+    public void adminRegister(String fullName, String email, String password, String role) {
         String normalizedRole = normalizeRole(role);
-        AdminCreateUserRequest request = AdminCreateUserRequest.builder().username(email).temporaryPassword(password).
-                userAttributes(AttributeType.builder().name("email").value(email).build(),AttributeType.builder().name("name").value(fullName).build()).userPoolId(userPoolId).build();                                                                                                                    
-        cognitoClient.adminCreateUser(request);
-        cognitoClient.adminSetUserPassword(AdminSetUserPasswordRequest.builder().password(password).permanent(true).username(email).userPoolId(userPoolId).build());
-        cognitoClient.adminAddUserToGroup(AdminAddUserToGroupRequest.builder().groupName(normalizedRole).userPoolId(userPoolId).username(email).build());
-        }catch (Exception e){
-            throw new IllegalArgumentException(e.getMessage());
+        try {
+            AdminCreateUserRequest createUserRequest = AdminCreateUserRequest.builder()
+                    .userPoolId(userPoolId)
+                    .username(email)
+                    .temporaryPassword(password)
+                    .userAttributes(
+                            AttributeType.builder().name("email").value(email).build(),
+                            AttributeType.builder().name("name").value(fullName).build())
+                    .build();
+            cognitoClient.adminCreateUser(createUserRequest);
+            cognitoClient.adminSetUserPassword(AdminSetUserPasswordRequest.builder()
+                    .userPoolId(userPoolId)
+                    .username(email)
+                    .password(password)
+                    .permanent(true)
+                    .build());
+            cognitoClient.adminAddUserToGroup(AdminAddUserToGroupRequest.builder()
+                    .userPoolId(userPoolId)
+                    .username(email)
+                    .groupName(normalizedRole)
+                    .build());
+        } catch (Exception e) {
+            throw new IllegalArgumentException(
+                    "Admin could not create " + normalizedRole + " account for " + email + ": " + e.getMessage(), e);
         }
     }
-    
+
     public void register(String fullName, String email, String password, String role) {
         String normalizedRole = normalizeRole(role);
-        
+
         try {
             SignUpRequest signUpRequest = SignUpRequest.builder()
                     .clientId(clientId)
@@ -76,43 +91,53 @@ public class AuthService {
                     .build();
             cognitoClient.signUp(signUpRequest);
         } catch (UsernameExistsException e) {
-            throw new IllegalArgumentException("An account with this email already exists.");
+            throw new IllegalArgumentException("An account with email " + email + " already exists.");
         } catch (InvalidPasswordException e) {
             throw new IllegalArgumentException("Password does not meet requirements: " + e.getMessage());
         } catch (CognitoIdentityProviderException e) {
-            throw new RuntimeException("Registration failed: " + e.awsErrorDetails().errorMessage(), e);
+            throw new RuntimeException("Cognito sign-up failed for " + email + ": " + e.awsErrorDetails().errorMessage(), e);
         }
 
+        if (!normalizedRole.equals("STUDENT")) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Self-registration only allows STUDENT accounts, but role " + normalizedRole + " was requested");
+        }
         try {
-            if(normalizedRole.equals("STUDENT")){
             AdminAddUserToGroupRequest groupRequest = AdminAddUserToGroupRequest.builder()
                     .userPoolId(userPoolId)
                     .username(email)
                     .groupName(normalizedRole)
                     .build();
             cognitoClient.adminAddUserToGroup(groupRequest);
-            }else throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not allowed to create any other account beside Student/Learner");
         } catch (CognitoIdentityProviderException e) {
-            throw new RuntimeException("Could not assign role: " + e.awsErrorDetails().errorMessage(), e);
+            throw new RuntimeException("Could not add " + email + " to group " + normalizedRole + ": "
+                    + e.awsErrorDetails().errorMessage(), e);
         }
     }
-    
-    public void resendOtp(String email){
-        ResendConfirmationCodeRequest request = ResendConfirmationCodeRequest.builder().clientId(clientId).secretHash(computeSecretHash(email)).username(email).build();
+
+    public void resendOtp(String email) {
+        ResendConfirmationCodeRequest request = ResendConfirmationCodeRequest.builder()
+                .clientId(clientId)
+                .secretHash(computeSecretHash(email))
+                .username(email)
+                .build();
         cognitoClient.resendConfirmationCode(request);
     }
 
-    public void registerConfirmation(String otp, String email){
-        try{
-        ConfirmSignUpRequest request = ConfirmSignUpRequest.builder().clientId(clientId).secretHash(computeSecretHash(email)).username(email).confirmationCode(otp).build();
-        cognitoClient.confirmSignUp(request);
-        }catch(Exception e){
-            throw new RuntimeException("Could not confirm signup" + e.getMessage());
+    public void registerConfirmation(String otp, String email) {
+        try {
+            ConfirmSignUpRequest request = ConfirmSignUpRequest.builder()
+                    .clientId(clientId)
+                    .secretHash(computeSecretHash(email))
+                    .username(email)
+                    .confirmationCode(otp)
+                    .build();
+            cognitoClient.confirmSignUp(request);
+        } catch (Exception e) {
+            throw new RuntimeException("Could not confirm sign-up for " + email + ": " + e.getMessage(), e);
         }
-        
-        
     }
-            
+
     public AuthenticationResultType login(String email, String password) {
         try {
             InitiateAuthRequest authRequest = InitiateAuthRequest.builder()
@@ -221,100 +246,141 @@ public class AuthService {
             default           -> "STUDENT";
         };
     }
-    
-   public void deleteAccount(String email){
-       try{
-       boolean isAdmin = cognitoClient.adminListGroupsForUser(AdminListGroupsForUserRequest.builder().userPoolId(userPoolId).username(email).build()).groups().stream().anyMatch(g -> "ADMIN".equals(g.groupName()));
-       if(isAdmin){
-           ListUsersInGroupRequest userListRequest = ListUsersInGroupRequest.builder().userPoolId(userPoolId).groupName("ADMIN").build();
-           ListUsersInGroupResponse userList = cognitoClient.listUsersInGroup(userListRequest);
-           int count = userList.users().size();
-           if(count <= 1){
-               throw new IllegalArgumentException("Cannot delete the last admin");
-       }
-       }
-       AdminDeleteUserRequest request = AdminDeleteUserRequest.builder().userPoolId(userPoolId).username(email).build();
-       cognitoClient.adminDeleteUser(request);
-       }catch (UserNotFoundException e){
-           throw new IllegalArgumentException("User cannot be found");
-       }catch (CognitoIdentityProviderException e){
-           throw new RuntimeException("Could not delete user: " + e.awsErrorDetails().errorMessage(), e);
-       }
-   }
-   
-   public void updateAccountByUser(String accessToken, String newPassword, String oldPassword){
-       try{
-           cognitoClient.changePassword(ChangePasswordRequest.builder().previousPassword(oldPassword).proposedPassword(newPassword).accessToken(accessToken).build());
-       }catch (UserNotFoundException e){
-           throw new IllegalArgumentException("User cannot be found");
-       }catch (CognitoIdentityProviderException e){
-           throw new RuntimeException("Could not delete user: " + e.awsErrorDetails().errorMessage(), e);
-       }
-   }
-   
-   public void updateAccountByAdmin(String email, String password){
-       try{
-           cognitoClient.adminSetUserPassword(AdminSetUserPasswordRequest.builder().userPoolId(userPoolId).username(email).password(password).permanent(true).build());
-       }catch (UserNotFoundException e){
-           throw new IllegalArgumentException("User cannot be found");
-       }catch (CognitoIdentityProviderException e){
-           throw new RuntimeException("Could not delete user: " + e.awsErrorDetails().errorMessage(), e);
-       }
-   }
-   
-   
-   public ListUsersResponse getUserPage(String nextToken, int limit){
-       try{
-           ListUsersRequest.Builder request = ListUsersRequest.builder()
-                   .userPoolId(userPoolId)
-                   .limit(limit);
-           if (nextToken != null && !nextToken.isBlank()) {
-               request.paginationToken(nextToken);
-           }
-           return cognitoClient.listUsers(request.build());
-       }catch (CognitoIdentityProviderException e){
-           throw new RuntimeException("Could not retrieve users: " + e.awsErrorDetails().errorMessage(), e);
-       }
-   }
-   
-   public List<String> getUserRole(String username){
-       try{
-           AdminListGroupsForUserRequest request = AdminListGroupsForUserRequest.builder().userPoolId(userPoolId).username(username).build();
-         return cognitoClient.adminListGroupsForUser(request).groups().stream().map(GroupType::groupName).toList();
-       }catch (CognitoIdentityProviderException e){
-           throw new RuntimeException("Could not retrieve users: " + e.awsErrorDetails().errorMessage(), e);
-       }
-   }
 
-   public String getEmailByUsername(String username){
-       try{
-           AdminGetUserRequest request = AdminGetUserRequest.builder().userPoolId(userPoolId).username(username).build();
-           return cognitoClient.adminGetUser(request).userAttributes().stream()
-                   .filter(attribute -> "email".equals(attribute.name()))
-                   .map(AttributeType::value)
-                   .findFirst()
-                   .orElse(username);
-       }catch (CognitoIdentityProviderException e){
-           throw new RuntimeException("Could not retrieve user: " + e.awsErrorDetails().errorMessage(), e);
-       }
-   }
-   
-   public void forgetPassword(String email){
-       try{
-           ForgotPasswordRequest request = ForgotPasswordRequest.builder().clientId(clientId).username(email).secretHash(computeSecretHash(email)).build();
-           cognitoClient.forgotPassword(request);
-       }catch(CognitoIdentityProviderException e){
-           throw new RuntimeException("Could not retrieve user: " + e.awsErrorDetails().errorMessage(), e);
-       }
-   }
-   
-   public void resetPassword(String otp, String email,String password){
-       try{
-           ConfirmForgotPasswordRequest request = ConfirmForgotPasswordRequest.builder().confirmationCode(otp).username(email).secretHash(computeSecretHash(email)).password(password).clientId(clientId).build();
-           cognitoClient.confirmForgotPassword(request);
-       }catch(CognitoIdentityProviderException e){
-           throw new RuntimeException("Could not retrieve user: " + e.awsErrorDetails().errorMessage(), e);
-       }
-   }
+    public void deleteAccount(String email) {
+        try {
+            boolean isAdmin = cognitoClient.adminListGroupsForUser(AdminListGroupsForUserRequest.builder()
+                            .userPoolId(userPoolId)
+                            .username(email)
+                            .build())
+                    .groups().stream()
+                    .anyMatch(group -> "ADMIN".equals(group.groupName()));
+            if (isAdmin) {
+                ListUsersInGroupRequest adminListRequest = ListUsersInGroupRequest.builder()
+                        .userPoolId(userPoolId)
+                        .groupName("ADMIN")
+                        .build();
+                int adminCount = cognitoClient.listUsersInGroup(adminListRequest).users().size();
+                if (adminCount <= 1) {
+                    throw new IllegalArgumentException("Cannot delete " + email + ": it is the last ADMIN account");
+                }
+            }
+            AdminDeleteUserRequest deleteRequest = AdminDeleteUserRequest.builder()
+                    .userPoolId(userPoolId)
+                    .username(email)
+                    .build();
+            cognitoClient.adminDeleteUser(deleteRequest);
+        } catch (UserNotFoundException e) {
+            throw new IllegalArgumentException("Cannot delete user: no Cognito user found for " + email);
+        } catch (CognitoIdentityProviderException e) {
+            throw new RuntimeException("Could not delete user " + email + ": " + e.awsErrorDetails().errorMessage(), e);
+        }
+    }
 
+    public void updateAccountByUser(String accessToken, String newPassword, String oldPassword) {
+        try {
+            cognitoClient.changePassword(ChangePasswordRequest.builder()
+                    .accessToken(accessToken)
+                    .previousPassword(oldPassword)
+                    .proposedPassword(newPassword)
+                    .build());
+        } catch (UserNotFoundException e) {
+            throw new IllegalArgumentException("Cannot change password: the user for this access token no longer exists");
+        } catch (CognitoIdentityProviderException e) {
+            throw new RuntimeException("Could not change password: " + e.awsErrorDetails().errorMessage(), e);
+        }
+    }
+
+    public void updateAccountByAdmin(String email, String newPassword) {
+        try {
+            cognitoClient.adminSetUserPassword(AdminSetUserPasswordRequest.builder()
+                    .userPoolId(userPoolId)
+                    .username(email)
+                    .password(newPassword)
+                    .permanent(true)
+                    .build());
+        } catch (UserNotFoundException e) {
+            throw new IllegalArgumentException("Cannot reset password: no Cognito user found for " + email);
+        } catch (CognitoIdentityProviderException e) {
+            throw new RuntimeException("Admin could not set password for " + email + ": "
+                    + e.awsErrorDetails().errorMessage(), e);
+        }
+    }
+
+    public ListUsersResponse getUserPage(String nextToken, int limit) {
+        try {
+            ListUsersRequest.Builder listRequest = ListUsersRequest.builder()
+                    .userPoolId(userPoolId)
+                    .limit(limit);
+            if (nextToken != null && !nextToken.isBlank()) {
+                listRequest.paginationToken(nextToken);
+            }
+            return cognitoClient.listUsers(listRequest.build());
+        } catch (CognitoIdentityProviderException e) {
+            throw new RuntimeException("Could not list users (limit " + limit + "): "
+                    + e.awsErrorDetails().errorMessage(), e);
+        }
+    }
+
+    public List<String> getUserRoles(String username) {
+        try {
+            AdminListGroupsForUserRequest request = AdminListGroupsForUserRequest.builder()
+                    .userPoolId(userPoolId)
+                    .username(username)
+                    .build();
+            return cognitoClient.adminListGroupsForUser(request).groups().stream()
+                    .map(GroupType::groupName)
+                    .toList();
+        } catch (CognitoIdentityProviderException e) {
+            throw new RuntimeException("Could not get groups for user " + username + ": "
+                    + e.awsErrorDetails().errorMessage(), e);
+        }
+    }
+
+    public String getEmailByUsername(String username) {
+        try {
+            AdminGetUserRequest request = AdminGetUserRequest.builder()
+                    .userPoolId(userPoolId)
+                    .username(username)
+                    .build();
+            return cognitoClient.adminGetUser(request).userAttributes().stream()
+                    .filter(attribute -> "email".equals(attribute.name()))
+                    .map(AttributeType::value)
+                    .findFirst()
+                    .orElse(username);
+        } catch (CognitoIdentityProviderException e) {
+            throw new RuntimeException("Could not look up email for user " + username + ": "
+                    + e.awsErrorDetails().errorMessage(), e);
+        }
+    }
+
+    public void forgotPassword(String email) {
+        try {
+            ForgotPasswordRequest request = ForgotPasswordRequest.builder()
+                    .clientId(clientId)
+                    .username(email)
+                    .secretHash(computeSecretHash(email))
+                    .build();
+            cognitoClient.forgotPassword(request);
+        } catch (CognitoIdentityProviderException e) {
+            throw new RuntimeException("Could not send password-reset code to " + email + ": "
+                    + e.awsErrorDetails().errorMessage(), e);
+        }
+    }
+
+    public void resetPassword(String otp, String email, String newPassword) {
+        try {
+            ConfirmForgotPasswordRequest request = ConfirmForgotPasswordRequest.builder()
+                    .clientId(clientId)
+                    .username(email)
+                    .secretHash(computeSecretHash(email))
+                    .confirmationCode(otp)
+                    .password(newPassword)
+                    .build();
+            cognitoClient.confirmForgotPassword(request);
+        } catch (CognitoIdentityProviderException e) {
+            throw new RuntimeException("Could not reset password for " + email + ": "
+                    + e.awsErrorDetails().errorMessage(), e);
+        }
+    }
 }
