@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package FCAJ.SecureLearn.Request;
 
 import java.util.UUID;
@@ -16,7 +12,7 @@ public class ChapterCreationRequest {
 
     public ChapterCreationRequest() {
     }
-    
+
     public ChapterCreationRequest(UUID course_id, String title, String description) {
         this.course_id = course_id;
         this.title = title;
@@ -46,5 +42,5 @@ public class ChapterCreationRequest {
     public void setDescription(String description) {
         this.description = description;
     }
-    
+
 }

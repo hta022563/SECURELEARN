@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package FCAJ.SecureLearn.Service;
 
 import java.net.URL;
@@ -26,7 +22,7 @@ import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignReques
 public class R2Service {
     private final S3Template template;
     private final S3Presigner presigner;
-    
+
     @Value("${app.s3.public-base-url}")
     private String publicBaseUrl;
 
@@ -36,8 +32,8 @@ public class R2Service {
         this.template = template;
         this.presigner = presigner;
     }
-    
-    public URL generatePresignedPutUrl(String bucketName, String objectKey, Duration expiry, String contentType){
+
+    public URL generatePresignedPutUrl(String bucketName, String objectKey, Duration expiry, String contentType) {
         ObjectMetadata objectMetadata = ObjectMetadata.builder().contentType(contentType).build();
         return template.createSignedPutURL(bucketName, objectKey, expiry, objectMetadata, contentType);
     }
@@ -66,8 +62,8 @@ public class R2Service {
             throw new IllegalStateException("Failed to read R2 object " + objectKey, e);
         }
     }
-    
-    public String getPublicUrl(String objectKey){
+
+    public String getPublicUrl(String objectKey) {
         return publicBaseUrl + "/" + objectKey;
     }
 
@@ -80,8 +76,8 @@ public class R2Service {
                 : publicBaseUrl;
         return value.startsWith(prefix + "/") ? value.substring(prefix.length() + 1) : null;
     }
-    
-    public void deleteObject(String bucketName, String objectKey){
+
+    public void deleteObject(String bucketName, String objectKey) {
         template.deleteObject(bucketName, objectKey);
     }
 

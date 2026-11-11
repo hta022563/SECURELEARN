@@ -119,7 +119,7 @@ public class SecurityConfiguration {
                 .requestMatchers(HttpMethod.POST,   "/api/v1/lesson").hasAnyRole("INSTRUCTOR", "ADMIN")
                 .requestMatchers(HttpMethod.PUT,    "/api/v1/lesson/{id}").hasAnyRole("INSTRUCTOR", "ADMIN")
                 .requestMatchers(HttpMethod.DELETE, "/api/v1/lesson/{id}").hasAnyRole("INSTRUCTOR", "ADMIN")
-                 
+
                 //Rules 16: user management - ADMIN only
                 .requestMatchers(HttpMethod.POST, "/api/v1/admin").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.DELETE, "/api/v1/admin").hasRole("ADMIN")

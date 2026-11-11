@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package FCAJ.SecureLearn.Model;
 
 import FCAJ.SecureLearn.Configuration.LogAnnotationClass;
@@ -24,12 +20,12 @@ import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortK
  */
 @DynamoDbBean
 public class AccessLog {
-   
+
     private String logId;
     String userEmail;
     LocalDateTime accessedTime;
     ActionType actionType;
-    String ipAddress, userAgent, device_fingerprint; 
+    String ipAddress, userAgent, device_fingerprint;
     int downloadInterval, statusCode, segmentCount;
     UUID lessonId;
 
@@ -40,7 +36,7 @@ public class AccessLog {
     public void setSegmentCount(int segmentCount) {
         this.segmentCount = segmentCount;
     }
-    
+
 
     public String getUserAgent() {
         return userAgent;
@@ -73,8 +69,8 @@ public class AccessLog {
     public void setStatusCode(int statusCode) {
         this.statusCode = statusCode;
     }
-    
-    
+
+
     public AccessLog() {
     }
 
@@ -90,8 +86,8 @@ public class AccessLog {
         this.segmentCount = segmentCount;
         this.lessonId = lessonId;
     }
-    
-    
+
+
     public AccessLog(String logId, String userEmail, LocalDateTime accessedTime, ActionType actionType, String ipAddress, String userAgent, String device_fingerprint, int statusCode) {
         this.logId = logId;
         this.userEmail = userEmail;
@@ -103,7 +99,7 @@ public class AccessLog {
         this.statusCode = statusCode;
     }
 
-    
+
     public AccessLog(String logId, String userEmail, LocalDateTime accessedTime, ActionType actionType, String ipAddress, String userAgent, String device_fingerprint, int statusCode, UUID lessonId) {
         this.logId = logId;
         this.userEmail = userEmail;
@@ -115,9 +111,9 @@ public class AccessLog {
         this.statusCode = statusCode;
         this.lessonId = lessonId;
     }
-    
-    
-    
+
+
+
     public AccessLog(String logId, String userId, LocalDateTime accessedTime, ActionType actionType, String ipAddress) {
         this.logId = logId;
         this.userEmail = userId;
@@ -135,7 +131,7 @@ public class AccessLog {
         this.lessonId = lessonId;
     }
 
-   
+
     @DynamoDbSortKey
     public String getLogId() {
         return logId;
@@ -152,7 +148,7 @@ public class AccessLog {
     public void setUserEmail(String userEmail) {
         this.userEmail = userEmail;
     }
-    
+
     @DynamoDbSecondarySortKey(indexNames = "LogInADay")
     public LocalDateTime getAccessedTime() {
         return accessedTime;
@@ -161,7 +157,7 @@ public class AccessLog {
     public void setAccessedTime(LocalDateTime accessedTime) {
         this.accessedTime = accessedTime;
     }
-    
+
     @DynamoDbSecondaryPartitionKey(indexNames = "LogInADay")
     public ActionType getActionType() {
         return actionType;
@@ -188,7 +184,7 @@ public class AccessLog {
         this.lessonId = lessonId;
     }
 
-   
 
-    
+
+
 }

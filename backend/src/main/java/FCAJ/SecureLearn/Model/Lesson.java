@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package FCAJ.SecureLearn.Model;
 
 import jakarta.persistence.Column;
@@ -23,24 +19,24 @@ public class Lesson {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
-    
+
     @ManyToOne(fetch = LAZY)
     @JoinColumn(name = "chapter_id")
     private Chapter chapter;
-    
+
     @Column(nullable = false, length = 200)
     private String title;
-    
+
     @Column(nullable = false, length = 500)
     private String description;
-    
+
     @Column(nullable = true)
     private String url;
 
     public Lesson() {
     }
 
-  
+
 
     public UUID getId() {
         return id;
@@ -49,7 +45,7 @@ public class Lesson {
     public void setId(UUID id) {
         this.id = id;
     }
-    
+
     public String getTitle() {
         return title;
     }
@@ -88,6 +84,6 @@ public class Lesson {
         this.description = description;
         this.url = url;
     }
-   
-    
+
+
 }

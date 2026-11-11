@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package FCAJ.SecureLearn.Service;
 
 import FCAJ.SecureLearn.Model.Course;
@@ -11,6 +7,7 @@ import FCAJ.SecureLearn.Repositories.CourseRepo;
 import FCAJ.SecureLearn.Repositories.EnrollmentRepo;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 
@@ -28,42 +25,54 @@ public class EnrollmentService {
         this.courseRepo = courseRepo;
     }
 
-    public void createEnrollment(String email, UUID course_id){
-        Course course = courseRepo.findById(course_id).orElseThrow();
-        Enrollment newEnrollment = new Enrollment(email, course, Status.NOTSTARTED, LocalDateTime.now(), null);
+    public void createEnrollment(String email, UUID courseId) {
+        Course enrolledCourse = findCourse(courseId, "enroll " + email);
+        Enrollment newEnrollment = new Enrollment(email, enrolledCourse, Status.NOTSTARTED, LocalDateTime.now(), null);
         enrollmentRepo.save(newEnrollment);
     }
 
-    public Enrollment getEnrollment(UUID id){
-        return enrollmentRepo.findById(id).orElseThrow();
+    public Enrollment getEnrollment(UUID enrollmentId) {
+        return findEnrollment(enrollmentId, "get enrollment");
     }
 
-    public List<Enrollment> getAllEnrollments(){
+    public List<Enrollment> getAllEnrollments() {
         return enrollmentRepo.findAll();
     }
 
-    public List<Enrollment> getEnrollmentsByEmail(String email){
+    public List<Enrollment> getEnrollmentsByEmail(String email) {
         return enrollmentRepo.findByEmail(email);
     }
 
-    public List<Enrollment> getEnrollmentsInCourse(UUID course_id){
-        return enrollmentRepo.findByCourseId(course_id);
+    public List<Enrollment> getEnrollmentsInCourse(UUID courseId) {
+        return enrollmentRepo.findByCourseId(courseId);
     }
 
-    public void updateEnrollment(UUID enrollment_id, String email, UUID course_id){
-        Enrollment updatedEnrollment = enrollmentRepo.findById(enrollment_id).orElseThrow();
-        Course course = courseRepo.findById(course_id).orElseThrow();
-        updatedEnrollment.setEmail(email);
-        updatedEnrollment.setCourse(course);
-        enrollmentRepo.save(updatedEnrollment);
+    public void updateEnrollment(UUID enrollmentId, String email, UUID courseId) {
+        Enrollment enrollmentToUpdate = findEnrollment(enrollmentId, "update enrollment");
+        Course newCourse = findCourse(courseId, "update enrollment " + enrollmentId);
+        enrollmentToUpdate.setEmail(email);
+        enrollmentToUpdate.setCourse(newCourse);
+        enrollmentRepo.save(enrollmentToUpdate);
     }
 
-    public void deleteEnrollment(UUID id){
-        Enrollment targetEnrollment = enrollmentRepo.findById(id).orElseThrow();
-        enrollmentRepo.delete(targetEnrollment);
+    public void deleteEnrollment(UUID enrollmentId) {
+        Enrollment enrollmentToDelete = findEnrollment(enrollmentId, "delete enrollment");
+        enrollmentRepo.delete(enrollmentToDelete);
     }
-    
-    public boolean checkEnrollemnt(String email, UUID id){
-        return enrollmentRepo.findByEmailAndCourseId(email, id) != null;
+
+    public boolean isEnrolledInCourse(String email, UUID courseId) {
+        return enrollmentRepo.findByEmailAndCourseId(email, courseId) != null;
+    }
+
+    private Enrollment findEnrollment(UUID enrollmentId, String action) {
+        return enrollmentRepo.findById(enrollmentId)
+                .orElseThrow(() -> new NoSuchElementException(
+                        "Cannot " + action + ": no enrollment found with id " + enrollmentId));
+    }
+
+    private Course findCourse(UUID courseId, String action) {
+        return courseRepo.findById(courseId)
+                .orElseThrow(() -> new NoSuchElementException(
+                        "Cannot " + action + ": no course found with id " + courseId));
     }
 }

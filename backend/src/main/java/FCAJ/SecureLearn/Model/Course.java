@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package FCAJ.SecureLearn.Model;
 
 
@@ -28,34 +24,34 @@ public class Course {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
-    
+
     @Column(nullable = false, length = 200)
     private String title;
-    
+
     @Column(nullable = false, length = 500)
     private String description;
-    
+
     @Column(nullable = false)
     private long price;
-    
+
     @Column(nullable = false, length = 200)
     private String instructor;
-    
+
     @Column(nullable = false)
     private LocalDateTime creationTime;
-    
+
     @Column(nullable = false)
     private LocalDateTime lastUpdateTime;
-    
+
     @OneToMany(mappedBy="course", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Chapter> chapter = new ArrayList();
-    
+
     @OneToMany(mappedBy="course", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Enrollment> enrollment = new ArrayList();
-    
+
     public Course() {
     }
-    
+
     public Course(String title, String description, long price, String instructor, LocalDateTime creationTime, LocalDateTime lastUpdateTime) {
         this.title = title;
         this.description = description;
@@ -64,7 +60,7 @@ public class Course {
         this.creationTime = creationTime;
         this.lastUpdateTime = lastUpdateTime;
     }
-    
+
     public UUID getId() {
         return id;
     }
@@ -120,7 +116,7 @@ public class Course {
     public void setLastUpdateTime(LocalDateTime lastUpdateTime) {
         this.lastUpdateTime = lastUpdateTime;
     }
-    
-   
-    
+
+
+
 }

@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package FCAJ.SecureLearn.Request;
 
 /**
@@ -10,7 +6,7 @@ package FCAJ.SecureLearn.Request;
  */
 public class ConfirmRequest {
     String email, otp;
-    
+
 
     public String getEmail() {
         return email;
@@ -35,5 +31,5 @@ public class ConfirmRequest {
 
     public ConfirmRequest() {
     }
-    
+
 }

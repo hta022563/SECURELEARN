@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package FCAJ.SecureLearn.Repositories;
 
 import FCAJ.SecureLearn.Model.Course;
@@ -20,9 +16,9 @@ import org.springframework.stereotype.Repository;
 public interface CourseRepo extends CrudRepository<Course, UUID> {
     List<Course> findByInstructor(String instructor);
     List<Course> findByTitleContaining(String title);
-    @Query("SELECT c from Course c Join c.chapter ch join ch.lesson l where l.id= :id  ")
-    Course findbyLessonId(@Param("id") UUID lessonId);
+    @Query("SELECT c FROM Course c JOIN c.chapter ch JOIN ch.lesson l WHERE l.id = :id")
+    Course findByLessonId(@Param("id") UUID lessonId);
     @Override
     List<Course> findAll();
-    
+
 }

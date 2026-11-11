@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package FCAJ.SecureLearn.Model;
 
 import jakarta.persistence.CascadeType;
@@ -27,17 +23,17 @@ public class Chapter {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
-    
+
     @ManyToOne(fetch = LAZY)
     @JoinColumn(name = "course_id")
     private Course course;
-    
+
     @Column(nullable = false, length = 200)
     private String title;
-    
+
     @Column(nullable = false, length = 500)
     private String description;
-    
+
     @OneToMany(mappedBy = "chapter", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Lesson> lesson = new ArrayList();
 
@@ -81,5 +77,5 @@ public class Chapter {
     public void setDescription(String description) {
         this.description = description;
     }
-    
+
 }

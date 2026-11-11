@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package FCAJ.SecureLearn.Service;
 
 import FCAJ.SecureLearn.Model.AccessLog;
@@ -30,9 +26,7 @@ import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
  */
 @Service
 public class LogService {
-   private final DynamoDbEnhancedClient enhancedClient;
-   private final AuthService authService;
-    final DynamoDbTable<AccessLog> logTable;
+    private final DynamoDbTable<AccessLog> logTable;
 
     private static final String UNKNOWN_PREFIX = "UNK";
     private static final Map<ActionType, String> LOG_PREFIX = new EnumMap<>(ActionType.class);
@@ -54,58 +48,59 @@ public class LogService {
         LOG_PREFIX.put(ActionType.VIDEO_DELETION, "COU");
     }
 
-    public LogService(DynamoDbEnhancedClient enhancedClient, AuthService authService) {
-        this.enhancedClient = enhancedClient;
-        this.authService = authService;
-        logTable = enhancedClient.table("AccessLog", TableSchema.fromBean(AccessLog.class));
+    public LogService(DynamoDbEnhancedClient enhancedClient) {
+        this.logTable = enhancedClient.table("AccessLog", TableSchema.fromBean(AccessLog.class));
     }
 
-    private String generateLogId(String email, ActionType actionType){
+    // Log ids look like "VID0007": a category prefix plus a per-user running count
+    private String generateLogId(String email, ActionType actionType) {
         String prefix = LOG_PREFIX.getOrDefault(actionType, UNKNOWN_PREFIX);
-        QueryConditional userQuery = QueryConditional.keyEqualTo(Key.builder().addPartitionValue(email).build());
-        PageIterable<AccessLog> logList = logTable.query(userQuery);
-        int count = 1;
-        for(AccessLog log : logList.items()){
-            if(log.getLogId().startsWith(prefix)){
-                count ++;
+        QueryConditional userLogsQuery = QueryConditional.keyEqualTo(Key.builder().addPartitionValue(email).build());
+        PageIterable<AccessLog> userLogs = logTable.query(userLogsQuery);
+        int nextNumber = 1;
+        for (AccessLog existingLog : userLogs.items()) {
+            if (existingLog.getLogId().startsWith(prefix)) {
+                nextNumber++;
             }
         }
-        return prefix + String.format("%04d", count);
+        return prefix + String.format("%04d", nextNumber);
     }
 
-    public void createLog(String email, ActionType actionType, LocalDateTime accessedTime, String ipAddress, String userAgent, String deviceFingerprint, int statusCode){
+    public void createLog(String email, ActionType actionType, LocalDateTime accessedTime, String ipAddress,
+            String userAgent, String deviceFingerprint, int statusCode) {
         String logId = generateLogId(email, actionType);
-        AccessLog newLog = new AccessLog(logId, email, accessedTime,actionType, ipAddress,userAgent,deviceFingerprint, statusCode);
+        AccessLog newLog = new AccessLog(logId, email, accessedTime, actionType, ipAddress, userAgent,
+                deviceFingerprint, statusCode);
         logTable.putItem(newLog);
     }
 
-    public void createLog(String email, ActionType actionType, LocalDateTime accessedTime, String ipAddress, String userAgent, String deviceFingerprint, int statusCode, UUID lessonId){
+    public void createLog(String email, ActionType actionType, LocalDateTime accessedTime, String ipAddress,
+            String userAgent, String deviceFingerprint, int statusCode, UUID lessonId) {
         String logId = generateLogId(email, actionType);
-        AccessLog newLog = new AccessLog(logId, email, accessedTime,actionType, ipAddress,userAgent,deviceFingerprint, statusCode, lessonId);
+        AccessLog newLog = new AccessLog(logId, email, accessedTime, actionType, ipAddress, userAgent,
+                deviceFingerprint, statusCode, lessonId);
         logTable.putItem(newLog);
     }
 
-    public void createLog(String email, ActionType actionType, LocalDateTime accessedTime, String ipAddress, String userAgent, String deviceFingerprint, int statusCode,int segmentCount, UUID lessonId){
+    public void createLog(String email, ActionType actionType, LocalDateTime accessedTime, String ipAddress,
+            String userAgent, String deviceFingerprint, int statusCode, int segmentId, UUID lessonId) {
         String logId = generateLogId(email, actionType);
-        AccessLog newLog = new AccessLog(logId, email, accessedTime,actionType, ipAddress,userAgent,deviceFingerprint, statusCode,segmentCount,lessonId);
+        AccessLog newLog = new AccessLog(logId, email, accessedTime, actionType, ipAddress, userAgent,
+                deviceFingerprint, statusCode, segmentId, lessonId);
         logTable.putItem(newLog);
     }
 
-
-   public List<AccessLog> getLogInDay(ActionType actionType){
-       LocalDateTime startOfDay = LocalDateTime.of(LocalDate.now(), LocalTime.MIN);
-       LocalDateTime endOfDay = LocalDateTime.of(LocalDate.now(), LocalTime.MAX);
-       Key fromKey = Key.builder().addPartitionValue(actionType.name()).addSortValue(startOfDay).build(),
-           toKey = Key.builder().addPartitionValue(actionType.name()).addSortValue(endOfDay).build();
-       QueryConditional userQuery = QueryConditional.sortBetween(fromKey, toKey);
-       SdkIterable<Page<AccessLog>> logIterable = logTable.index("LogInADay").query(userQuery);
-       List<AccessLog> logList = new ArrayList();
-       for(Page<AccessLog> logPage : logIterable){
-           for(AccessLog log: logPage.items()){
-               logList.add(log);
-           System.out.println(log.getUserEmail());
-           }
-       }
-       return logList;
-   }
+    public List<AccessLog> getLogsForToday(ActionType actionType) {
+        LocalDateTime startOfDay = LocalDateTime.of(LocalDate.now(), LocalTime.MIN);
+        LocalDateTime endOfDay = LocalDateTime.of(LocalDate.now(), LocalTime.MAX);
+        Key fromKey = Key.builder().addPartitionValue(actionType.name()).addSortValue(startOfDay).build();
+        Key toKey = Key.builder().addPartitionValue(actionType.name()).addSortValue(endOfDay).build();
+        QueryConditional todayQuery = QueryConditional.sortBetween(fromKey, toKey);
+        SdkIterable<Page<AccessLog>> logPages = logTable.index("LogInADay").query(todayQuery);
+        List<AccessLog> todaysLogs = new ArrayList<>();
+        for (Page<AccessLog> logPage : logPages) {
+            todaysLogs.addAll(logPage.items());
+        }
+        return todaysLogs;
+    }
 }
