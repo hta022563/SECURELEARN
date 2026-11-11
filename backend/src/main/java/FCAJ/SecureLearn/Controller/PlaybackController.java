@@ -3,11 +3,14 @@ package FCAJ.SecureLearn.Controller;
 import FCAJ.SecureLearn.Configuration.LogAnnotationClass;
 import FCAJ.SecureLearn.Model.ActionType;
 import FCAJ.SecureLearn.Service.AuthService;
+import FCAJ.SecureLearn.Service.CourseService;
+import FCAJ.SecureLearn.Service.EnrollmentService;
 import FCAJ.SecureLearn.Service.LogService;
 import FCAJ.SecureLearn.Service.PlaybackService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.CacheControl;
@@ -29,11 +32,14 @@ public class PlaybackController {
     private final PlaybackService playbackService;
     private final LogService logService;
     private final AuthService authService;
-
-    public PlaybackController(PlaybackService playbackService, LogService logService, AuthService authService) {
+    private final EnrollmentService enrollmentService;
+    private final CourseService courseService;
+    public PlaybackController(PlaybackService playbackService, LogService logService, AuthService authService, EnrollmentService enrollmentService, CourseService courseService) {
         this.playbackService = playbackService;
         this.logService = logService;
         this.authService = authService;
+        this.enrollmentService = enrollmentService;
+        this.courseService = courseService;
     }
 
     @GetMapping("/playback")
@@ -45,6 +51,15 @@ public class PlaybackController {
         String contextUrl = ServletUriComponentsBuilder.fromCurrentContextPath()
                 .build()
                 .toUriString();
+        List<String> userGroupList = jwt.getClaimAsStringList("cognito:groups");
+        for(String group: userGroupList){
+            if(group.equalsIgnoreCase("Student")){
+            if(!enrollmentService.checkEnrollemnt(authService.getEmailByUsername(jwt.getClaimAsString("username")), courseService.getCourseByLessonId(id).getId())){
+                return ResponseEntity.status(403).body(Map.of("Error: ", "User have not enrolled in this course" ));
+            }
+        }
+        }
+        
         PlaybackService.PlaybackDetails details = playbackService.createPlayback(id, contextUrl,jwt.getClaimAsString("username"));
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
