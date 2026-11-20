@@ -448,7 +448,7 @@ export default function SubjectLectures() {
         </div>
       </div>
 
-      {/* 2. BỘ LỌC & TÌM KIẾM THEO KHÓA HỌC */}
+      {/* 2. BỘ TÌM KIẾM BÀI GIẢNG & CHUYỂN ĐỔI MÔN HỌC */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-5 shadow-sm border border-slate-200/80 dark:border-slate-800 mb-6 space-y-4">
         <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
           <div className="relative flex-1">
@@ -476,27 +476,23 @@ export default function SubjectLectures() {
             )}
           </div>
 
-          <div className="flex items-center gap-2 min-w-[230px]">
-            <Filter className="h-4 w-4 text-slate-400 shrink-0" />
+          {/* Chọn / Chuyển Môn Học */}
+          <div className="flex items-center gap-2 min-w-[220px]">
+            <BookOpen className="h-4 w-4 text-slate-400 shrink-0" />
             <select
-              value={selectedCourseId}
-              onChange={(e) => handleSelectCourse(e.target.value)}
-              aria-label={t('subject_lectures.filter_by_course', 'Lọc theo khóa học')}
-              className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60 px-3.5 py-2.5 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              value={subjectId}
+              onChange={(e) => navigate(`/${currentLang}/catalog/subject/${e.target.value}`)}
+              aria-label={t('subject_lectures.switch_subject', 'Chuyển môn học')}
+              className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60 px-3.5 py-2.5 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer"
             >
-              <option value="">
-                {t('subject_lectures.all_courses', 'Tất cả khóa học')} ({courses.length})
+              {allSubjects.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+              <option value="unassigned">
+                {t('catalog.unassigned_subject', 'Khóa học chưa phân môn')}
               </option>
-              {courses.map((course) => {
-                const cId = course.id || course.ID;
-                const count = lessonCountByCourse.get(String(cId)) || 0;
-                return (
-                  <option key={cId} value={cId}>
-                    {course.title}
-                    {isAuthenticated ? ` (${count} ${t('subject_lectures.lectures_label', 'bài giảng')})` : ''}
-                  </option>
-                );
-              })}
             </select>
           </div>
         </div>
@@ -504,7 +500,7 @@ export default function SubjectLectures() {
         {courses.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
             <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mr-1">
-              {t('subject_lectures.filter_course_pills', 'Khóa học:')}
+              {t('subject_lectures.filter_course_pills', 'Khóa học trong môn:')}
             </span>
             <button
               type="button"
