@@ -209,7 +209,8 @@
     "created_at": "Khởi tạo:",
     "modal_denied_title": "Chưa Được Cấp Quyền Xem",
     "modal_denied_desc": "Khóa học này hiện tại chưa được cấp quyền xem cho tài khoản của bạn.",
-    "modal_denied_policy": "Quy định bảo mật SecureLearn: Khóa học trong danh mục khóa học chưa được cấp quyền xem thì chưa thể xem được. Chỉ các khóa học đã được ghi danh trong \"Khóa học của tôi\" mới có thể xem video bài giảng."
+    "modal_denied_policy": "Quy định bảo mật SecureLearn: Khóa học trong danh mục khóa học chưa được cấp quyền xem thì chưa thể xem được. Chỉ các khóa học đã được ghi danh trong \"Khóa học của tôi\" mới có thể xem video bài giảng.",
+    "delete_subject_cascade_warning": "Thao tác này sẽ XÓA VĨNH VIỄN cả khóa học thuộc môn này:"
   },
   "subject_lectures": {
     "loading": "Đang tải danh sách bài giảng của môn học...",
@@ -311,7 +312,7 @@
     "edit_chapter": "Sửa Chương",
     "add_lesson": "Nạp Bài",
     "no_videos_in_chapter": "Chưa có video bài học nào trong chương này.",
-    "upload_lesson_now": "Tải bài ngay \u2192",
+    "upload_lesson_now": "Tải bài ngay →",
     "edit_name": "Sửa Tên",
     "reupload_video": "Up lại video",
     "edit_video_title": "Chỉnh Sửa Tiêu Đề Bài Giảng Nhỏ",
@@ -439,7 +440,9 @@
     "create_success": "Đã tạo thành công khóa học",
     "create_success_title": "Tạo Khóa Học Thành Công",
     "create_failed": "Không thể tạo khóa học",
-    "error": "Lỗi"
+    "error": "Lỗi",
+    "subject_required": "Khóa học phải thuộc một môn học. Hãy chọn hoặc tạo môn học.",
+    "select_subject_required": "-- Chọn môn học --"
   },
   "admin": {
     "title": "Bảng Điều Khiển AI",

@@ -4,12 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { GraduationCap, X, ShieldCheck, Plus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { createCourse, getCourses } from '../services/courseService';
-import {
-  getSubjects,
-  createSubject,
-  assignCourseToSubject,
-} from '../services/subjectService';
+import { createCourse } from '../services/courseService';
+import { loadSubjects, createSubject } from '../services/subjectService';
 
 /**
  * =============================================================================
@@ -32,23 +28,29 @@ export default function CreateCourseModal({ show, onHide, onCourseCreated, defau
 
   useEffect(() => {
     if (!show) return;
-    const list = getSubjects();
-    setSubjects(list);
-    if (defaultSubjectId && defaultSubjectId !== 'unassigned') {
-      setSubjectId(defaultSubjectId);
-    } else if (list.length > 0) {
-      setSubjectId((prev) => prev || list[0].id);
-    } else {
-      setSubjectId('');
-    }
+    let isMounted = true;
+    loadSubjects().then((list) => {
+      if (!isMounted) return;
+      setSubjects(list);
+      if (defaultSubjectId && list.some((s) => String(s.id) === String(defaultSubjectId))) {
+        setSubjectId(defaultSubjectId);
+      } else if (list.length > 0) {
+        setSubjectId((prev) => (list.some((s) => s.id === prev) ? prev : list[0].id));
+      } else {
+        setSubjectId('');
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
   }, [show, defaultSubjectId]);
 
   if (!show) return null;
 
-  const handleCreateInlineSubject = () => {
+  const handleCreateInlineSubject = async () => {
     if (!newSubjectName.trim()) return;
     try {
-      const created = createSubject({ name: newSubjectName.trim(), description: '' });
+      const created = await createSubject({ name: newSubjectName.trim() });
       setSubjects((prev) => [created, ...prev]);
       setSubjectId(created.id);
       setNewSubjectName('');
@@ -73,6 +75,14 @@ export default function CreateCourseModal({ show, onHide, onCourseCreated, defau
       );
       return;
     }
+    if (!subjectId) {
+      showToast(
+        t('course_modal.subject_required', 'Khóa học phải thuộc một môn học. Hãy chọn hoặc tạo môn học.'),
+        'warning',
+        t('course_modal.missing_data', 'Thiếu Dữ Liệu')
+      );
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -84,25 +94,9 @@ export default function CreateCourseModal({ show, onHide, onCourseCreated, defau
         prices: Number(price) || 0,
         price: Number(price) || 0,
         instructor: instructorVal,
+        subjectId,
       });
-
-      let resolvedCourse = newCourse;
-      if (subjectId) {
-        // BE POST /course không trả về course.id, nên fetch lại danh sách để lấy ID thực từ DB và gán vào Môn học ở FE
-        const allCourses = await getCourses();
-        const matched = allCourses
-          .filter(
-            (c) =>
-              (c.title || '').trim().toLowerCase() === title.trim().toLowerCase() &&
-              (c.instructor || '').trim().toLowerCase() === instructorVal.trim().toLowerCase()
-          )
-          .sort((a, b) => new Date(b.creationTime || 0) - new Date(a.creationTime || 0))[0];
-
-        if (matched?.id) {
-          assignCourseToSubject(matched.id, subjectId);
-          resolvedCourse = matched;
-        }
-      }
+      const resolvedCourse = { ...newCourse, subjectId };
 
       showToast(
         `${t('course_modal.create_success', 'Đã tạo thành công khóa học')}: "${newCourse.Title}"!`,
@@ -205,8 +199,8 @@ export default function CreateCourseModal({ show, onHide, onCourseCreated, defau
                 onChange={(e) => setSubjectId(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3.5 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-all"
               >
-                <option value="">
-                  {t('course_modal.select_subject_optional', '-- Chưa phân môn học --')}
+                <option value="" disabled>
+                  {t('course_modal.select_subject_required', '-- Chọn môn học --')}
                 </option>
                 {subjects.map((sub) => (
                   <option key={sub.id} value={sub.id}>

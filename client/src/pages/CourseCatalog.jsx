@@ -18,8 +18,12 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getCourses } from '../services/courseService';
 import {
+  loadSubjects,
   groupCoursesBySubjects,
+<<<<<<< HEAD
   getSubjects,
+=======
+>>>>>>> 1657229ae49b33ab0d8b659d341745d429148a48
   deleteSubject,
 } from '../services/subjectService';
 import CreateCourseModal from '../components/CreateCourseModal';
@@ -53,7 +57,8 @@ export default function CourseCatalog() {
   const loadCourses = async () => {
     setIsLoading(true);
     try {
-      const coursesData = await getCourses();
+      const [coursesData] = await Promise.all([getCourses(), loadSubjects()]);
+      setSubjectVersion((v) => v + 1);
       setAllCourses(Array.isArray(coursesData) ? coursesData : []);
     } catch (err) {
       console.warn('[CourseCatalog] Lỗi nạp khóa học:', err);
@@ -68,14 +73,8 @@ export default function CourseCatalog() {
   }, []);
 
   const displaySubjects = useMemo(() => {
-    return groupCoursesBySubjects(allCourses, {
-      name: t('catalog.unassigned_subject', 'Khóa học chưa phân môn'),
-      description: t(
-        'catalog.unassigned_subject_desc',
-        'Các khóa học hiện chưa được gán vào môn học cụ thể.'
-      ),
-    });
-  }, [allCourses, subjectVersion, t]);
+    return groupCoursesBySubjects(allCourses);
+  }, [allCourses, subjectVersion]);
 
   // Bộ lọc danh mục theo Môn Học & Tìm kiếm từ khóa
   const filteredSubjects = useMemo(() => {
@@ -113,27 +112,54 @@ export default function CourseCatalog() {
     navigate(`/${currentLang}/catalog/subject/${subjectId}${query}`);
   };
 
-  const handleDeleteSubject = (e, subject) => {
+  const handleDeleteSubject = async (e, subject) => {
     e.stopPropagation();
+    const courseCount = subject.courseCount || 0;
     if (
-      window.confirm(
-        `${t('catalog.delete_subject_confirm', 'Bạn có chắc muốn xóa môn học')} "${subject.name}"?`
+      !window.confirm(
+        `${t('catalog.delete_subject_confirm', 'Bạn có chắc muốn xóa môn học')} "${subject.name}"?` +
+          (courseCount > 0
+            ? `
+${t('catalog.delete_subject_cascade_warning', 'Thao tác này sẽ XÓA VĨNH VIỄN cả khóa học thuộc môn này:')} ${courseCount}`
+            : '')
       )
     ) {
-      deleteSubject(subject.id);
-      setSubjectVersion((v) => v + 1);
+      return;
+    }
+    try {
+      await deleteSubject(subject.id);
+      await loadCourses();
       showToast(
         `${t('catalog.deleted_subject', 'Đã xóa môn học')}: "${subject.name}"`,
         'info',
         t('instructor.deleted', 'Đã Xóa')
       );
+    } catch (err) {
+      showToast(err.message, 'danger', t('course_modal.error', 'Lỗi'));
     }
   };
 
+<<<<<<< HEAD
   const selectedSubjectObj = useMemo(() => {
     if (!selectedSubjectFilter) return null;
     return displaySubjects.find((s) => String(s.id) === String(selectedSubjectFilter)) || null;
   }, [displaySubjects, selectedSubjectFilter]);
+=======
+  const selectedCourseObj = useMemo(() => {
+    if (!selectedCourseFilter) return null;
+    const found = allCourses.find(
+      (c) => String(c.id || c.ID) === String(selectedCourseFilter)
+    );
+    if (!found) return null;
+    const subId = found.subjectId;
+    const subObj = displaySubjects.find((s) => String(s.id) === String(subId));
+    return {
+      ...found,
+      subjectId: subId,
+      subjectName: subObj?.name || '',
+    };
+  }, [allCourses, selectedCourseFilter, displaySubjects]);
+>>>>>>> 1657229ae49b33ab0d8b659d341745d429148a48
 
   const canManage =
     isAuthenticated && (user?.role === 'Instructor' || user?.role === 'Administrator');
@@ -197,11 +223,26 @@ export default function CourseCatalog() {
               <option value="">
                 {t('catalog.all_subjects_filter', 'Lọc theo môn học: Tất cả')} ({displaySubjects.length})
               </option>
+<<<<<<< HEAD
               {displaySubjects.map((subject) => (
                 <option key={subject.id} value={subject.id}>
                   {subject.name} ({subject.courseCount || subject.courses?.length || 0} {t('subject_lectures.courses_label', 'khóa học')})
                 </option>
               ))}
+=======
+              {allCourses.map((course) => {
+                const subId = course.subjectId;
+                const subName = subId
+                  ? displaySubjects.find((s) => String(s.id) === String(subId))?.name
+                  : null;
+                return (
+                  <option key={course.id || course.ID} value={course.id || course.ID}>
+                    {course.title}
+                    {subName ? ` — ${subName}` : ''}
+                  </option>
+                );
+              })}
+>>>>>>> 1657229ae49b33ab0d8b659d341745d429148a48
             </select>
           </div>
 
