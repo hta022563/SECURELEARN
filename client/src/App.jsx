@@ -18,6 +18,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 // 3. Guest / Public Pages
 import Home from './pages/Home';
 import CourseCatalog from './pages/CourseCatalog';
+import SubjectLectures from './pages/SubjectLectures';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Unauthorized from './pages/Unauthorized';
@@ -115,8 +116,9 @@ export default function App() {
                       <Route path="home" element={<Home />} />
                       <Route index element={<Navigate to="home" replace />} />
 
-                      {/* Trang Khóa học: Danh mục khóa học toàn diện & Bộ lọc */}
+                      {/* Trang Khóa học: Danh mục môn học & Chi tiết bài giảng theo môn */}
                       <Route path="catalog" element={<CourseCatalog />} />
+                      <Route path="catalog/subject/:subjectId" element={<SubjectLectures />} />
 
                       {/* Xác thực người dùng */}
                       <Route path="login" element={<Login />} />

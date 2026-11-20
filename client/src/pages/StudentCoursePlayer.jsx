@@ -85,6 +85,9 @@ export default function StudentCoursePlayer() {
 
         if (isMounted && courseRes) {
           setBackendData(courseRes);
+          if (courseRes.targetLessonId) {
+            setActiveLectureId(courseRes.targetLessonId);
+          }
         }
       } catch (err) {
         console.warn('[StudentCoursePlayer] Lỗi nạp từ Backend API:', err);

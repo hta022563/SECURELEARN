@@ -10,9 +10,10 @@ import {
   Calendar,
   User,
   ShieldCheck,
-  Fingerprint,
-  Cpu,
-  Cloud,
+  BookOpen,
+  Layers,
+  Clock,
+  Award,
   ChevronDown,
   ChevronUp,
   ArrowRight,
@@ -33,7 +34,6 @@ import {
   enrollInCourse,
 } from '../services/entitlementService';
 import { getCourses } from '../services/courseService';
-import LearningTimeline from '../components/LearningTimeline';
 import HeroStatsCard from '../components/home/HeroStatsCard';
 
 // Danh sách câu hỏi thường gặp về SecureLearn (Bản quyền số, DRM, Mã hóa HLS & Hệ thống AI)
@@ -370,11 +370,6 @@ export default function Home() {
         </div>
 
         {/* =====================================================================
-         * LỘ TRÌNH HỌC TẬP TIMELINE
-         * ===================================================================== */}
-        <LearningTimeline />
-
-        {/* =====================================================================
          * 2. SECTION: VIDEO & BÀI GIẢNG MỚI NHẤT (CHỈ HIỂN THỊ TOP 3 MỚI NHẤT)
          * ===================================================================== */}
         <section className="mb-16 pb-4">
@@ -537,7 +532,7 @@ export default function Home() {
         </section>
 
         {/* =====================================================================
-         * 3. SECTION: CÔNG NGHỆ BẢO VỆ BẢN QUYỀN ĐỘC QUYỀN
+         * 3. SECTION: ĐIỂM NỔI BẬT CỦA KHÓA HỌC
          * ===================================================================== */}
         <section className="mb-16 pb-4">
           <div className="text-center mb-10">
@@ -556,7 +551,7 @@ export default function Home() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 text-center shadow-sm hover:shadow-md transition-shadow">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 mx-auto mb-4">
-                <Lock className="h-7 w-7" />
+                <BookOpen className="h-7 w-7" />
               </div>
               <h3 className="font-bold text-slate-900 dark:text-white text-base mb-1.5">{t('home.hls_title')}</h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{t('home.hls_desc')}</p>
@@ -564,7 +559,7 @@ export default function Home() {
 
             <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 text-center shadow-sm hover:shadow-md transition-shadow">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-50 dark:bg-cyan-950 text-cyan-600 dark:text-cyan-400 mx-auto mb-4">
-                <Fingerprint className="h-7 w-7" />
+                <Layers className="h-7 w-7" />
               </div>
               <h3 className="font-bold text-slate-900 dark:text-white text-base mb-1.5">{t('home.watermark_title')}</h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{t('home.watermark_desc')}</p>
@@ -572,7 +567,7 @@ export default function Home() {
 
             <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 text-center shadow-sm hover:shadow-md transition-shadow">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 mx-auto mb-4">
-                <Cpu className="h-7 w-7" />
+                <Clock className="h-7 w-7" />
               </div>
               <h3 className="font-bold text-slate-900 dark:text-white text-base mb-1.5">{t('home.ai_title')}</h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{t('home.ai_desc')}</p>
@@ -580,7 +575,7 @@ export default function Home() {
 
             <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 text-center shadow-sm hover:shadow-md transition-shadow">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 mx-auto mb-4">
-                <Cloud className="h-7 w-7" />
+                <Award className="h-7 w-7" />
               </div>
               <h3 className="font-bold text-slate-900 dark:text-white text-base mb-1.5">{t('home.cdn_title')}</h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{t('home.cdn_desc')}</p>

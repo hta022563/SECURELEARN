@@ -1,17 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { useTranslation } from 'react-i18next';
-import { GraduationCap, X, ShieldCheck } from 'lucide-react';
+import { GraduationCap, X, ShieldCheck, Plus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { createCourse } from '../services/courseService';
+import { createCourse, getCourses } from '../services/courseService';
+import {
+  getSubjects,
+  createSubject,
+  assignCourseToSubject,
+} from '../services/subjectService';
 
 /**
  * =============================================================================
  * COMPONENT: CreateCourseModal (Pure Tailwind CSS Modal with 100% i18n)
  * =============================================================================
  */
-export default function CreateCourseModal({ show, onHide, onCourseCreated }) {
+export default function CreateCourseModal({ show, onHide, onCourseCreated, defaultSubjectId = '' }) {
   const { user } = useAuth();
   const { t } = useTranslation();
   const { showToast } = useToast();
@@ -19,9 +24,44 @@ export default function CreateCourseModal({ show, onHide, onCourseCreated }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('499000');
+  const [subjects, setSubjects] = useState([]);
+  const [subjectId, setSubjectId] = useState('');
+  const [showNewSubjectForm, setShowNewSubjectForm] = useState(false);
+  const [newSubjectName, setNewSubjectName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  useEffect(() => {
+    if (!show) return;
+    const list = getSubjects();
+    setSubjects(list);
+    if (defaultSubjectId && defaultSubjectId !== 'unassigned') {
+      setSubjectId(defaultSubjectId);
+    } else if (list.length > 0) {
+      setSubjectId((prev) => prev || list[0].id);
+    } else {
+      setSubjectId('');
+    }
+  }, [show, defaultSubjectId]);
+
   if (!show) return null;
+
+  const handleCreateInlineSubject = () => {
+    if (!newSubjectName.trim()) return;
+    try {
+      const created = createSubject({ name: newSubjectName.trim(), description: '' });
+      setSubjects((prev) => [created, ...prev]);
+      setSubjectId(created.id);
+      setNewSubjectName('');
+      setShowNewSubjectForm(false);
+      showToast(
+        `${t('subject_modal.create_success', 'Đã tạo môn học')}: "${created.name}"`,
+        'success',
+        t('subject_modal.create_success_title', 'Tạo Môn Học Thành Công')
+      );
+    } catch (err) {
+      showToast(err.message, 'warning', t('course_modal.error', 'Lỗi'));
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -37,13 +77,32 @@ export default function CreateCourseModal({ show, onHide, onCourseCreated }) {
     setIsSubmitting(true);
 
     try {
+      const instructorVal = user?.name || user?.email || user?.userId || 'Instructor';
       const newCourse = await createCourse({
         title: title.trim(),
         description: description.trim(),
         prices: Number(price) || 0,
         price: Number(price) || 0,
-        instructor: user?.name || user?.email || user?.userId || 'Instructor',
+        instructor: instructorVal,
       });
+
+      let resolvedCourse = newCourse;
+      if (subjectId) {
+        // BE POST /course không trả về course.id, nên fetch lại danh sách để lấy ID thực từ DB và gán vào Môn học ở FE
+        const allCourses = await getCourses();
+        const matched = allCourses
+          .filter(
+            (c) =>
+              (c.title || '').trim().toLowerCase() === title.trim().toLowerCase() &&
+              (c.instructor || '').trim().toLowerCase() === instructorVal.trim().toLowerCase()
+          )
+          .sort((a, b) => new Date(b.creationTime || 0) - new Date(a.creationTime || 0))[0];
+
+        if (matched?.id) {
+          assignCourseToSubject(matched.id, subjectId);
+          resolvedCourse = matched;
+        }
+      }
 
       showToast(
         `${t('course_modal.create_success', 'Đã tạo thành công khóa học')}: "${newCourse.Title}"!`,
@@ -55,10 +114,12 @@ export default function CreateCourseModal({ show, onHide, onCourseCreated }) {
       setTitle('');
       setDescription('');
       setPrice('499000');
+      setShowNewSubjectForm(false);
+      setNewSubjectName('');
       onHide();
 
       if (typeof onCourseCreated === 'function') {
-        onCourseCreated(newCourse);
+        onCourseCreated(resolvedCourse);
       }
     } catch (err) {
       showToast(
@@ -102,6 +163,59 @@ export default function CreateCourseModal({ show, onHide, onCourseCreated }) {
               'Khởi tạo khóa học mới theo chuẩn bản quyền số DRM của SecureLearn. Sau khi tạo, bạn có thể thêm các Chương và tải lên video bài giảng.'
             )}
           </p>
+
+          {/* Môn học */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label htmlFor="courseSubject" className="block text-xs font-semibold text-slate-700 dark:text-slate-200">
+                {t('course_modal.subject_label', 'Thuộc Môn học')}
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowNewSubjectForm((prev) => !prev)}
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                <Plus className="h-3 w-3" />
+                <span>{showNewSubjectForm ? t('course_modal.cancel', 'Hủy') : t('course_modal.add_subject_inline', 'Tạo môn học mới')}</span>
+              </button>
+            </div>
+
+            {showNewSubjectForm ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={newSubjectName}
+                  onChange={(e) => setNewSubjectName(e.target.value)}
+                  placeholder={t('subject_modal.name_placeholder', 'Nhập tên môn học mới...')}
+                  className="flex-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3.5 py-2 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
+                />
+                <button
+                  type="button"
+                  disabled={!newSubjectName.trim()}
+                  onClick={handleCreateInlineSubject}
+                  className="rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-3.5 py-2 text-xs font-semibold text-white"
+                >
+                  {t('common.save', 'Lưu')}
+                </button>
+              </div>
+            ) : (
+              <select
+                id="courseSubject"
+                value={subjectId}
+                onChange={(e) => setSubjectId(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3.5 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-all"
+              >
+                <option value="">
+                  {t('course_modal.select_subject_optional', '-- Chưa phân môn học --')}
+                </option>
+                {subjects.map((sub) => (
+                  <option key={sub.id} value={sub.id}>
+                    {sub.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
 
           {/* Tiêu đề */}
           <div>
@@ -210,4 +324,5 @@ CreateCourseModal.propTypes = {
   show: PropTypes.bool.isRequired,
   onHide: PropTypes.func.isRequired,
   onCourseCreated: PropTypes.func,
+  defaultSubjectId: PropTypes.string,
 };

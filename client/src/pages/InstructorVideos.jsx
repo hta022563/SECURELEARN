@@ -34,6 +34,7 @@ import {
 } from '../services/courseService';
 import CreateCourseModal from '../components/CreateCourseModal';
 import ReuploadVideoModal from '../components/ReuploadVideoModal';
+import { getSubjectForCourse } from '../services/subjectService';
 
 /**
  * Helper format thời lượng từ giây sang mm:ss hoặc X phút
@@ -501,7 +502,7 @@ export default function InstructorVideos() {
               <div className="p-4 bg-blue-50/70 dark:bg-blue-950/30 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
                 <span className="inline-flex items-center gap-1 px-3 py-1 text-[11px] font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-950/60 rounded-full">
                   <ShieldCheck className="h-3 w-3 text-blue-600" />
-                  <span>DRM HLS Ready</span>
+                  <span>{getSubjectForCourse(course.ID)?.name || 'DRM HLS Ready'}</span>
                 </span>
                 <span className="text-[11px] font-mono text-slate-400">
                   {course.ID}

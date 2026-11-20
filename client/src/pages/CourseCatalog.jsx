@@ -5,238 +5,145 @@ import {
   Search,
   X,
   PlusCircle,
-  Calendar,
-  User,
-  Play,
-  Lock,
-  Info,
-  GraduationCap,
-  LogIn,
   BookOpen,
-  CreditCard,
-  CheckCircle2,
-  ExternalLink,
+  Layers,
+  ArrowRight,
+  Play,
+  Filter,
+  FolderPlus,
   Loader2,
-  RefreshCw,
+  Trash2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { getCourses } from '../services/courseService';
 import {
-  checkCourseAccess,
-  getEntitledCourseIds,
-  fetchMyEnrollments,
-  enrollInCourse,
-} from '../services/entitlementService';
-import { getCourses, searchCourses } from '../services/courseService';
+  groupCoursesBySubjects,
+  getCourseSubjectId,
+  deleteSubject,
+} from '../services/subjectService';
 import CreateCourseModal from '../components/CreateCourseModal';
+import CreateSubjectModal from '../components/CreateSubjectModal';
 
 /**
  * =============================================================================
- * PAGE: CourseCatalog (Danh Mục Khóa Học Toàn Diện - Pure Tailwind CSS)
+ * PAGE: CourseCatalog (Danh Mục Môn Học & Lọc Theo Khóa Học - FE Only)
  * =============================================================================
  */
 export default function CourseCatalog() {
   const { lang } = useParams();
+  const currentLang = lang || 'vi';
   const { t } = useTranslation();
-  const { showToast } = useToast();
-  const [courseList, setCourseList] = useState([]);
-  const [enrolledCourseIds, setEnrolledCourseIds] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState('ALL'); // 'ALL' | 'ENTITLED' | 'UNENTITLED'
-  const [blockedModalCourse, setBlockedModalCourse] = useState(null);
-  const [isEnrolling, setIsEnrolling] = useState(false);
-  const [enrollmentPaymentInfo, setEnrollmentPaymentInfo] = useState(null);
-  const [enrollmentError, setEnrollmentError] = useState(null);
-  const [showCreateCourseModal, setShowCreateCourseModal] = useState(false);
-
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
+  const { showToast } = useToast();
 
-  useEffect(() => {
-    let isMounted = true;
-    const timer = setTimeout(() => {
-      const fetchPromise = searchTerm.trim()
-        ? searchCourses(searchTerm.trim())
-        : getCourses();
+  const [allCourses, setAllCourses] = useState([]);
+  const [subjectVersion, setSubjectVersion] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
 
-      fetchPromise
-        .then((data) => {
-          if (isMounted && Array.isArray(data)) {
-            setCourseList(data);
-          }
-        })
-        .catch((err) => {
-          console.warn('[CourseCatalog] Lỗi nạp khóa học:', err);
-          if (isMounted) setCourseList([]);
-        });
-    }, 300);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCourseFilter, setSelectedCourseFilter] = useState('');
 
-    return () => {
-      isMounted = false;
-      clearTimeout(timer);
-    };
-  }, [searchTerm]);
+  const [showCreateCourseModal, setShowCreateCourseModal] = useState(false);
+  const [showCreateSubjectModal, setShowCreateSubjectModal] = useState(false);
 
-  // Gọi API GET /api/v1/enrollment/me để kiểm tra quyền khóa học của học sinh đang đăng nhập
-  useEffect(() => {
-    let isMounted = true;
-    if (!isAuthenticated || !user) {
-      setEnrolledCourseIds([]);
-      return () => {
-        isMounted = false;
-      };
-    }
-
-    fetchMyEnrollments(user)
-      .then((res) => {
-        if (isMounted && res) {
-          setEnrolledCourseIds(res.courseIds || []);
-        }
-      })
-      .catch((err) => {
-        console.warn('[CourseCatalog] Lỗi kiểm tra enrollment/me:', err);
-        if (isMounted) setEnrolledCourseIds([]);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [isAuthenticated, user]);
-
-  // Danh sách ID các khóa học đã được cấp quyền cho người dùng hiện tại
-  const entitledIds = useMemo(() => {
-    return getEntitledCourseIds(user, courseList, enrolledCourseIds);
-  }, [user, courseList, enrolledCourseIds]);
-
-  // Lọc mềm theo từ khóa tìm kiếm và trạng thái quyền
-  const filteredCourses = courseList.filter((course) => {
-    const term = searchTerm.toLowerCase();
-    const courseId = course.ID || course.id;
-    const title = (course.Title || course.title || '').toLowerCase();
-    const desc = (course.Description || course.description || '').toLowerCase();
-    const matchesSearch = title.includes(term) || desc.includes(term);
-
-    if (!matchesSearch) return false;
-
-    const hasAccess = entitledIds.some((id) => String(id).toLowerCase() === String(courseId).toLowerCase());
-    if (filterType === 'ENTITLED') return hasAccess;
-    if (filterType === 'UNENTITLED') return !hasAccess;
-    return true;
-  });
-
-  // Xử lý khi nhấn vào khóa học
-  const handleCourseAction = (course) => {
-    const courseId = course.ID || course.id;
-    const access = checkCourseAccess(user, courseId, enrolledCourseIds);
-
-    if (access.hasAccess) {
-      if (user?.role === 'Instructor') {
-        navigate(`/${lang}/instructor/preview/${courseId}`);
-      } else {
-        navigate(`/${lang}/student/player/${courseId}`);
-      }
-    } else {
-      setEnrollmentPaymentInfo(null);
-      setEnrollmentError(null);
-      setBlockedModalCourse({
-        ...course,
-        ID: courseId,
-        reasonMessage: access.message,
-      });
-    }
-  };
-
-  // Gọi API /api/v1/enrollment/{id} để đăng ký và tạo thông tin thanh toán
-  const handleEnrollCourse = async (course) => {
-    if (!isAuthenticated || !user) {
-      setBlockedModalCourse(null);
-      navigate(`/${lang}/login`);
-      return;
-    }
-
-    const courseId = course?.ID || course?.id;
-    if (!courseId) return;
-
-    setIsEnrolling(true);
-    setEnrollmentError(null);
-
+  const loadCourses = async () => {
+    setIsLoading(true);
     try {
-      const result = await enrollInCourse(courseId, user);
-      const refreshed = await fetchMyEnrollments(user);
-      const updatedIds = refreshed.courseIds || [];
-      setEnrolledCourseIds(updatedIds);
-
-      // Nếu Backend trả về URL cổng thanh toán trực tiếp thì điều hướng sang trang thanh toán
-      if (result.paymentUrl && !result.qrCode) {
-        window.location.href = result.paymentUrl;
-        return;
-      }
-
-      const isNowEnrolled = updatedIds.some(
-        (id) => String(id).toLowerCase() === String(courseId).toLowerCase()
-      );
-
-      if (isNowEnrolled && !result.paymentUrl && !result.qrCode) {
-        if (showToast) {
-          showToast(
-            `Đăng ký khóa học "${course.Title || course.title}" thành công!`,
-            'success',
-            'Đăng Ký Thành Công'
-          );
-        }
-        setBlockedModalCourse(null);
-        navigate(`/${lang}/student/player/${courseId}`);
-        return;
-      }
-
-      setEnrollmentPaymentInfo({
-        ...result,
-        courseId,
-        isNowEnrolled,
-      });
+      const coursesData = await getCourses();
+      setAllCourses(Array.isArray(coursesData) ? coursesData : []);
     } catch (err) {
-      console.error('[CourseCatalog] Lỗi gọi /api/v1/enrollment/{id}:', err);
-      setEnrollmentError(
-        err?.response?.data?.error ||
-          err?.response?.data?.message ||
-          err?.message ||
-          'Không thể tạo thông tin đăng ký/thanh toán cho khóa học này.'
-      );
+      console.warn('[CourseCatalog] Lỗi nạp khóa học:', err);
+      setAllCourses([]);
     } finally {
-      setIsEnrolling(false);
+      setIsLoading(false);
     }
   };
 
-  // Kiểm tra lại quyền từ GET /api/v1/enrollment/me sau khi thanh toán
-  const handleVerifyEnrollment = async (courseId) => {
-    setIsEnrolling(true);
-    setEnrollmentError(null);
-    try {
-      const refreshed = await fetchMyEnrollments(user);
-      const updatedIds = refreshed.courseIds || [];
-      setEnrolledCourseIds(updatedIds);
+  useEffect(() => {
+    loadCourses();
+  }, []);
 
-      const hasAccessNow = updatedIds.some(
-        (id) => String(id).toLowerCase() === String(courseId).toLowerCase()
-      );
-      if (hasAccessNow) {
-        if (showToast) {
-          showToast('Đã xác nhận quyền học tập thành công!', 'success', 'Hoàn Tất Đăng Ký');
-        }
-        setBlockedModalCourse(null);
-        setEnrollmentPaymentInfo(null);
-        navigate(`/${lang}/student/player/${courseId}`);
-      } else {
-        setEnrollmentError(
-          'Hệ thống chưa ghi nhận hoàn tất thanh toán cho khóa học này. Vui lòng hoàn tất thanh toán rồi thử lại.'
+  const displaySubjects = useMemo(() => {
+    return groupCoursesBySubjects(allCourses, {
+      name: t('catalog.unassigned_subject', 'Khóa học chưa phân môn'),
+      description: t(
+        'catalog.unassigned_subject_desc',
+        'Các khóa học hiện chưa được gán vào môn học cụ thể.'
+      ),
+    });
+  }, [allCourses, subjectVersion, t]);
+
+  const filteredSubjects = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+
+    return displaySubjects.filter((subject) => {
+      const subjectCourses = subject.courses || [];
+
+      if (selectedCourseFilter) {
+        const hasSelectedCourse = subjectCourses.some(
+          (c) => String(c.id || c.ID) === String(selectedCourseFilter)
         );
+        if (!hasSelectedCourse) return false;
       }
-    } catch (err) {
-      setEnrollmentError(err?.message || 'Không thể kiểm tra trạng thái đăng ký.');
-    } finally {
-      setIsEnrolling(false);
+
+      if (!term) return true;
+
+      const matchSubject =
+        (subject.name || '').toLowerCase().includes(term) ||
+        (subject.description || '').toLowerCase().includes(term);
+
+      const matchCourse = subjectCourses.some(
+        (c) =>
+          (c.title || c.Title || '').toLowerCase().includes(term) ||
+          (c.description || c.Description || '').toLowerCase().includes(term) ||
+          (c.instructor || c.Instructor || '').toLowerCase().includes(term)
+      );
+
+      return matchSubject || matchCourse;
+    });
+  }, [displaySubjects, searchTerm, selectedCourseFilter]);
+
+  const handleOpenSubject = (subjectId, courseId = '') => {
+    const query = courseId ? `?courseId=${encodeURIComponent(courseId)}` : '';
+    navigate(`/${currentLang}/catalog/subject/${subjectId}${query}`);
+  };
+
+  const handleDeleteSubject = (e, subject) => {
+    e.stopPropagation();
+    if (
+      window.confirm(
+        `${t('catalog.delete_subject_confirm', 'Bạn có chắc muốn xóa môn học')} "${subject.name}"?`
+      )
+    ) {
+      deleteSubject(subject.id);
+      setSubjectVersion((v) => v + 1);
+      showToast(
+        `${t('catalog.deleted_subject', 'Đã xóa môn học')}: "${subject.name}"`,
+        'info',
+        t('instructor.deleted', 'Đã Xóa')
+      );
     }
   };
+
+  const selectedCourseObj = useMemo(() => {
+    if (!selectedCourseFilter) return null;
+    const found = allCourses.find(
+      (c) => String(c.id || c.ID) === String(selectedCourseFilter)
+    );
+    if (!found) return null;
+    const subId = getCourseSubjectId(found.id || found.ID) || 'unassigned';
+    const subObj = displaySubjects.find((s) => String(s.id) === String(subId));
+    return {
+      ...found,
+      subjectId: subId,
+      subjectName: subObj?.name || '',
+    };
+  }, [allCourses, selectedCourseFilter, displaySubjects]);
+
+  const canManage =
+    isAuthenticated && (user?.role === 'Instructor' || user?.role === 'Administrator');
 
   return (
     <div className="py-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -249,21 +156,26 @@ export default function CourseCatalog() {
           </span>
         </h1>
         <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed">
-          {t('catalog.subtitle')}
+          {t(
+            'catalog.subjects_subtitle',
+            'Chọn môn học để khám phá toàn bộ bài giảng và lọc nhanh theo từng khóa học.'
+          )}
         </p>
       </div>
 
-      {/* 2. BỘ TÌM KIẾM ĐỘNG & BỘ LỌC QUYỀN TRUY CẬP */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-5 shadow-sm border border-slate-200/80 dark:border-slate-800 mb-8">
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-          {/* Ô tìm kiếm */}
+      {/* 2. BỘ TÌM KIẾM & LỌC THEO KHÓA HỌC */}
+      <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-5 shadow-sm border border-slate-200/80 dark:border-slate-800 mb-8 space-y-4">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
           <div className="relative flex-1">
             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
               <Search className="h-4 w-4" />
             </div>
             <input
               type="text"
-              placeholder={t('catalog.search_placeholder')}
+              placeholder={t(
+                'catalog.search_subject_or_course_placeholder',
+                'Tìm kiếm theo tên môn học hoặc tên khóa học...'
+              )}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-10 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
@@ -279,9 +191,42 @@ export default function CourseCatalog() {
             )}
           </div>
 
-          {/* Bộ nút lọc & Thêm khóa học */}
-          <div className="flex flex-wrap items-center gap-2">
-            {isAuthenticated && (user?.role === 'Instructor' || user?.role === 'Administrator') && (
+          <div className="flex items-center gap-2 min-w-[240px]">
+            <Filter className="h-4 w-4 text-slate-400 shrink-0" />
+            <select
+              value={selectedCourseFilter}
+              onChange={(e) => setSelectedCourseFilter(e.target.value)}
+              aria-label={t('catalog.filter_by_course', 'Lọc theo khóa học')}
+              className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60 px-3.5 py-2.5 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+            >
+              <option value="">
+                {t('catalog.all_courses_filter', 'Lọc theo khóa học: Tất cả')} ({allCourses.length})
+              </option>
+              {allCourses.map((course) => {
+                const subId = getCourseSubjectId(course.id || course.ID);
+                const subName = subId
+                  ? displaySubjects.find((s) => String(s.id) === String(subId))?.name
+                  : null;
+                return (
+                  <option key={course.id || course.ID} value={course.id || course.ID}>
+                    {course.title}
+                    {subName ? ` — ${subName}` : ''}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+
+          {canManage && (
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowCreateSubjectModal(true)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-blue-600/30 bg-blue-50/60 dark:bg-blue-950/40 hover:bg-blue-100 px-4 py-2 text-xs font-semibold text-blue-600 dark:text-blue-400 transition-all cursor-pointer"
+              >
+                <FolderPlus className="h-3.5 w-3.5" />
+                <span>{t('catalog.add_subject', 'Thêm Môn Học')}</span>
+              </button>
               <button
                 type="button"
                 onClick={() => setShowCreateCourseModal(true)}
@@ -290,182 +235,189 @@ export default function CourseCatalog() {
                 <PlusCircle className="h-3.5 w-3.5" />
                 <span>{t('catalog.add_course')}</span>
               </button>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setFilterType('ALL')}
-              className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all ${
-                filterType === 'ALL'
-                  ? 'bg-slate-900 dark:bg-blue-600 text-white shadow-xs'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
-            >
-              {t('catalog.filter_all')} ({courseList.length})
-            </button>
-
-            {isAuthenticated && user?.role === 'Student' && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setFilterType('ENTITLED')}
-                  className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all ${
-                    filterType === 'ENTITLED'
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100'
-                  }`}
-                >
-                  {t('catalog.filter_entitled')} ({entitledIds.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFilterType('UNENTITLED')}
-                  className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all ${
-                    filterType === 'UNENTITLED'
-                      ? 'bg-slate-600 text-white shadow-xs'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
-                  }`}
-                >
-                  {t('catalog.filter_unentitled')} ({Math.max(0, courseList.length - entitledIds.length)})
-                </button>
-              </>
-            )}
-          </div>
+            </div>
+          )}
         </div>
+
+        {selectedCourseObj && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/70 dark:border-blue-800/70 text-xs">
+            <div>
+              <span className="text-slate-500 dark:text-slate-400">
+                {t('catalog.filtering_course', 'Đang lọc khóa học:')}{' '}
+              </span>
+              <strong className="text-slate-900 dark:text-white">{selectedCourseObj.title}</strong>
+              {selectedCourseObj.subjectName && (
+                <span className="text-blue-600 dark:text-blue-400 ml-1.5">
+                  ({selectedCourseObj.subjectName})
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  handleOpenSubject(
+                    selectedCourseObj.subjectId,
+                    selectedCourseObj.id || selectedCourseObj.ID
+                  )
+                }
+                className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 px-4 py-1.5 text-xs font-semibold text-white shadow-xs cursor-pointer"
+              >
+                <Play className="h-3 w-3 fill-white" />
+                <span>{t('catalog.view_course_lectures', 'Xem bài giảng của khóa học này')}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedCourseFilter('')}
+                className="rounded-full px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-800 cursor-pointer"
+              >
+                {t('catalog.clear_filter')}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* 3. LƯỚI KHÓA HỌC */}
-      {filteredCourses.length === 0 ? (
+      {/* 3. DANH SÁCH MÔN HỌC */}
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center py-20">
+          <Loader2 className="h-10 w-10 text-blue-600 animate-spin mb-3" />
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            {t('common.loading', 'Đang nạp...')}
+          </p>
+        </div>
+      ) : filteredSubjects.length === 0 ? (
         <div className="text-center py-16 px-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
           <BookOpen className="h-12 w-12 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
           <h5 className="text-lg font-bold text-slate-900 dark:text-white mb-2">
-            {t('catalog.no_results')}
+            {t('catalog.no_subjects', 'Không tìm thấy môn học nào phù hợp')}
           </h5>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-6">
             {t('catalog.no_results_desc')}
           </p>
-          <button
-            type="button"
-            onClick={() => {
-              setSearchTerm('');
-              setFilterType('ALL');
-            }}
-            className="inline-flex items-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 px-5 py-2.5 text-xs font-semibold text-white shadow-xs"
-          >
-            {t('catalog.clear_filter')}
-          </button>
+          {(searchTerm || selectedCourseFilter) && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchTerm('');
+                setSelectedCourseFilter('');
+              }}
+              className="inline-flex items-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 px-5 py-2.5 text-xs font-semibold text-white shadow-xs"
+            >
+              {t('catalog.clear_filter')}
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-          {filteredCourses.map((course) => {
-            const cId = course.ID || course.id;
-            const title = course.Title || course.title || 'Khóa học';
-            const desc = course.Description || course.description || '';
-            const instructorName = course.Instructor || course.instructor || course.Owner || course.owner;
-            const isEntitled = entitledIds.some(
-              (id) => String(id).toLowerCase() === String(cId).toLowerCase()
+          {filteredSubjects.map((subject) => {
+            const subjectCourses = subject.courses || [];
+            const term = searchTerm.trim().toLowerCase();
+            const matchingCourses = selectedCourseFilter
+              ? subjectCourses.filter(
+                  (c) => String(c.id || c.ID) === String(selectedCourseFilter)
+                )
+              : term
+              ? subjectCourses.filter((c) =>
+                  (c.title || c.Title || '').toLowerCase().includes(term)
+                )
+              : subjectCourses;
+            const previewCourses = (matchingCourses.length > 0 ? matchingCourses : subjectCourses).slice(
+              0,
+              3
             );
 
             return (
               <div
-                key={cId}
-                onClick={() => handleCourseAction(course)}
+                key={subject.id}
+                onClick={() => handleOpenSubject(subject.id, selectedCourseFilter || '')}
                 className="group flex flex-col rounded-3xl overflow-hidden bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 cursor-pointer"
               >
-                {/* Header Thẻ Khóa học */}
-                <div
-                  className={`p-5 border-b border-slate-100 dark:border-slate-800 flex flex-col justify-between ${
-                    isEntitled
-                      ? 'bg-blue-50/70 dark:bg-blue-950/30'
-                      : 'bg-slate-50/70 dark:bg-slate-850'
-                  }`}
-                  style={{ minHeight: '120px' }}
-                >
-                  <div className="flex items-center justify-between">
-                    {isEntitled ? (
-                      <span className="inline-flex items-center gap-1 px-3 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/60 rounded-full shadow-xs">
-                        {t('catalog.entitled')}
+                {/* Header thẻ Môn học */}
+                <div className="p-5 bg-gradient-to-br from-blue-50/80 to-indigo-50/50 dark:from-blue-950/40 dark:to-slate-900 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 text-white shrink-0 shadow-xs">
+                      <BookOpen className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                        {t('catalog.subject_badge', 'Môn học')}
                       </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold text-slate-600 dark:text-slate-400 bg-slate-200/70 dark:bg-slate-800 rounded-full">
-                        {t('catalog.not_entitled')}
-                      </span>
-                    )}
-                    <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500">
-                      {cId}
-                    </span>
+                      <h3 className="font-bold text-base text-slate-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                        {subject.name}
+                      </h3>
+                    </div>
                   </div>
 
-                  {(course["Creation Time"] || course.createdAt || course.creation_time) && (
-                    <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 mt-3">
-                      <Calendar className="h-3 w-3" />
-                      <span>
-                        {t('catalog.created_at')}{' '}
-                        {(course["Creation Time"] || course.createdAt || course.creation_time).split('T')[0]}
-                      </span>
-                    </div>
+                  {canManage && !subject.isVirtual && (
+                    <button
+                      type="button"
+                      title={t('catalog.delete_subject', 'Xóa môn học')}
+                      onClick={(e) => handleDeleteSubject(e, subject)}
+                      className="p-1.5 rounded-full text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors shrink-0"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   )}
                 </div>
 
-                {/* Nội dung Thẻ */}
+                {/* Nội dung thẻ */}
                 <div className="p-5 flex flex-col flex-1">
-                  <h3
-                    className="font-bold text-base text-slate-900 dark:text-white mb-2 line-clamp-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors"
-                    title={title}
-                  >
-                    {title}
-                  </h3>
-
-                  <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-3 mb-4 flex-1 leading-relaxed">
-                    {desc}
+                  <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mb-4 leading-relaxed">
+                    {subject.description ||
+                      t(
+                        'catalog.default_subject_desc',
+                        'Khám phá các khóa học và bài giảng thuộc môn học này.'
+                      )}
                   </p>
 
-                  {/* Giảng viên */}
-                  {instructorName && (
-                    <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mb-4 pt-3 border-t border-slate-100 dark:border-slate-800">
-                      <User className="h-3.5 w-3.5 text-blue-500" />
-                      <span>{instructorName}</span>
+                  {/* Thống kê */}
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-semibold">
+                      <Layers className="h-3 w-3 text-blue-500" />
+                      <span>
+                        {subject.courseCount} {t('subject_lectures.courses_label', 'khóa học')}
+                      </span>
+                    </span>
+                  </div>
+
+                  {/* Danh sách các Khóa học thuộc môn */}
+                  {previewCourses.length > 0 && (
+                    <div className="mb-4 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-1.5 flex-1">
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        {t('catalog.courses_in_subject', 'Khóa học thuộc môn:')}
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {previewCourses.map((c) => (
+                          <button
+                            key={c.id || c.ID}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenSubject(subject.id, c.id || c.ID);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-blue-100 dark:hover:bg-blue-900/50 px-2.5 py-1 text-[11px] font-medium text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+                          >
+                            <span className="truncate max-w-[160px]">{c.title}</span>
+                          </button>
+                        ))}
+                        {subjectCourses.length > previewCourses.length && !selectedCourseFilter && (
+                          <span className="inline-flex items-center px-2 py-1 text-[11px] text-slate-400">
+                            +{subjectCourses.length - previewCourses.length}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   )}
 
-                  {/* Học phí & Nút hành động */}
-                  <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800 mt-auto">
-                    <div>
-                      <span className="block text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
-                        {t('catalog.tuition')}
-                      </span>
-                      <span className="text-base font-extrabold text-blue-600 dark:text-blue-400">
-                        {course.Price === 0
-                          ? t('catalog.free')
-                          : `${course.Price?.toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US')} ${lang === 'vi' ? 'đ' : 'VND'}`}
-                      </span>
-                    </div>
-
-                    {isEntitled ? (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCourseAction(course);
-                        }}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 px-4 py-2 text-xs font-semibold text-white shadow-xs transition-all cursor-pointer"
-                      >
-                        <Play className="h-3.5 w-3.5 fill-white" />
-                        <span>{t('catalog.start_learning')}</span>
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCourseAction(course);
-                        }}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-amber-500 hover:bg-amber-600 px-4 py-2 text-xs font-semibold text-white shadow-xs transition-all cursor-pointer"
-                      >
-                        <CreditCard className="h-3.5 w-3.5" />
-                        <span>{lang === 'en' ? 'Enroll Now' : 'Đăng Ký Học'}</span>
-                      </button>
-                    )}
+                  {/* Footer CTA */}
+                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800 mt-auto flex items-center justify-between">
+                    <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">
+                      {t('catalog.enter_subject', 'Vào xem bài giảng')}
+                    </span>
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                      <ArrowRight className="h-4 w-4" />
+                    </span>
                   </div>
                 </div>
               </div>
@@ -474,200 +426,22 @@ export default function CourseCatalog() {
         </div>
       )}
 
-      {/* 4. MODAL ĐĂNG KÝ KHÓA HỌC & THÔNG TIN THANH TOÁN (/api/v1/enrollment/{id}) */}
-      {Boolean(blockedModalCourse) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="relative w-full max-w-md overflow-hidden rounded-3xl bg-white dark:bg-slate-900 p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2 text-amber-500">
-                <Lock className="h-5 w-5" />
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  {enrollmentPaymentInfo
-                    ? lang === 'en'
-                      ? 'Course Payment Information'
-                      : 'Thông Tin Thanh Toán Khóa Học'
-                    : t('catalog.modal_denied_title')}
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setBlockedModalCourse(null);
-                  setEnrollmentPaymentInfo(null);
-                  setEnrollmentError(null);
-                }}
-                className="rounded-full p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-2xl text-xs flex items-center justify-between gap-2">
-              <div>
-                <div className="font-bold text-amber-800 dark:text-amber-200">
-                  {blockedModalCourse?.Title || blockedModalCourse?.title}
-                </div>
-                <small className="text-amber-700/70 font-mono">ID: {blockedModalCourse?.ID}</small>
-              </div>
-              <div className="text-right shrink-0">
-                <span className="block text-[10px] text-amber-700/70 uppercase">Học phí</span>
-                <span className="font-extrabold text-sm text-blue-600 dark:text-blue-400">
-                  {blockedModalCourse?.Price === 0
-                    ? t('catalog.free')
-                    : `${blockedModalCourse?.Price?.toLocaleString('vi-VN')} đ`}
-                </span>
-              </div>
-            </div>
-
-            {enrollmentError && (
-              <div className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-2xl text-xs text-rose-700 dark:text-rose-300">
-                {enrollmentError}
-              </div>
-            )}
-
-            {enrollmentPaymentInfo ? (
-              <div className="space-y-3 text-xs">
-                <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-2xl text-emerald-800 dark:text-emerald-200 flex items-start gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <div>
-                    <div className="font-bold mb-0.5">{enrollmentPaymentInfo.message}</div>
-                    <p className="text-[11px] opacity-90">
-                      Vui lòng hoàn tất thanh toán theo thông tin bên dưới để kích hoạt quyền học tập.
-                    </p>
-                  </div>
-                </div>
-
-                {enrollmentPaymentInfo.qrCode && (
-                  <div className="flex flex-col items-center justify-center p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700">
-                    <img
-                      src={enrollmentPaymentInfo.qrCode}
-                      alt="QR Thanh Toán"
-                      className="max-w-[200px] rounded-xl shadow-xs mb-2"
-                    />
-                    <span className="text-[11px] text-slate-500">Quét mã QR để thanh toán</span>
-                  </div>
-                )}
-
-                {enrollmentPaymentInfo.raw &&
-                  typeof enrollmentPaymentInfo.raw === 'object' && (
-                    <div className="p-3.5 bg-slate-50 dark:bg-slate-800/70 rounded-2xl border border-slate-200/80 dark:border-slate-700 space-y-1.5">
-                      {Object.entries(enrollmentPaymentInfo.raw)
-                        .filter(
-                          ([key, val]) =>
-                            val !== null &&
-                            val !== undefined &&
-                            typeof val !== 'object' &&
-                            !['qrCode', 'qrDataURL', 'qrUrl', 'qrImage', 'paymentUrl', 'checkoutUrl'].includes(key)
-                        )
-                        .map(([key, val]) => (
-                          <div key={key} className="flex justify-between gap-2 text-xs">
-                            <span className="text-slate-500 capitalize">{key}:</span>
-                            <span className="font-semibold text-slate-900 dark:text-white break-all text-right">
-                              {String(val)}
-                            </span>
-                          </div>
-                        ))}
-                    </div>
-                  )}
-
-                {enrollmentPaymentInfo.paymentUrl && (
-                  <a
-                    href={enrollmentPaymentInfo.paymentUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 hover:bg-blue-700 px-4 py-2.5 text-xs font-semibold text-white no-underline shadow-xs"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    <span>Mở Trang Cổng Thanh Toán</span>
-                  </a>
-                )}
-              </div>
-            ) : (
-              <>
-                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                  {t('catalog.modal_denied_desc')}
-                </p>
-
-                <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300 flex items-start gap-2">
-                  <Info className="h-4 w-4 text-blue-500 flex-shrink-0 mt-0.5" />
-                  <span>{t('catalog.modal_denied_policy')}</span>
-                </div>
-              </>
-            )}
-
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800 flex-wrap">
-              <button
-                type="button"
-                onClick={() => {
-                  setBlockedModalCourse(null);
-                  setEnrollmentPaymentInfo(null);
-                  setEnrollmentError(null);
-                }}
-                className="rounded-full border border-slate-200 dark:border-slate-700 px-4 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
-              >
-                {t('common.close')}
-              </button>
-
-              {isAuthenticated ? (
-                enrollmentPaymentInfo ? (
-                  <button
-                    type="button"
-                    disabled={isEnrolling}
-                    onClick={() => handleVerifyEnrollment(blockedModalCourse?.ID)}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 px-5 py-1.5 text-xs font-semibold text-white shadow-xs cursor-pointer"
-                  >
-                    {isEnrolling ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-4 w-4" />
-                    )}
-                    <span>Kiểm Tra Quyền & Vào Học</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    disabled={isEnrolling}
-                    onClick={() => handleEnrollCourse(blockedModalCourse)}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 px-5 py-1.5 text-xs font-semibold text-white shadow-xs cursor-pointer"
-                  >
-                    {isEnrolling ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <CreditCard className="h-4 w-4" />
-                    )}
-                    <span>
-                      {isEnrolling
-                        ? 'Đang tạo thanh toán...'
-                        : lang === 'en'
-                        ? 'Enroll & Pay Now'
-                        : 'Đăng Ký Khóa Học'}
-                    </span>
-                  </button>
-                )
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setBlockedModalCourse(null);
-                    navigate(`/${lang}/login`);
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 px-5 py-1.5 text-xs font-semibold text-white shadow-xs cursor-pointer"
-                >
-                  <LogIn className="h-4 w-4" />
-                  <span>{t('common.login')}</span>
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* MODAL TẠO MÔN HỌC MỚI */}
+      <CreateSubjectModal
+        show={showCreateSubjectModal}
+        onHide={() => setShowCreateSubjectModal(false)}
+        onSubjectCreated={() => {
+          setSubjectVersion((v) => v + 1);
+        }}
+      />
 
       {/* MODAL TẠO KHÓA HỌC MỚI */}
       <CreateCourseModal
         show={showCreateCourseModal}
         onHide={() => setShowCreateCourseModal(false)}
-        onCourseCreated={(newCourse) => {
-          setCourseList((prev) => [newCourse, ...prev]);
+        onCourseCreated={() => {
+          loadCourses();
+          setSubjectVersion((v) => v + 1);
         }}
       />
     </div>
