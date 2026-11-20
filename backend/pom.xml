@@ -47,6 +47,11 @@
                     <artifactId>spring-boot-starter-oauth2-client</artifactId>
                 </dependency>
                 <dependency>
+                    <groupId>com.amazonaws.serverless</groupId>
+                    <artifactId>aws-serverless-java-container-springboot4</artifactId>
+                    <version>3.0.5</version>
+                </dependency>
+                <dependency>
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
                 </dependency>
@@ -56,6 +61,8 @@
                 </dependency>
                 <dependency>
                      <groupId>org.springframework.boot</groupId>
+                    <!-- Tomcat stays for local runs (docker-compose / java -jar);
+                         the Lambda zip leaves it out in src/assembly/lambda-package.xml -->
                     <artifactId>spring-boot-starter-web</artifactId>
                 </dependency>
                 <dependency>
@@ -107,9 +114,52 @@
         
 	<build>
 		<plugins>
+			<!--
+			  Lambda packaging: target/lib gets every runtime jar unchanged, then the
+			  assembly zips classes + lib/ into target/SecureLearn-<version>-lambda-package.zip,
+			  which template.yaml deploys. Jars are kept separate instead of shaded into one,
+			  because shading overwrites the per-jar Spring Boot auto-configuration lists.
+			-->
+			<!-- Local runnable jar (target/SecureLearn-*.jar) used by the backend Dockerfile -->
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-dependency-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>copy-dependencies</id>
+						<phase>package</phase>
+						<goals>
+							<goal>copy-dependencies</goal>
+						</goals>
+						<configuration>
+							<includeScope>runtime</includeScope>
+							<outputDirectory>${project.build.directory}/lib</outputDirectory>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-assembly-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>lambda-package</id>
+						<phase>package</phase>
+						<goals>
+							<goal>single</goal>
+						</goals>
+						<configuration>
+							<appendAssemblyId>true</appendAssemblyId>
+							<descriptors>
+								<descriptor>src/assembly/lambda-package.xml</descriptor>
+							</descriptors>
+						</configuration>
+					</execution>
+				</executions>
 			</plugin>
 		</plugins>
 	</build>

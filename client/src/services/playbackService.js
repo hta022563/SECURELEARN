@@ -1,4 +1,5 @@
 import apiClient from '../api/axiosClient.js';
+import { LOCAL_API_URL } from '../api/apiConfig.js';
 
 /**
  * =============================================================================
@@ -82,7 +83,8 @@ export async function getLessonPlayback(lessonId) {
  * @returns {string} URL manifest hoàn chỉnh
  */
 export function buildManifestUrl(lessonId, token) {
-  const baseUrl = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || 'http://localhost:8080/api/v1';
+  // Playback still runs on the local backend (see api/apiConfig.js)
+  const baseUrl = LOCAL_API_URL;
   return `${baseUrl}/lesson/${lessonId}/manifest?token=${encodeURIComponent(token)}`;
 }
 

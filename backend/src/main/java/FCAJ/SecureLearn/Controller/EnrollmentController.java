@@ -5,6 +5,7 @@ import FCAJ.SecureLearn.Response.EnrollmentLockResponse;
 import FCAJ.SecureLearn.Service.AuthService;
 import FCAJ.SecureLearn.Service.EnrollmentService;
 import java.util.List;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/v1/enrollment")
+@Profile("course")
 public class EnrollmentController {
     private final EnrollmentService enrollmentService;
     private final AuthService authService;

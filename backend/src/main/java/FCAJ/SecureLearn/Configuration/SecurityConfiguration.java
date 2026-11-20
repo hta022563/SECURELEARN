@@ -121,9 +121,10 @@ public class SecurityConfiguration {
                 .requestMatchers(HttpMethod.DELETE, "/api/v1/lesson/{id}").hasAnyRole("INSTRUCTOR", "ADMIN")
 
                 //Rules 16: user management - ADMIN only
-                .requestMatchers(HttpMethod.POST, "/api/v1/admin").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/api/v1/admin").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.GET, "/api/v1/admin").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/v1/admin/register").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/v1/admin/update").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/api/v1/admin/delete").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/v1/admin/user").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/v1/enrollment/me").hasRole("STUDENT")
                 // Rule 16: catch-all — any other /api/** requires authentication
                 .requestMatchers(HttpMethod.POST,"/api/momo/ipn").permitAll()

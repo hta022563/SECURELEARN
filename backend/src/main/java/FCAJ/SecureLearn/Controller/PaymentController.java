@@ -7,6 +7,7 @@ import FCAJ.SecureLearn.Service.MomoService;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
  * @author ngoct
  */
 @RestController
+@Profile("payment")
 public class PaymentController {
 
     private final MomoService momoService;

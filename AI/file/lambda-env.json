@@ -1,0 +1,17 @@
+{
+  "Variables": {
+    "R2_SECRET_ID": "securelearn/r2-model-reader",
+    "R2_BUCKET": "securelearn-models",
+    "MODEL_KEY": "models/isolation_forest_securelearn_v1.pkl",
+    "ACCESS_LOG_TABLE": "AccessLog",
+    "ACCESS_LOG_INDEX": "LogInADay",
+    "LOG_TIMEZONE": "UTC",
+    "ALERT_TABLE": "AnomalyAlert",
+    "SNS_TOPIC_ARN": "arn:aws:sns:ap-southeast-1:572805506601:securelearn-anomaly-alerts",
+    "LOOKBACK_MINUTES": "5",
+    "WINDOW_SIZE": "50",
+    "MIN_REQUESTS": "10",
+    "SCORE_THRESHOLD": "0",
+    "DEDUP_MINUTES": "30"
+  }
+}

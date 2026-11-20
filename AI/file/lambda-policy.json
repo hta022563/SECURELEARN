@@ -1,0 +1,29 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadAccessLog",
+      "Effect": "Allow",
+      "Action": "dynamodb:Query",
+      "Resource": "arn:aws:dynamodb:ap-southeast-1:572805506601:table/AccessLog/index/LogInADay"
+    },
+    {
+      "Sid": "WriteAlerts",
+      "Effect": "Allow",
+      "Action": ["dynamodb:Query", "dynamodb:PutItem"],
+      "Resource": "arn:aws:dynamodb:ap-southeast-1:572805506601:table/AnomalyAlert"
+    },
+    {
+      "Sid": "SendAlertEmail",
+      "Effect": "Allow",
+      "Action": "sns:Publish",
+      "Resource": "arn:aws:sns:ap-southeast-1:572805506601:securelearn-anomaly-alerts"
+    },
+    {
+      "Sid": "ReadR2Credentials",
+      "Effect": "Allow",
+      "Action": "secretsmanager:GetSecretValue",
+      "Resource": "arn:aws:secretsmanager:ap-southeast-1:572805506601:secret:securelearn/r2-model-reader-*"
+    }
+  ]
+}

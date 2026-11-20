@@ -1,0 +1,292 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  SecureLearn backend on AWS Lambda. The same Spring Boot package is deployed as one
+  function per permission group; each group gets its own IAM role, its own secrets and
+  its own API routes. Account is always deployed; every other group has its own
+  Enable<Group> switch so groups can go live one at a time.
+
+# ---------------------------------------------------------------------------
+# Before the first deploy, create the secrets this template reads (region ap-southeast-1):
+#   securelearn/cognito    {"COGNITO_CLIENT_SECRET": "..."}   (account, admin)
+# Needed only when the group that reads them is switched on:
+#   securelearn/database   {"SPRING_DATASOURCE_URL": "...", "SPRING_DATASOURCE_USERNAME": "...", "SPRING_DATASOURCE_PASSWORD": "..."}
+#   securelearn/r2-read    {"R2_ACCESS_KEY": "...", "R2_SECRET_ACCESS_KEY": "..."}   (Cloudflare token, read-only)
+#   securelearn/r2-write   {"R2_ACCESS_KEY": "...", "R2_SECRET_ACCESS_KEY": "..."}   (Cloudflare token, read/write)
+#   securelearn/playback   {"PLAYBACK_TOKEN_SECRET": "..."}
+#   securelearn/momo       {"MOMO_PARTNER_CODE": "...", "MOMO_ACCESS_KEY": "...", "MOMO_SECRET_KEY": "..."}
+# The values are resolved by CloudFormation at deploy time, so re-deploy after rotating one.
+# ---------------------------------------------------------------------------
+
+Parameters:
+  # One switch per group. A group's routes only exist in API Gateway while it is on.
+  EnableAdmin:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'true'
+    Description: /api/v1/admin/* (Cognito only, no database)
+  EnableCourse:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'false'
+    Description: courses, chapters, lessons, /enrollment/me (needs securelearn/database)
+  EnablePlayback:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'false'
+    Description: /lesson/{id}/... (needs database, r2-read, playback secrets)
+  EnablePayment:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'false'
+    Description: MoMo checkout + IPN (needs database, momo secrets)
+  EnableUpload:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'false'
+    Description: /api/v1/upload/* (needs database, r2-write secrets; no ffmpeg on Lambda yet)
+  CognitoPoolId:
+    Type: String
+    Default: ap-southeast-1_ocn23tg3K
+  CorsAllowedOrigins:
+    Type: String
+    Default: http://localhost:5173
+  MomoUrl:
+    Type: String
+    Default: https://test-payment.momo.vn
+
+Conditions:
+  AdminOn:    !Equals [!Ref EnableAdmin, 'true']
+  CourseOn:   !Equals [!Ref EnableCourse, 'true']
+  PlaybackOn: !Equals [!Ref EnablePlayback, 'true']
+  PaymentOn:  !Equals [!Ref EnablePayment, 'true']
+  UploadOn:   !Equals [!Ref EnableUpload, 'true']
+
+Globals:
+  Function:
+    CodeUri: s3://securelearn-fcaj-2026/SecureLearn-0.0.1-SNAPSHOT-lambda-packagev3.zip
+    # The adapter's own handler: starts SecureLearnApplication (MAIN_CLASS) and turns each
+    # API Gateway event into an HttpServletRequest for the controllers.
+    Handler: com.amazonaws.serverless.proxy.spring.SpringDelegatingLambdaContainerHandler::handleRequest
+    Runtime: java25
+    Architectures: [arm64]
+    MemorySize: 2048
+    Timeout: 30
+    AutoPublishAlias: live
+    # Without this, a new version (what the API actually calls) is published only when the
+    # code location changes, so parameter/env-only updates like a new CORS origin never go live.
+    AutoPublishAliasAllProperties: true
+    SnapStart:
+      ApplyOn: PublishedVersions
+    Environment:
+      Variables:
+        MAIN_CLASS: FCAJ.SecureLearn.SecureLearnApplication
+        JAVA_TOOL_OPTIONS: -XX:+TieredCompilation -XX:TieredStopAtLevel=1
+        COGNITO_POOL_ID: !Ref CognitoPoolId
+        CORS_ALLOWED_ORIGINS: !Ref CorsAllowedOrigins
+        # Schema is managed outside the app, and Hibernate must not open a DB connection at
+        # startup: groups without a database (account, admin) still create the JPA beans.
+        SPRING_JPA_HIBERNATE_DDL_AUTO: none
+        SPRING_JPA_DATABASE_PLATFORM: org.hibernate.dialect.PostgreSQLDialect
+        SPRING_APPLICATION_JSON: '{"spring.jpa.properties.hibernate.boot.allow_jdbc_metadata_access":false}'
+        SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: '2'
+        # Placeholders. Every bean still loads in every group (step 3 is not finished), so
+        # each property must exist even where it is never used. A group that really needs a
+        # value overrides it below with its own secret. Delete a placeholder once the beans
+        # that read it carry an @Profile.
+        SPRING_DATASOURCE_URL: jdbc:postgresql://unused.invalid:5432/none
+        R2_ACCESS_KEY: unused
+        R2_SECRET_ACCESS_KEY: unused
+        R2_PUBLIC_URL: https://unused.invalid
+        MOMO_URL: https://unused.invalid
+        MOMO_PARTNER_CODE: unused
+        MOMO_ACCESS_KEY: unused
+        MOMO_SECRET_KEY: unused
+        COGNITO_CLIENT_SECRET: unused
+
+Resources:
+  # One HTTP API for every group; each group only receives the routes listed on it.
+  SecureLearnApi:
+    Type: AWS::Serverless::HttpApi
+
+  # --------------------------- account: /api/v1/auth/* ---------------------------
+  AccountFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Sign-up, login, tokens, password reset (AuthController)
+      Environment:
+        Variables:
+          SPRING_PROFILES_ACTIVE: account
+          COGNITO_CLIENT_SECRET: '{{resolve:secretsmanager:securelearn/cognito:SecretString:COGNITO_CLIENT_SECRET}}'
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                # register() puts every new user in the student group
+                - cognito-idp:AdminAddUserToGroup
+                # LogInterceptor looks up the email of the logged-in user
+                - cognito-idp:AdminGetUser
+              Resource: !Sub arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoPoolId}
+      Events:
+        Auth:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SecureLearnApi
+            Path: /api/v1/auth/{proxy+}
+            Method: ANY
+            # 1.0: the adapter answers in the 1.0 shape (multiValueHeaders); 2.0 would drop every header
+            PayloadFormatVersion: '1.0'
+
+  # --------------------------- admin: /api/v1/admin/* ---------------------------
+  AdminFunction:
+    Type: AWS::Serverless::Function
+    Condition: AdminOn
+    Properties:
+      Description: User management for admins (AdminController)
+      Environment:
+        Variables:
+          SPRING_PROFILES_ACTIVE: admin
+          COGNITO_CLIENT_SECRET: '{{resolve:secretsmanager:securelearn/cognito:SecretString:COGNITO_CLIENT_SECRET}}'
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:AdminCreateUser
+                - cognito-idp:AdminSetUserPassword
+                - cognito-idp:AdminAddUserToGroup
+                - cognito-idp:AdminDeleteUser
+                - cognito-idp:AdminGetUser
+                - cognito-idp:AdminListGroupsForUser
+                - cognito-idp:ListUsers
+                - cognito-idp:ListUsersInGroup
+              Resource: !Sub arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoPoolId}
+      Events:
+        Admin:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SecureLearnApi
+            Path: /api/v1/admin/{proxy+}
+            Method: ANY
+            # 1.0: the adapter answers in the 1.0 shape (multiValueHeaders); 2.0 would drop every header
+            PayloadFormatVersion: '1.0'
+
+  # ------------- course: courses, chapters, lessons, my enrollments -------------
+  CourseFunction:
+    Type: AWS::Serverless::Function
+    Condition: CourseOn
+    Properties:
+      Description: Course catalog and enrollment list (CourseController, EnrollmentController)
+      Environment:
+        Variables:
+          SPRING_PROFILES_ACTIVE: course
+          SPRING_DATASOURCE_URL: '{{resolve:secretsmanager:securelearn/database:SecretString:SPRING_DATASOURCE_URL}}'
+          SPRING_DATASOURCE_USERNAME: '{{resolve:secretsmanager:securelearn/database:SecretString:SPRING_DATASOURCE_USERNAME}}'
+          SPRING_DATASOURCE_PASSWORD: '{{resolve:secretsmanager:securelearn/database:SecretString:SPRING_DATASOURCE_PASSWORD}}'
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: cognito-idp:AdminGetUser
+              Resource: !Sub arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoPoolId}
+      Events:
+        Course:      { Type: HttpApi, Properties: { ApiId: !Ref SecureLearnApi, Path: /api/v1/course, Method: ANY, PayloadFormatVersion: '1.0' } }
+        CourseAny:   { Type: HttpApi, Properties: { ApiId: !Ref SecureLearnApi, Path: '/api/v1/course/{proxy+}', Method: ANY, PayloadFormatVersion: '1.0' } }
+        AllCourses:  { Type: HttpApi, Properties: { ApiId: !Ref SecureLearnApi, Path: /api/v1/allcourses, Method: ANY, PayloadFormatVersion: '1.0' } }
+        Chapter:     { Type: HttpApi, Properties: { ApiId: !Ref SecureLearnApi, Path: /api/v1/chapter, Method: ANY, PayloadFormatVersion: '1.0' } }
+        ChapterAny:  { Type: HttpApi, Properties: { ApiId: !Ref SecureLearnApi, Path: '/api/v1/chapter/{proxy+}', Method: ANY, PayloadFormatVersion: '1.0' } }
+        Lesson:      { Type: HttpApi, Properties: { ApiId: !Ref SecureLearnApi, Path: /api/v1/lesson, Method: ANY, PayloadFormatVersion: '1.0' } }
+        LessonById:  { Type: HttpApi, Properties: { ApiId: !Ref SecureLearnApi, Path: '/api/v1/lesson/{id}', Method: ANY, PayloadFormatVersion: '1.0' } }
+        MyEnrolment: { Type: HttpApi, Properties: { ApiId: !Ref SecureLearnApi, Path: /api/v1/enrollment/me, Method: ANY, PayloadFormatVersion: '1.0' } }
+
+  # ---------------- playback: /api/v1/lesson/{id}/<playback|manifest|key|segment> ----------------
+  PlaybackFunction:
+    Type: AWS::Serverless::Function
+    Condition: PlaybackOn
+    Properties:
+      Description: Playback tokens, manifest, key and segment proxy (PlaybackController)
+      Environment:
+        Variables:
+          SPRING_PROFILES_ACTIVE: playback
+          SPRING_DATASOURCE_URL: '{{resolve:secretsmanager:securelearn/database:SecretString:SPRING_DATASOURCE_URL}}'
+          SPRING_DATASOURCE_USERNAME: '{{resolve:secretsmanager:securelearn/database:SecretString:SPRING_DATASOURCE_USERNAME}}'
+          SPRING_DATASOURCE_PASSWORD: '{{resolve:secretsmanager:securelearn/database:SecretString:SPRING_DATASOURCE_PASSWORD}}'
+          R2_ACCESS_KEY: '{{resolve:secretsmanager:securelearn/r2-read:SecretString:R2_ACCESS_KEY}}'
+          R2_SECRET_ACCESS_KEY: '{{resolve:secretsmanager:securelearn/r2-read:SecretString:R2_SECRET_ACCESS_KEY}}'
+          PLAYBACK_TOKEN_SECRET: '{{resolve:secretsmanager:securelearn/playback:SecretString:PLAYBACK_TOKEN_SECRET}}'
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: cognito-idp:AdminGetUser
+              Resource: !Sub arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoPoolId}
+      Events:
+        Playback:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SecureLearnApi
+            Path: '/api/v1/lesson/{id}/{proxy+}'
+            Method: GET
+            # 1.0: the adapter answers in the 1.0 shape (multiValueHeaders); 2.0 would drop every header
+            PayloadFormatVersion: '1.0'
+
+  # --------------------------- payment: MoMo checkout + IPN ---------------------------
+  PaymentFunction:
+    Type: AWS::Serverless::Function
+    Condition: PaymentOn
+    Properties:
+      Description: MoMo payment creation and IPN callback (PaymentController)
+      Environment:
+        Variables:
+          SPRING_PROFILES_ACTIVE: payment
+          SPRING_DATASOURCE_URL: '{{resolve:secretsmanager:securelearn/database:SecretString:SPRING_DATASOURCE_URL}}'
+          SPRING_DATASOURCE_USERNAME: '{{resolve:secretsmanager:securelearn/database:SecretString:SPRING_DATASOURCE_USERNAME}}'
+          SPRING_DATASOURCE_PASSWORD: '{{resolve:secretsmanager:securelearn/database:SecretString:SPRING_DATASOURCE_PASSWORD}}'
+          MOMO_URL: !Ref MomoUrl
+          MOMO_PARTNER_CODE: '{{resolve:secretsmanager:securelearn/momo:SecretString:MOMO_PARTNER_CODE}}'
+          MOMO_ACCESS_KEY: '{{resolve:secretsmanager:securelearn/momo:SecretString:MOMO_ACCESS_KEY}}'
+          MOMO_SECRET_KEY: '{{resolve:secretsmanager:securelearn/momo:SecretString:MOMO_SECRET_KEY}}'
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: cognito-idp:AdminGetUser
+              Resource: !Sub arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoPoolId}
+      Events:
+        Enroll:   { Type: HttpApi, Properties: { ApiId: !Ref SecureLearnApi, Path: '/api/v1/enrollment/{courseId}', Method: POST, PayloadFormatVersion: '1.0' } }
+        MomoIpn:  { Type: HttpApi, Properties: { ApiId: !Ref SecureLearnApi, Path: /api/momo/ipn, Method: POST, PayloadFormatVersion: '1.0' } }
+
+  # --------------------------- upload: presign + FFmpeg ---------------------------
+  # /process runs FFmpeg inside the request, so it is bound by API Gateway's 30 s limit.
+  # Long videos need the worker split out (separate function, async) - not done here.
+  UploadFunction:
+    Type: AWS::Serverless::Function
+    Condition: UploadOn
+    Properties:
+      Description: Presigned upload URLs and HLS processing (UploadController)
+      MemorySize: 3008
+      EphemeralStorage:
+        Size: 4096
+      Environment:
+        Variables:
+          SPRING_PROFILES_ACTIVE: upload
+          SPRING_DATASOURCE_URL: '{{resolve:secretsmanager:securelearn/database:SecretString:SPRING_DATASOURCE_URL}}'
+          SPRING_DATASOURCE_USERNAME: '{{resolve:secretsmanager:securelearn/database:SecretString:SPRING_DATASOURCE_USERNAME}}'
+          SPRING_DATASOURCE_PASSWORD: '{{resolve:secretsmanager:securelearn/database:SecretString:SPRING_DATASOURCE_PASSWORD}}'
+          R2_ACCESS_KEY: '{{resolve:secretsmanager:securelearn/r2-write:SecretString:R2_ACCESS_KEY}}'
+          R2_SECRET_ACCESS_KEY: '{{resolve:secretsmanager:securelearn/r2-write:SecretString:R2_SECRET_ACCESS_KEY}}'
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: cognito-idp:AdminGetUser
+              Resource: !Sub arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoPoolId}
+      Events:
+        Upload:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SecureLearnApi
+            Path: /api/v1/upload/{proxy+}
+            Method: ANY
+            # 1.0: the adapter answers in the 1.0 shape (multiValueHeaders); 2.0 would drop every header
+            PayloadFormatVersion: '1.0'
+
+Outputs:
+  ApiUrl:
+    Description: Base URL of the HTTP API
+    Value: !Sub https://${SecureLearnApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}

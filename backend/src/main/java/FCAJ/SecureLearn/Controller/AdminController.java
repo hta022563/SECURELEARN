@@ -11,6 +11,7 @@ import FCAJ.SecureLearn.Service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -29,6 +30,7 @@ import software.amazon.awssdk.services.cognitoidentityprovider.model.ListUsersRe
  */
 @RestController
 @RequestMapping("/api/v1/admin")
+@Profile("admin")
 public class AdminController {
     private final AuthService authService;
 

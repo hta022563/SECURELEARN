@@ -1,18 +1,18 @@
 import axios from 'axios';
 import { getDeviceFingerprint } from '../services/fingerprintService.js';
+import { LAMBDA_API_URL, LOCAL_API_URL, baseUrlFor } from './apiConfig.js';
 
 /**
  * Axios Client tập trung cho toàn bộ ứng dụng SecureLearn
  * - Tự động đính kèm JWT Bearer Token vào Header
  * - Tự động đính kèm X-Device-Fingerprint vào Header mọi request
- * - Tự động định tuyến baseURL theo biến môi trường
+ * - Tự động định tuyến baseURL: /auth, /admin → Lambda; còn lại → backend local (xem apiConfig.js)
  * - Tự động refresh token khi gặp mã lỗi 401 qua POST /api/v1/auth/refresh
  */
-const BASE_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || 'http://localhost:8080/api/v1';
 const STORAGE_KEY = 'securelearn_auth_user';
 
 const axiosClient = axios.create({
-  baseURL: BASE_URL,
+  baseURL: LOCAL_API_URL,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
@@ -23,6 +23,11 @@ const axiosClient = axios.create({
 // Request Interceptor: Gắn token xác thực & Device Fingerprint
 axiosClient.interceptors.request.use(
   async (config) => {
+    // Groups already on Lambda go to API Gateway; everything else stays on the local backend
+    if (config.url && !/^https?:\/\//.test(config.url)) {
+      config.baseURL = baseUrlFor(config.url);
+    }
+
     try {
       if (typeof sessionStorage !== 'undefined') {
         const stored = sessionStorage.getItem(STORAGE_KEY);
@@ -110,7 +115,7 @@ axiosClient.interceptors.response.use(
         if (refreshToken && email) {
           // POST /api/v1/auth/refresh (Public permitAll)
           const refreshRes = await axios.post(
-            `${BASE_URL}/auth/refresh`,
+            `${LAMBDA_API_URL}/auth/refresh`,
             { refreshToken, email },
             { headers: { 'Content-Type': 'application/json' } }
           );

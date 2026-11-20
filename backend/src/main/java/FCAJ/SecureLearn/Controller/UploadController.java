@@ -18,6 +18,7 @@ import FCAJ.SecureLearn.Request.VideoUploadRequest;
 import FCAJ.SecureLearn.Service.LessonService;
 import FCAJ.SecureLearn.Service.R2Service;
 import FCAJ.SecureLearn.Service.VideoProcessingService;
+import org.springframework.context.annotation.Profile;
 
 /**
  * Handles the video upload pipeline:
@@ -38,6 +39,7 @@ import FCAJ.SecureLearn.Service.VideoProcessingService;
  */
 @RestController
 @RequestMapping("/api/v1/upload")
+@Profile("upload")
 public class UploadController {
     private static final Logger log = LoggerFactory.getLogger(UploadController.class);
 

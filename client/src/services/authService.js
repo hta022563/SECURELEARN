@@ -16,8 +16,10 @@
  */
 
 import { getDeviceFingerprint } from './fingerprintService.js';
+import { LAMBDA_API_URL } from '../api/apiConfig.js';
 
-const BASE_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || 'http://localhost:8080/api/v1';
+// Auth runs on AWS Lambda (see api/apiConfig.js)
+const BASE_URL = LAMBDA_API_URL;
 
 // Storage key — keep in sync with AuthContext
 const STORAGE_KEY = 'securelearn_auth_user';
