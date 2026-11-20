@@ -1,13 +1,16 @@
 package FCAJ.SecureLearn.Model;
 
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.ManyToMany;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -43,6 +46,12 @@ public class Course {
     @Column(nullable = false)
     private LocalDateTime lastUpdateTime;
 
+    // Owning side: this column is the foreign key. A course must have a subject.
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "subject_id", nullable = false)
+    private Subject subject;
+
     @OneToMany(mappedBy="course", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Chapter> chapter = new ArrayList();
 
@@ -59,6 +68,20 @@ public class Course {
         this.instructor = instructor;
         this.creationTime = creationTime;
         this.lastUpdateTime = lastUpdateTime;
+    }
+
+    public Subject getSubject() {
+        return subject;
+    }
+
+    public void setSubject(Subject subject) {
+        this.subject = subject;
+    }
+
+    // Sent to the frontend instead of the whole Subject (which is @JsonIgnore'd).
+    // Reading the id of a lazy proxy does not trigger a database load.
+    public UUID getSubjectId() {
+        return subject == null ? null : subject.getId();
     }
 
     public UUID getId() {

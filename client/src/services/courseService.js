@@ -10,8 +10,8 @@ import apiClient from '../api/axiosClient.js';
  * 1. Course Management:
  *    - GET    /api/v1/allcourses                    -> Lấy tất cả khóa học
  *    - GET    /api/v1/course/search?title={keyword} -> Tìm kiếm khóa học theo tiêu đề
- *    - POST   /api/v1/course                        -> Tạo khóa học mới ({ title, description, instructor, prices })
- *    - PUT    /api/v1/course/{id}                   -> Cập nhật khóa học ({ title, description, instructor, prices })
+ *    - POST   /api/v1/course                        -> Tạo khóa học mới ({ title, description, instructor, prices, subjectId })
+ *    - PUT    /api/v1/course/{id}                   -> Cập nhật khóa học ({ title, description, instructor, prices, subjectId? })
  *    - DELETE /api/v1/course/{id}                   -> Xóa khóa học (cascades chapters & lessons)
  *
  * 2. Chapter Management:
@@ -83,6 +83,7 @@ export function normalizeCourse(item) {
     Instructor: courseInstructor,
     owner: courseInstructor,
     Owner: courseInstructor,
+    subjectId: item.subjectId ? String(item.subjectId) : null,
     creationTime,
     'Creation Time': creationTime,
     lastUpdateTime,
@@ -212,7 +213,7 @@ export async function getCourseById(courseId) {
  * Backend: POST /api/v1/course
  * Request Body: { title, description, instructor, prices }
  */
-export async function createCourse({ title, description, instructor, owner, price, prices }) {
+export async function createCourse({ title, description, instructor, owner, price, prices, subjectId }) {
   const courseTitle = (title || '').trim();
   const courseDesc = (description || '').trim();
   const courseInstructor = (instructor || owner || 'Instructor').trim();
@@ -223,6 +224,7 @@ export async function createCourse({ title, description, instructor, owner, pric
     description: courseDesc,
     instructor: courseInstructor,
     prices: priceNum,
+    subjectId: subjectId || null,
   };
 
   const res = await apiClient.post('/course', payload);
@@ -239,7 +241,7 @@ export async function createCourse({ title, description, instructor, owner, pric
  * Cập nhật một khóa học trên Backend
  * Backend: PUT /api/v1/course/{id}
  */
-export async function updateCourse(id, { title, description, instructor, owner, price, prices }) {
+export async function updateCourse(id, { title, description, instructor, owner, price, prices, subjectId }) {
   const courseTitle = (title || '').trim();
   const courseDesc = (description || '').trim();
   const courseInstructor = (instructor || owner || 'Instructor').trim();
@@ -250,6 +252,7 @@ export async function updateCourse(id, { title, description, instructor, owner, 
     description: courseDesc,
     instructor: courseInstructor,
     prices: priceNum,
+    subjectId: subjectId || null,
   };
 
   return await apiClient.put(`/course/${id}`, payload);

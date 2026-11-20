@@ -1,252 +1,149 @@
+import apiClient from '../api/axiosClient.js';
+import { updateCourse } from './courseService.js';
+
 /**
  * =============================================================================
- * SERVICE: subjectService (FRONTEND-ONLY SUBJECT MANAGEMENT VIA LOCALSTORAGE)
+ * SERVICE: subjectService (BACKEND SPRING BOOT API)
  * =============================================================================
- * Quản lý Môn học (Subject) và ánh xạ Khóa học -> Môn học thuần phía Frontend,
- * không yêu cầu thay đổi Backend hay Database.
+ * Backend:
+ *    - GET    /api/v1/subject        -> [{ id, name }]
+ *    - POST   /api/v1/subject        -> { name }            (tên phải duy nhất)
+ *    - PUT    /api/v1/subject/{id}   -> { name }
+ *    - DELETE /api/v1/subject/{id}   -> XÓA LUÔN mọi khóa học thuộc môn này
+ *
+ * Mỗi khóa học BẮT BUỘC thuộc một môn học. Khóa học từ BE có trường `subjectId`.
+ * Gán khóa học sang môn khác = PUT /api/v1/course/{id} kèm { subjectId }.
+ *
+ * Danh sách môn được giữ trong bộ nhớ (cache) để các hàm đọc vẫn đồng bộ:
+ * gọi `loadSubjects()` (async) trước khi dùng `getSubjects()` / `getSubjectById()`.
  */
 
-const SUBJECTS_STORAGE_KEY = 'securelearn_subjects_v1';
-const COURSE_SUBJECT_MAP_KEY = 'securelearn_course_subject_map_v1';
+let subjectsCache = [];
+// { [courseId]: subjectId } — được cập nhật mỗi khi danh sách khóa học đi qua service này
+let courseSubjectMap = {};
 
-function readJson(key, fallback) {
-  try {
-    if (typeof localStorage === 'undefined') return fallback;
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
-    const parsed = JSON.parse(raw);
-    return parsed ?? fallback;
-  } catch (err) {
-    console.warn(`[subjectService] Không thể đọc ${key}:`, err.message);
-    return fallback;
-  }
+function errorMessage(err) {
+  return err?.response?.data?.error || err?.message || 'Lỗi không xác định';
 }
 
-function writeJson(key, value) {
-  try {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (err) {
-    console.warn(`[subjectService] Không thể lưu ${key}:`, err.message);
-  }
+function normalizeSubject(item) {
+  return { id: String(item.id), name: item.name || '' };
 }
 
-function generateId() {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return `subj-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+function rememberCourses(courses = []) {
+  (Array.isArray(courses) ? courses : []).forEach((c) => {
+    const cId = String(c.id || c.ID || '');
+    if (cId && c.subjectId) courseSubjectMap[cId] = String(c.subjectId);
+  });
 }
 
 /**
- * Lấy danh sách tất cả Môn học đã lưu trên Frontend
+ * Nạp danh sách Môn học từ Backend vào cache
+ */
+export async function loadSubjects() {
+  try {
+    const data = await apiClient.get('/subject');
+    subjectsCache = Array.isArray(data) ? data.map(normalizeSubject) : [];
+  } catch (err) {
+    console.warn('[subjectService] GET /subject lỗi:', errorMessage(err));
+  }
+  return subjectsCache;
+}
+
+/**
+ * Danh sách Môn học trong cache (gọi loadSubjects() trước)
  */
 export function getSubjects() {
-  const list = readJson(SUBJECTS_STORAGE_KEY, []);
-  return Array.isArray(list) ? list : [];
+  return subjectsCache;
 }
 
-/**
- * Lấy thông tin một Môn học theo ID
- */
 export function getSubjectById(subjectId) {
-  if (!subjectId || subjectId === 'unassigned') return null;
-  return getSubjects().find((s) => String(s.id) === String(subjectId)) || null;
+  if (!subjectId) return null;
+  return subjectsCache.find((s) => String(s.id) === String(subjectId)) || null;
 }
 
-/**
- * Tạo mới một Môn học
- */
-export function createSubject({ name, description = '' }) {
+export async function createSubject({ name }) {
   const trimmedName = (name || '').trim();
-  if (!trimmedName) {
-    throw new Error('Tên môn học không được để trống.');
+  if (!trimmedName) throw new Error('Tên môn học không được để trống.');
+  try {
+    const created = normalizeSubject(await apiClient.post('/subject', { name: trimmedName }));
+    subjectsCache = [created, ...subjectsCache];
+    return created;
+  } catch (err) {
+    throw new Error(errorMessage(err));
   }
-
-  const subjects = getSubjects();
-  const duplicate = subjects.some(
-    (s) => (s.name || '').trim().toLowerCase() === trimmedName.toLowerCase()
-  );
-  if (duplicate) {
-    throw new Error(`Môn học "${trimmedName}" đã tồn tại.`);
-  }
-
-  const now = new Date().toISOString();
-  const newSubject = {
-    id: generateId(),
-    name: trimmedName,
-    description: (description || '').trim(),
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  writeJson(SUBJECTS_STORAGE_KEY, [newSubject, ...subjects]);
-  return newSubject;
 }
 
-/**
- * Cập nhật thông tin một Môn học
- */
-export function updateSubject(subjectId, { name, description = '' }) {
+export async function updateSubject(subjectId, { name }) {
   const trimmedName = (name || '').trim();
-  if (!trimmedName) {
-    throw new Error('Tên môn học không được để trống.');
+  if (!trimmedName) throw new Error('Tên môn học không được để trống.');
+  try {
+    const updated = normalizeSubject(await apiClient.put(`/subject/${subjectId}`, { name: trimmedName }));
+    subjectsCache = subjectsCache.map((s) => (String(s.id) === String(subjectId) ? updated : s));
+    return updated;
+  } catch (err) {
+    throw new Error(errorMessage(err));
   }
+}
 
-  const subjects = getSubjects();
-  const duplicate = subjects.some(
-    (s) =>
-      String(s.id) !== String(subjectId) &&
-      (s.name || '').trim().toLowerCase() === trimmedName.toLowerCase()
-  );
-  if (duplicate) {
-    throw new Error(`Môn học "${trimmedName}" đã tồn tại.`);
+/**
+ * Xóa Môn học — Backend xóa luôn TẤT CẢ khóa học (và chương, bài học) thuộc môn này
+ */
+export async function deleteSubject(subjectId) {
+  try {
+    await apiClient.delete(`/subject/${subjectId}`);
+  } catch (err) {
+    throw new Error(errorMessage(err));
   }
-
-  let updatedSubject = null;
-  const next = subjects.map((s) => {
-    if (String(s.id) !== String(subjectId)) return s;
-    updatedSubject = {
-      ...s,
-      name: trimmedName,
-      description: (description || '').trim(),
-      updatedAt: new Date().toISOString(),
-    };
-    return updatedSubject;
+  subjectsCache = subjectsCache.filter((s) => String(s.id) !== String(subjectId));
+  Object.keys(courseSubjectMap).forEach((cId) => {
+    if (courseSubjectMap[cId] === String(subjectId)) delete courseSubjectMap[cId];
   });
-
-  if (!updatedSubject) {
-    throw new Error('Không tìm thấy môn học cần cập nhật.');
-  }
-
-  writeJson(SUBJECTS_STORAGE_KEY, next);
-  return updatedSubject;
 }
 
-/**
- * Xóa một Môn học (các khóa học thuộc môn này sẽ trở thành chưa phân môn)
- */
-export function deleteSubject(subjectId) {
-  const subjects = getSubjects().filter((s) => String(s.id) !== String(subjectId));
-  writeJson(SUBJECTS_STORAGE_KEY, subjects);
-
-  const mapping = getCourseSubjectMap();
-  const nextMapping = {};
-  Object.entries(mapping).forEach(([courseId, sId]) => {
-    if (String(sId) !== String(subjectId)) {
-      nextMapping[courseId] = sId;
-    }
-  });
-  writeJson(COURSE_SUBJECT_MAP_KEY, nextMapping);
-}
-
-/**
- * Lấy bảng ánh xạ { [courseId]: subjectId }
- */
-export function getCourseSubjectMap() {
-  const map = readJson(COURSE_SUBJECT_MAP_KEY, {});
-  return map && typeof map === 'object' && !Array.isArray(map) ? map : {};
-}
-
-/**
- * Lấy subjectId của một khóa học
- */
 export function getCourseSubjectId(courseId) {
   if (!courseId) return null;
-  const map = getCourseSubjectMap();
-  const sId = map[String(courseId)] || null;
-  if (!sId) return null;
-  // Đảm bảo subjectId vẫn còn tồn tại trong danh sách môn học
-  return getSubjectById(sId) ? sId : null;
+  return courseSubjectMap[String(courseId)] || null;
 }
 
 /**
- * Lấy đối tượng Subject của một khóa học
+ * Lấy Subject của một khóa học (nhận object khóa học hoặc courseId)
  */
-export function getSubjectForCourse(courseId) {
-  const sId = getCourseSubjectId(courseId);
+export function getSubjectForCourse(courseOrId) {
+  const sId =
+    courseOrId && typeof courseOrId === 'object'
+      ? courseOrId.subjectId
+      : getCourseSubjectId(courseOrId);
   return sId ? getSubjectById(sId) : null;
 }
 
 /**
- * Gán hoặc gỡ gán khóa học vào một môn học
+ * Chuyển khóa học sang môn khác (PUT /course/{id} cần đầy đủ thông tin khóa học)
  */
-export function assignCourseToSubject(courseId, subjectId) {
-  if (!courseId) return;
-  const map = getCourseSubjectMap();
-  const key = String(courseId);
-  if (!subjectId || subjectId === 'unassigned') {
-    delete map[key];
-  } else {
-    map[key] = String(subjectId);
+export async function assignCourseToSubject(course, subjectId) {
+  if (!course || !subjectId) return;
+  try {
+    await updateCourse(course.id || course.ID, { ...course, subjectId });
+  } catch (err) {
+    throw new Error(errorMessage(err));
   }
-  writeJson(COURSE_SUBJECT_MAP_KEY, map);
+  courseSubjectMap[String(course.id || course.ID)] = String(subjectId);
 }
 
 /**
- * Gom nhóm danh sách khóa học từ Backend theo từng Môn học ở FE
+ * Gom nhóm danh sách khóa học theo Môn học (dựa trên course.subjectId từ BE)
  */
-export function groupCoursesBySubjects(allCourses = [], unassignedMeta = null) {
-  const subjects = getSubjects();
-  const map = getCourseSubjectMap();
-  const validSubjectIds = new Set(subjects.map((s) => String(s.id)));
-
-  const coursesBySubject = new Map();
-  subjects.forEach((s) => {
-    coursesBySubject.set(String(s.id), []);
+export function groupCoursesBySubjects(allCourses = []) {
+  rememberCourses(allCourses);
+  return subjectsCache.map((subject) => {
+    const subCourses = getCoursesForSubject(subject.id, allCourses);
+    return { ...subject, courses: subCourses, courseCount: subCourses.length };
   });
-  const unassignedCourses = [];
-
-  (Array.isArray(allCourses) ? allCourses : []).forEach((course) => {
-    const cId = String(course.id || course.ID || '');
-    const mappedSubId = cId ? map[cId] : null;
-    if (mappedSubId && validSubjectIds.has(String(mappedSubId))) {
-      coursesBySubject.get(String(mappedSubId)).push(course);
-    } else {
-      unassignedCourses.push(course);
-    }
-  });
-
-  const result = subjects.map((subject) => {
-    const subCourses = coursesBySubject.get(String(subject.id)) || [];
-    return {
-      ...subject,
-      courses: subCourses,
-      courseCount: subCourses.length,
-    };
-  });
-
-  if (unassignedCourses.length > 0) {
-    result.push({
-      id: 'unassigned',
-      name: unassignedMeta?.name || 'Khóa học chưa phân môn',
-      description:
-        unassignedMeta?.description ||
-        'Các khóa học hiện chưa được gán vào môn học cụ thể.',
-      courses: unassignedCourses,
-      courseCount: unassignedCourses.length,
-      isVirtual: true,
-    });
-  }
-
-  return result;
 }
 
-/**
- * Lấy danh sách khóa học thuộc một subjectId cụ thể ('unassigned' cho khóa chưa phân môn)
- */
 export function getCoursesForSubject(subjectId, allCourses = []) {
-  const map = getCourseSubjectMap();
-  const validSubjectIds = new Set(getSubjects().map((s) => String(s.id)));
-
-  return (Array.isArray(allCourses) ? allCourses : []).filter((course) => {
-    const cId = String(course.id || course.ID || '');
-    const mappedSubId = cId ? map[cId] : null;
-    const isAssignedValid = Boolean(mappedSubId && validSubjectIds.has(String(mappedSubId)));
-
-    if (subjectId === 'unassigned') {
-      return !isAssignedValid;
-    }
-    return isAssignedValid && String(mappedSubId) === String(subjectId);
-  });
+  rememberCourses(allCourses);
+  return (Array.isArray(allCourses) ? allCourses : []).filter(
+    (course) => String(course.subjectId || '') === String(subjectId)
+  );
 }

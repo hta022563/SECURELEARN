@@ -18,8 +18,8 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { getCourses } from '../services/courseService';
 import {
+  loadSubjects,
   groupCoursesBySubjects,
-  getCourseSubjectId,
   deleteSubject,
 } from '../services/subjectService';
 import CreateCourseModal from '../components/CreateCourseModal';
@@ -51,7 +51,8 @@ export default function CourseCatalog() {
   const loadCourses = async () => {
     setIsLoading(true);
     try {
-      const coursesData = await getCourses();
+      const [coursesData] = await Promise.all([getCourses(), loadSubjects()]);
+      setSubjectVersion((v) => v + 1);
       setAllCourses(Array.isArray(coursesData) ? coursesData : []);
     } catch (err) {
       console.warn('[CourseCatalog] Lỗi nạp khóa học:', err);
@@ -66,14 +67,8 @@ export default function CourseCatalog() {
   }, []);
 
   const displaySubjects = useMemo(() => {
-    return groupCoursesBySubjects(allCourses, {
-      name: t('catalog.unassigned_subject', 'Khóa học chưa phân môn'),
-      description: t(
-        'catalog.unassigned_subject_desc',
-        'Các khóa học hiện chưa được gán vào môn học cụ thể.'
-      ),
-    });
-  }, [allCourses, subjectVersion, t]);
+    return groupCoursesBySubjects(allCourses);
+  }, [allCourses, subjectVersion]);
 
   const filteredSubjects = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
@@ -110,20 +105,30 @@ export default function CourseCatalog() {
     navigate(`/${currentLang}/catalog/subject/${subjectId}${query}`);
   };
 
-  const handleDeleteSubject = (e, subject) => {
+  const handleDeleteSubject = async (e, subject) => {
     e.stopPropagation();
+    const courseCount = subject.courseCount || 0;
     if (
-      window.confirm(
-        `${t('catalog.delete_subject_confirm', 'Bạn có chắc muốn xóa môn học')} "${subject.name}"?`
+      !window.confirm(
+        `${t('catalog.delete_subject_confirm', 'Bạn có chắc muốn xóa môn học')} "${subject.name}"?` +
+          (courseCount > 0
+            ? `
+${t('catalog.delete_subject_cascade_warning', 'Thao tác này sẽ XÓA VĨNH VIỄN cả khóa học thuộc môn này:')} ${courseCount}`
+            : '')
       )
     ) {
-      deleteSubject(subject.id);
-      setSubjectVersion((v) => v + 1);
+      return;
+    }
+    try {
+      await deleteSubject(subject.id);
+      await loadCourses();
       showToast(
         `${t('catalog.deleted_subject', 'Đã xóa môn học')}: "${subject.name}"`,
         'info',
         t('instructor.deleted', 'Đã Xóa')
       );
+    } catch (err) {
+      showToast(err.message, 'danger', t('course_modal.error', 'Lỗi'));
     }
   };
 
@@ -133,7 +138,7 @@ export default function CourseCatalog() {
       (c) => String(c.id || c.ID) === String(selectedCourseFilter)
     );
     if (!found) return null;
-    const subId = getCourseSubjectId(found.id || found.ID) || 'unassigned';
+    const subId = found.subjectId;
     const subObj = displaySubjects.find((s) => String(s.id) === String(subId));
     return {
       ...found,
@@ -203,7 +208,7 @@ export default function CourseCatalog() {
                 {t('catalog.all_courses_filter', 'Lọc theo khóa học: Tất cả')} ({allCourses.length})
               </option>
               {allCourses.map((course) => {
-                const subId = getCourseSubjectId(course.id || course.ID);
+                const subId = course.subjectId;
                 const subName = subId
                   ? displaySubjects.find((s) => String(s.id) === String(subId))?.name
                   : null;

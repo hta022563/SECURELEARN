@@ -16,14 +16,17 @@ import org.springframework.stereotype.Service;
 @Service
 public class CourseService {
     private final CourseRepo courseRepo;
+    private final SubjectService subjectService;
 
-    public CourseService(CourseRepo courseRepo) {
+    public CourseService(CourseRepo courseRepo, SubjectService subjectService) {
         this.courseRepo = courseRepo;
+        this.subjectService = subjectService;
     }
 
     public void addNewCourse(String title, String description, String instructor, long price,
-            LocalDateTime creationTime, LocalDateTime lastUpdatedTime) {
+            LocalDateTime creationTime, LocalDateTime lastUpdatedTime, UUID subjectId) {
         Course newCourse = new Course(title, description, price, instructor, creationTime, lastUpdatedTime);
+        newCourse.setSubject(subjectService.findSubject(subjectId, "create course"));
         courseRepo.save(newCourse);
     }
 
@@ -36,8 +39,12 @@ public class CourseService {
     }
 
     public void updateCourse(UUID courseId, String title, String description, String instructor, long price,
-            LocalDateTime lastUpdatedTime) {
+            LocalDateTime lastUpdatedTime, UUID subjectId) {
         Course courseToUpdate = findCourse(courseId, "update course");
+        // subjectId is optional on update: null keeps the current subject.
+        if (subjectId != null) {
+            courseToUpdate.setSubject(subjectService.findSubject(subjectId, "update course"));
+        }
         courseToUpdate.setTitle(title);
         courseToUpdate.setDescription(description);
         courseToUpdate.setInstructor(instructor);

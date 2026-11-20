@@ -3,6 +3,7 @@ package FCAJ.SecureLearn.Controller;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -65,7 +66,11 @@ public class CourseController {
         if (request.getPrices() < 1000 || request.getPrices() > 50000000) {
             return ResponseEntity.badRequest().body(Map.of("error", "Price must be between 1000 and 50000000, got " + request.getPrices()));
         }
-        courseService.addNewCourse(request.getTitle(), request.getDescription(), request.getInstructor(), request.getPrices(), LocalDateTime.now(), LocalDateTime.now());
+        try {
+            courseService.addNewCourse(request.getTitle(), request.getDescription(), request.getInstructor(), request.getPrices(), LocalDateTime.now(), LocalDateTime.now(), request.getSubjectId());
+        } catch (IllegalArgumentException | NoSuchElementException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
         return ResponseEntity.ok().body(Map.of("success", "Course added successfully"));
     }
 
@@ -95,7 +100,7 @@ public class CourseController {
      */
     @PutMapping("/course/{id}")
     public ResponseEntity<?> updateCourse(@PathVariable UUID id, @RequestBody CourseCreationRequest request) {
-        courseService.updateCourse(id, request.getTitle(), request.getDescription(), request.getInstructor(), request.getPrices(), LocalDateTime.now());
+        courseService.updateCourse(id, request.getTitle(), request.getDescription(), request.getInstructor(), request.getPrices(), LocalDateTime.now(), request.getSubjectId());
         return ResponseEntity.ok().body(Map.of("success", "Course updated successfully"));
     }
 

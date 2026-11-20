@@ -99,6 +99,7 @@ public class SecurityConfiguration {
                 // Rules 4–5: public read endpoints
                 .requestMatchers(HttpMethod.GET,  "/api/v1/allcourses").permitAll()
                 .requestMatchers(HttpMethod.GET,  "/api/v1/course/search").permitAll()
+                .requestMatchers(HttpMethod.GET,  "/api/v1/subject").permitAll()
 
                 // Rules 4–6: authenticated read endpoints (any valid JWT)
                 .requestMatchers(HttpMethod.GET,  "/api/v1/course/{courseId}/chapters").authenticated()
@@ -109,6 +110,9 @@ public class SecurityConfiguration {
                 .requestMatchers(HttpMethod.POST,   "/api/v1/course").hasAnyRole("INSTRUCTOR", "ADMIN")
                 .requestMatchers(HttpMethod.PUT,    "/api/v1/course/{id}").hasAnyRole("INSTRUCTOR", "ADMIN")
                 .requestMatchers(HttpMethod.DELETE, "/api/v1/course/{id}").hasAnyRole("INSTRUCTOR", "ADMIN")
+                .requestMatchers(HttpMethod.POST,   "/api/v1/subject").hasAnyRole("INSTRUCTOR", "ADMIN")
+                .requestMatchers(HttpMethod.PUT,    "/api/v1/subject/{id}").hasAnyRole("INSTRUCTOR", "ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/api/v1/subject/{id}").hasAnyRole("INSTRUCTOR", "ADMIN")
 
                 // Rules 10–12: chapter write — INSTRUCTOR or ADMIN only
                 .requestMatchers(HttpMethod.POST,   "/api/v1/chapter").hasAnyRole("INSTRUCTOR", "ADMIN")
