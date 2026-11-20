@@ -30,7 +30,7 @@ import {
 } from '../services/entitlementService';
 import { getCourses, getChapters, getLessons } from '../services/courseService';
 import {
-  getSubjects,
+  loadSubjects,
   getSubjectById,
   getCoursesForSubject,
   assignCourseToSubject,
@@ -77,12 +77,12 @@ export default function SubjectLectures() {
       };
     }
     return getSubjectById(subjectId);
-  }, [subjectId, subjectVersion, t]);
+  }, [subjectId, subjectVersion, allSubjects, t]);
 
   const loadData = async () => {
     setIsLoading(true);
-    setAllSubjects(getSubjects());
     try {
+      setAllSubjects(await loadSubjects());
       const coursesList = await getCourses();
       const safeCourses = Array.isArray(coursesList) ? coursesList : [];
       setAllCourses(safeCourses);
@@ -194,14 +194,20 @@ export default function SubjectLectures() {
     }
   };
 
-  const handleAssignCourseSubject = (courseId, newSubjectId) => {
-    assignCourseToSubject(courseId, newSubjectId);
-    setSubjectVersion((v) => v + 1);
-    if (showToast) {
-      showToast(
-        t('subject_lectures.course_moved', 'Đã cập nhật môn học cho khóa học.'),
-        'success'
-      );
+  const handleAssignCourseSubject = async (courseId, newSubjectId) => {
+    const course = allCourses.find((c) => String(c.id || c.ID) === String(courseId));
+    if (!course || !newSubjectId) return;
+    try {
+      await assignCourseToSubject(course, newSubjectId);
+      setSubjectVersion((v) => v + 1);
+      if (showToast) {
+        showToast(
+          t('subject_lectures.course_moved', 'Đã cập nhật môn học cho khóa học.'),
+          'success'
+        );
+      }
+    } catch (err) {
+      if (showToast) showToast(err.message, 'danger');
     }
   };
 
@@ -628,13 +634,10 @@ export default function SubjectLectures() {
                     {canManage && allSubjects.length > 0 && (
                       <div className="mb-3">
                         <select
-                          value={subjectId === 'unassigned' ? '' : subjectId}
+                          value={subjectId}
                           onChange={(e) => handleAssignCourseSubject(cId, e.target.value)}
                           className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2.5 py-1.5 text-[11px] text-slate-700 dark:text-slate-200"
                         >
-                          <option value="">
-                            {t('course_modal.select_subject_optional', '-- Chưa phân môn học --')}
-                          </option>
                           {allSubjects.map((s) => (
                             <option key={s.id} value={s.id}>
                               {s.name}

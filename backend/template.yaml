@@ -29,7 +29,7 @@ Parameters:
     Type: String
     AllowedValues: ['true', 'false']
     Default: 'false'
-    Description: courses, chapters, lessons, /enrollment/me (needs securelearn/database)
+    Description: subjects, courses, chapters, lessons, /enrollment/me (needs securelearn/database)
   EnablePlayback:
     Type: String
     AllowedValues: ['true', 'false']
@@ -191,6 +191,8 @@ Resources:
         Course:      { Type: HttpApi, Properties: { ApiId: !Ref SecureLearnApi, Path: /api/v1/course, Method: ANY, PayloadFormatVersion: '1.0' } }
         CourseAny:   { Type: HttpApi, Properties: { ApiId: !Ref SecureLearnApi, Path: '/api/v1/course/{proxy+}', Method: ANY, PayloadFormatVersion: '1.0' } }
         AllCourses:  { Type: HttpApi, Properties: { ApiId: !Ref SecureLearnApi, Path: /api/v1/allcourses, Method: ANY, PayloadFormatVersion: '1.0' } }
+        Subject:     { Type: HttpApi, Properties: { ApiId: !Ref SecureLearnApi, Path: /api/v1/subject, Method: ANY, PayloadFormatVersion: '1.0' } }
+        SubjectAny:  { Type: HttpApi, Properties: { ApiId: !Ref SecureLearnApi, Path: '/api/v1/subject/{proxy+}', Method: ANY, PayloadFormatVersion: '1.0' } }
         Chapter:     { Type: HttpApi, Properties: { ApiId: !Ref SecureLearnApi, Path: /api/v1/chapter, Method: ANY, PayloadFormatVersion: '1.0' } }
         ChapterAny:  { Type: HttpApi, Properties: { ApiId: !Ref SecureLearnApi, Path: '/api/v1/chapter/{proxy+}', Method: ANY, PayloadFormatVersion: '1.0' } }
         Lesson:      { Type: HttpApi, Properties: { ApiId: !Ref SecureLearnApi, Path: /api/v1/lesson, Method: ANY, PayloadFormatVersion: '1.0' } }

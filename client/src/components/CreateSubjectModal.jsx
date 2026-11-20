@@ -10,12 +10,11 @@ export default function CreateSubjectModal({ show, onHide, onSubjectCreated }) {
   const { showToast } = useToast();
 
   const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!show) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim()) {
       showToast(
@@ -28,10 +27,7 @@ export default function CreateSubjectModal({ show, onHide, onSubjectCreated }) {
 
     setIsSubmitting(true);
     try {
-      const created = createSubject({
-        name: name.trim(),
-        description: description.trim(),
-      });
+      const created = await createSubject({ name: name.trim() });
 
       showToast(
         `${t('subject_modal.create_success', 'Đã tạo môn học')}: "${created.name}"`,
@@ -40,7 +36,6 @@ export default function CreateSubjectModal({ show, onHide, onSubjectCreated }) {
       );
 
       setName('');
-      setDescription('');
       onHide();
 
       if (typeof onSubjectCreated === 'function') {
@@ -100,20 +95,6 @@ export default function CreateSubjectModal({ show, onHide, onSubjectCreated }) {
               required
               autoFocus
               className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3.5 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-all"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="subjectDesc" className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1.5">
-              {t('subject_modal.desc_label', 'Mô tả môn học')}
-            </label>
-            <textarea
-              id="subjectDesc"
-              rows={3}
-              placeholder={t('subject_modal.desc_placeholder', 'Giới thiệu tổng quan về môn học...')}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3.5 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-all resize-none"
             />
           </div>
 

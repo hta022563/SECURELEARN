@@ -205,7 +205,8 @@
     "created_at": "Created:",
     "modal_denied_title": "Access Not Granted",
     "modal_denied_desc": "This course is currently not granted access for your account.",
-    "modal_denied_policy": "SecureLearn Security Policy: Courses in the catalog that are not granted access cannot be viewed. Only courses enrolled in \"My Courses\" can be accessed."
+    "modal_denied_policy": "SecureLearn Security Policy: Courses in the catalog that are not granted access cannot be viewed. Only courses enrolled in \"My Courses\" can be accessed.",
+    "delete_subject_cascade_warning": "This will PERMANENTLY DELETE the courses in this subject:"
   },
   "subject_lectures": {
     "loading": "Loading lectures for this subject...",
@@ -306,7 +307,7 @@
     "edit_chapter": "Edit Chapter",
     "add_lesson": "Add Lesson",
     "no_videos_in_chapter": "No video lessons in this chapter yet.",
-    "upload_lesson_now": "Upload lesson now \u2192",
+    "upload_lesson_now": "Upload lesson now →",
     "edit_name": "Edit Name",
     "reupload_video": "Reupload Video",
     "edit_video_title": "Edit Lesson Title",
@@ -434,7 +435,9 @@
     "create_success": "Successfully created course",
     "create_success_title": "Course Created Successfully",
     "create_failed": "Cannot create course",
-    "error": "Error"
+    "error": "Error",
+    "subject_required": "A course must belong to a subject. Pick or create one.",
+    "select_subject_required": "-- Select a subject --"
   },
   "admin": {
     "title": "AI Security Dashboard",

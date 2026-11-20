@@ -1,5 +1,7 @@
 package FCAJ.SecureLearn.Request;
 
+import java.util.UUID;
+
 /**
  *
  * @author ngoct
@@ -7,6 +9,7 @@ package FCAJ.SecureLearn.Request;
 public class CourseCreationRequest {
     String title, description, instructor;
     long prices;
+    UUID subjectId;
 
     public CourseCreationRequest() {
     }
@@ -50,4 +53,11 @@ public class CourseCreationRequest {
         this.prices = prices;
     }
 
+    public UUID getSubjectId() {
+        return subjectId;
+    }
+
+    public void setSubjectId(UUID subjectId) {
+        this.subjectId = subjectId;
+    }
 }
