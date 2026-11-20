@@ -8,6 +8,7 @@ import java.net.URL;
 import java.time.Duration;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 
 @Service
+@Profile({"playback", "upload"})
 public class PlaybackService {
 
     private final LessonRepo lessonRepo;

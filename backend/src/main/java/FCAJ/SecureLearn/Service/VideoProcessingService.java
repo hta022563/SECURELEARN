@@ -13,6 +13,7 @@ import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.stream.Stream;
+import org.springframework.context.annotation.Profile;
 
 /**
  * Downloads a raw video from R2, transcodes it to HLS with FFmpeg,
@@ -28,6 +29,7 @@ import java.util.stream.Stream;
  *   ...
  */
 @Service
+@Profile({"playback", "upload"})
 public class VideoProcessingService {
 
     private final S3Template s3Template;

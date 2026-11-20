@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -27,6 +28,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 // {id} in the base path is the lesson id; LogInterceptor reads it under the name "id"
 @RestController
 @RequestMapping("/api/v1/lesson/{id}")
+@Profile("playback")
 public class PlaybackController {
     // FFmpeg writes HLS segments as MPEG-TS (segment_%03d.ts)
     private static final MediaType MPEG_TS = MediaType.parseMediaType("video/mp2t");

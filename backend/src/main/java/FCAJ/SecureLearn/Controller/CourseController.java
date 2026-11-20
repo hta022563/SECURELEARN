@@ -30,6 +30,7 @@ import FCAJ.SecureLearn.Service.CourseService;
 import FCAJ.SecureLearn.Service.LessonService;
 import FCAJ.SecureLearn.Response.ChapterResponse;
 import FCAJ.SecureLearn.Response.LessonResponse;
+import org.springframework.context.annotation.Profile;
 
 /**
  * REST Controller for Course, Chapter, and Lesson management.
@@ -39,6 +40,7 @@ import FCAJ.SecureLearn.Response.LessonResponse;
  */
 @RestController
 @RequestMapping("/api/v1")
+@Profile("course")
 public class CourseController {
     private final CourseService courseService;
     private final ChapterService chapterService;

@@ -5,6 +5,7 @@ import FCAJ.SecureLearn.Model.ActionType;
 import FCAJ.SecureLearn.Service.LogService;
 import java.util.ArrayList;
 import java.util.List;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/v1/ai")
+@Profile("ai")
 public class AIController {
     private final LogService logService;
 

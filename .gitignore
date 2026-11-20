@@ -14,3 +14,13 @@ build/
 client/dist/
 server/dist/
 .kiro
+
+# Local env overrides and real credentials (commit the *.example files instead)
+.env.local
+client/.env.local
+AI/file/r2-secret.json
+
+# AI binaries and run output
+AI/file.rar
+AI/*.pkl
+AI/file/out.json

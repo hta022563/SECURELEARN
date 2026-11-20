@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import io.awspring.cloud.s3.ObjectMetadata;
 import io.awspring.cloud.s3.S3Template;
+import org.springframework.context.annotation.Profile;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
@@ -19,6 +20,7 @@ import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignReques
  * @author ngoct
  */
 @Service
+@Profile({"playback", "upload"})
 public class R2Service {
     private final S3Template template;
     private final S3Presigner presigner;

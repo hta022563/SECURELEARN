@@ -1,5 +1,6 @@
 package FCAJ.SecureLearn.Configuration;
 
+import FCAJ.SecureLearn.Model.AccessLog;
 import FCAJ.SecureLearn.Model.ActionType;
 import FCAJ.SecureLearn.Service.AuthService;
 import FCAJ.SecureLearn.Service.LogService;
@@ -55,6 +56,7 @@ public class LogInterceptor implements HandlerInterceptor {
         String ipAddress = request.getRemoteAddr();
         String userAgent = headerOrUnknown(request, "User-Agent");
         String deviceFingerprint = headerOrUnknown(request, "X-Device-Fingerprint");
+        AccessLog rawLog = null;
         try {
             if (pathVariables.get("id") != null) {
                 lessonId = UUID.fromString(pathVariables.get("id"));
@@ -62,19 +64,20 @@ public class LogInterceptor implements HandlerInterceptor {
             if (pathVariables.get("segmentId") != null) {
                 segmentId = Integer.valueOf(pathVariables.get("segmentId"));
             }
-            switch(actionType){
-                case SEGMENT_REQUEST:
-                    logService.createLog(email, actionType, LocalDateTime.now(), ipAddress, userAgent, deviceFingerprint,
-                        response.getStatus(), segmentId, lessonId);
-                case PLAYBACK,MANIFEST_REQUEST, KEY_REQUEST:
-                    logService.createLog(email, actionType, LocalDateTime.now(), ipAddress, userAgent, deviceFingerprint,
-                        response.getStatus(), lessonId);
-               default:
-                    logService.createLog(username, actionType, LocalDateTime.now(), ipAddress, userAgent, deviceFingerprint,
-                        response.getStatus());
+            switch (actionType) {
+                case SEGMENT_REQUEST -> rawLog = logService.createLog(email, actionType, LocalDateTime.now(),
+                        ipAddress, userAgent, deviceFingerprint, response.getStatus(), segmentId, lessonId);
+                case PLAYBACK, MANIFEST_REQUEST, KEY_REQUEST -> rawLog = logService.createLog(email, actionType,
+                        LocalDateTime.now(), ipAddress, userAgent, deviceFingerprint, response.getStatus(), lessonId);
+                default -> rawLog = logService.createLog(username, actionType, LocalDateTime.now(), ipAddress,
+                        userAgent, deviceFingerprint, response.getStatus());
             }
+            if (rawLog == null) {
+                throw new IllegalStateException("createLog returned no log to save");
+            }
+            logService.saveLog(rawLog);
         } catch (RuntimeException e) {
-            logger.warn("Failed to write {} access log for user {} on {} (status {})",
+            logger.warn("Failed to build or save {} access log for user {} on {} (status {})",
                     actionType, username, request.getRequestURI(), response.getStatus(), e);
         }
     }

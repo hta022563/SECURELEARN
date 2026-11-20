@@ -18,6 +18,7 @@ import software.amazon.awssdk.services.cognitoidentityprovider.model.Authenticat
 
 import java.util.List;
 import java.util.Map;
+import org.springframework.context.annotation.Profile;
 
 /**
  * REST controller for email/password authentication backed by AWS Cognito.
@@ -33,6 +34,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/v1/auth")
+@Profile("account")
 public class AuthController {
 
     private final AuthService authService;

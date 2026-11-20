@@ -17,7 +17,6 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.enhanced.dynamodb.model.Page;
-import software.amazon.awssdk.enhanced.dynamodb.model.PageIterable;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 
 /**
@@ -52,42 +51,34 @@ public class LogService {
         this.logTable = enhancedClient.table("AccessLog", TableSchema.fromBean(AccessLog.class));
     }
 
-    // Log ids look like "VID0007": a category prefix plus a per-user running count
-    private String generateLogId(String email, ActionType actionType) {
+    // A category prefix plus a random UUID keeps ids unique without reading the table, e.g. "VID3f2a..."
+    private String generateLogId(ActionType actionType) {
         String prefix = LOG_PREFIX.getOrDefault(actionType, UNKNOWN_PREFIX);
-        QueryConditional userLogsQuery = QueryConditional.keyEqualTo(Key.builder().addPartitionValue(email).build());
-        PageIterable<AccessLog> userLogs = logTable.query(userLogsQuery);
-        int nextNumber = 1;
-        for (AccessLog existingLog : userLogs.items()) {
-            if (existingLog.getLogId().startsWith(prefix)) {
-                nextNumber++;
-            }
-        }
-        return prefix + String.format("%04d", nextNumber);
+        return prefix + UUID.randomUUID();
     }
 
-    public void createLog(String email, ActionType actionType, LocalDateTime accessedTime, String ipAddress,
+    // Raw logs are built here; the caller saves them with saveLog
+    public AccessLog createLog(String email, ActionType actionType, LocalDateTime accessedTime, String ipAddress,
             String userAgent, String deviceFingerprint, int statusCode) {
-        String logId = generateLogId(email, actionType);
-        AccessLog newLog = new AccessLog(logId, email, accessedTime, actionType, ipAddress, userAgent,
+        return new AccessLog(generateLogId(actionType), email, accessedTime, actionType, ipAddress, userAgent,
                 deviceFingerprint, statusCode);
-        logTable.putItem(newLog);
     }
 
-    public void createLog(String email, ActionType actionType, LocalDateTime accessedTime, String ipAddress,
+    public AccessLog createLog(String email, ActionType actionType, LocalDateTime accessedTime, String ipAddress,
             String userAgent, String deviceFingerprint, int statusCode, UUID lessonId) {
-        String logId = generateLogId(email, actionType);
-        AccessLog newLog = new AccessLog(logId, email, accessedTime, actionType, ipAddress, userAgent,
+        return new AccessLog(generateLogId(actionType), email, accessedTime, actionType, ipAddress, userAgent,
                 deviceFingerprint, statusCode, lessonId);
-        logTable.putItem(newLog);
     }
 
-    public void createLog(String email, ActionType actionType, LocalDateTime accessedTime, String ipAddress,
+    public AccessLog createLog(String email, ActionType actionType, LocalDateTime accessedTime, String ipAddress,
             String userAgent, String deviceFingerprint, int statusCode, int segmentId, UUID lessonId) {
-        String logId = generateLogId(email, actionType);
-        AccessLog newLog = new AccessLog(logId, email, accessedTime, actionType, ipAddress, userAgent,
+        return new AccessLog(generateLogId(actionType), email, accessedTime, actionType, ipAddress, userAgent,
                 deviceFingerprint, statusCode, segmentId, lessonId);
-        logTable.putItem(newLog);
+    }
+
+    // Throws an SdkException if DynamoDB rejects the write or can't be reached
+    public void saveLog(AccessLog rawLog) {
+        logTable.putItem(rawLog);
     }
 
     public List<AccessLog> getLogsForToday(ActionType actionType) {

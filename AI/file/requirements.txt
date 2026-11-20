@@ -1,0 +1,5 @@
+# Phải khớp phiên bản lúc train (model được pickle bằng scikit-learn 1.9.1, numpy 2.x)
+scikit-learn==1.9.1
+numpy>=2,<3
+pandas>=2,<3
+joblib
