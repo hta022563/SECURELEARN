@@ -25,7 +25,7 @@ public class PlaybackService {
     private final R2Service r2Service;
     private final PlaybackTokenService tokenService;
 
-    @Value("${r2.bucket-name}")
+    @Value("${s3.bucket-name}")
     private String bucketName;
 
     @Value("${playback.segment-url-ttl-seconds:7200}")

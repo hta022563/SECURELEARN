@@ -11,11 +11,12 @@ Description: >
 #   securelearn/cognito    {"COGNITO_CLIENT_SECRET": "..."}   (account, admin)
 # Needed only when the group that reads them is switched on:
 #   securelearn/database   {"SPRING_DATASOURCE_URL": "...", "SPRING_DATASOURCE_USERNAME": "...", "SPRING_DATASOURCE_PASSWORD": "..."}
-#   securelearn/r2-read    {"R2_ACCESS_KEY": "...", "R2_SECRET_ACCESS_KEY": "..."}   (Cloudflare token, read-only)
-#   securelearn/r2-write   {"R2_ACCESS_KEY": "...", "R2_SECRET_ACCESS_KEY": "..."}   (Cloudflare token, read/write)
 #   securelearn/playback   {"PLAYBACK_TOKEN_SECRET": "..."}
 #   securelearn/momo       {"MOMO_PARTNER_CODE": "...", "MOMO_ACCESS_KEY": "...", "MOMO_SECRET_KEY": "..."}
 # The values are resolved by CloudFormation at deploy time, so re-deploy after rotating one.
+# Video storage is the S3 bucket named by VideoBucketName. It is reached through each
+# function's IAM role (no keys). Every policy below is the minimum the current code calls;
+# re-check them when a controller starts using a new AWS API.
 # ---------------------------------------------------------------------------
 
 Parameters:
@@ -34,7 +35,7 @@ Parameters:
     Type: String
     AllowedValues: ['true', 'false']
     Default: 'false'
-    Description: /lesson/{id}/... (needs database, r2-read, playback secrets)
+    Description: /lesson/{id}/... (needs database, playback secrets, read on the video bucket)
   EnablePayment:
     Type: String
     AllowedValues: ['true', 'false']
@@ -44,7 +45,7 @@ Parameters:
     Type: String
     AllowedValues: ['true', 'false']
     Default: 'false'
-    Description: /api/v1/upload/* (needs database, r2-write secrets; no ffmpeg on Lambda yet)
+    Description: /api/v1/upload/* (needs database secrets, write on the video bucket; no ffmpeg on Lambda yet)
   CognitoPoolId:
     Type: String
     Default: ap-southeast-1_ocn23tg3K
@@ -54,6 +55,10 @@ Parameters:
   MomoUrl:
     Type: String
     Default: https://test-payment.momo.vn
+  VideoBucketName:
+    Type: String
+    Default: secure-learn-fcaj-2026-video
+    Description: S3 bucket (in this region) that holds uploaded videos and HLS output
 
 Conditions:
   AdminOn:    !Equals [!Ref EnableAdmin, 'true']
@@ -90,14 +95,13 @@ Globals:
         SPRING_JPA_DATABASE_PLATFORM: org.hibernate.dialect.PostgreSQLDialect
         SPRING_APPLICATION_JSON: '{"spring.jpa.properties.hibernate.boot.allow_jdbc_metadata_access":false}'
         SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: '2'
+        S3_BUCKET_NAME: !Ref VideoBucketName
         # Placeholders. Every bean still loads in every group (step 3 is not finished), so
         # each property must exist even where it is never used. A group that really needs a
         # value overrides it below with its own secret. Delete a placeholder once the beans
         # that read it carry an @Profile.
         SPRING_DATASOURCE_URL: jdbc:postgresql://unused.invalid:5432/none
-        R2_ACCESS_KEY: unused
-        R2_SECRET_ACCESS_KEY: unused
-        R2_PUBLIC_URL: https://unused.invalid
+        PLAYBACK_TOKEN_SECRET: unused
         MOMO_URL: https://unused.invalid
         MOMO_PARTNER_CODE: unused
         MOMO_ACCESS_KEY: unused
@@ -124,9 +128,13 @@ Resources:
               Action:
                 # register() puts every new user in the student group
                 - cognito-idp:AdminAddUserToGroup
-                # LogInterceptor looks up the email of the logged-in user
+                # LogInterceptor looks up the email of the logged-in user (LOGIN is logged)
                 - cognito-idp:AdminGetUser
               Resource: !Sub arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoPoolId}
+            # LogInterceptor writes one AccessLog item per @LogAnnotationClass request
+            - Effect: Allow
+              Action: dynamodb:PutItem
+              Resource: !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/AccessLog
       Events:
         Auth:
           Type: HttpApi
@@ -151,15 +159,23 @@ Resources:
         - Statement:
             - Effect: Allow
               Action:
+                # adminRegister(): create user, set permanent password, add to role group
                 - cognito-idp:AdminCreateUser
                 - cognito-idp:AdminSetUserPassword
                 - cognito-idp:AdminAddUserToGroup
-                - cognito-idp:AdminDeleteUser
-                - cognito-idp:AdminGetUser
+                # deleteAccount(): checks it is not the last ADMIN, then deletes
                 - cognito-idp:AdminListGroupsForUser
-                - cognito-idp:ListUsers
                 - cognito-idp:ListUsersInGroup
+                - cognito-idp:AdminDeleteUser
+                # getUserPage() lists users; getUserRoles() reuses AdminListGroupsForUser
+                - cognito-idp:ListUsers
+                # LogInterceptor looks up the email of the admin (admin actions are logged)
+                - cognito-idp:AdminGetUser
               Resource: !Sub arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoPoolId}
+            # LogInterceptor writes one AccessLog item per @LogAnnotationClass request
+            - Effect: Allow
+              Action: dynamodb:PutItem
+              Resource: !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/AccessLog
       Events:
         Admin:
           Type: HttpApi
@@ -185,8 +201,13 @@ Resources:
       Policies:
         - Statement:
             - Effect: Allow
+              # EnrollmentController + LogInterceptor (course/chapter/video deletion) look up the email
               Action: cognito-idp:AdminGetUser
               Resource: !Sub arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoPoolId}
+            # LogInterceptor writes one AccessLog item per @LogAnnotationClass request
+            - Effect: Allow
+              Action: dynamodb:PutItem
+              Resource: !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/AccessLog
       Events:
         Course:      { Type: HttpApi, Properties: { ApiId: !Ref SecureLearnApi, Path: /api/v1/course, Method: ANY, PayloadFormatVersion: '1.0' } }
         CourseAny:   { Type: HttpApi, Properties: { ApiId: !Ref SecureLearnApi, Path: '/api/v1/course/{proxy+}', Method: ANY, PayloadFormatVersion: '1.0' } }
@@ -211,14 +232,23 @@ Resources:
           SPRING_DATASOURCE_URL: '{{resolve:secretsmanager:securelearn/database:SecretString:SPRING_DATASOURCE_URL}}'
           SPRING_DATASOURCE_USERNAME: '{{resolve:secretsmanager:securelearn/database:SecretString:SPRING_DATASOURCE_USERNAME}}'
           SPRING_DATASOURCE_PASSWORD: '{{resolve:secretsmanager:securelearn/database:SecretString:SPRING_DATASOURCE_PASSWORD}}'
-          R2_ACCESS_KEY: '{{resolve:secretsmanager:securelearn/r2-read:SecretString:R2_ACCESS_KEY}}'
-          R2_SECRET_ACCESS_KEY: '{{resolve:secretsmanager:securelearn/r2-read:SecretString:R2_SECRET_ACCESS_KEY}}'
           PLAYBACK_TOKEN_SECRET: '{{resolve:secretsmanager:securelearn/playback:SecretString:PLAYBACK_TOKEN_SECRET}}'
       Policies:
         - Statement:
+            # Manifest, segments and content.key are all under hls/. No ListBucket, so a missing
+            # segment comes back as AccessDenied (500) instead of NoSuchKey (404).
             - Effect: Allow
+              Action: s3:GetObject
+              Resource: !Sub arn:aws:s3:::${VideoBucketName}/hls/*
+        - Statement:
+            - Effect: Allow
+              # PlaybackController + LogInterceptor look up the student's email
               Action: cognito-idp:AdminGetUser
               Resource: !Sub arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoPoolId}
+            # LogInterceptor writes one AccessLog item per @LogAnnotationClass request
+            - Effect: Allow
+              Action: dynamodb:PutItem
+              Resource: !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/AccessLog
       Events:
         Playback:
           Type: HttpApi
@@ -248,6 +278,7 @@ Resources:
       Policies:
         - Statement:
             - Effect: Allow
+              # PaymentController looks up the student's email (nothing here is logged)
               Action: cognito-idp:AdminGetUser
               Resource: !Sub arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoPoolId}
       Events:
@@ -271,13 +302,16 @@ Resources:
           SPRING_DATASOURCE_URL: '{{resolve:secretsmanager:securelearn/database:SecretString:SPRING_DATASOURCE_URL}}'
           SPRING_DATASOURCE_USERNAME: '{{resolve:secretsmanager:securelearn/database:SecretString:SPRING_DATASOURCE_USERNAME}}'
           SPRING_DATASOURCE_PASSWORD: '{{resolve:secretsmanager:securelearn/database:SecretString:SPRING_DATASOURCE_PASSWORD}}'
-          R2_ACCESS_KEY: '{{resolve:secretsmanager:securelearn/r2-write:SecretString:R2_ACCESS_KEY}}'
-          R2_SECRET_ACCESS_KEY: '{{resolve:secretsmanager:securelearn/r2-write:SecretString:R2_SECRET_ACCESS_KEY}}'
       Policies:
         - Statement:
+            # Raw upload: browser PUTs via a URL this role presigns; /process reads it, then deletes it
             - Effect: Allow
-              Action: cognito-idp:AdminGetUser
-              Resource: !Sub arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoPoolId}
+              Action: [s3:PutObject, s3:GetObject, s3:DeleteObject]
+              Resource: !Sub arn:aws:s3:::${VideoBucketName}/videos/*
+            # FFmpeg output: segments, playlist and content.key
+            - Effect: Allow
+              Action: s3:PutObject
+              Resource: !Sub arn:aws:s3:::${VideoBucketName}/hls/*
       Events:
         Upload:
           Type: HttpApi
