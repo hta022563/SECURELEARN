@@ -20,6 +20,10 @@ import { getCourses } from '../services/courseService';
 import {
   loadSubjects,
   groupCoursesBySubjects,
+<<<<<<< HEAD
+  getSubjects,
+=======
+>>>>>>> 1657229ae49b33ab0d8b659d341745d429148a48
   deleteSubject,
 } from '../services/subjectService';
 import CreateCourseModal from '../components/CreateCourseModal';
@@ -27,8 +31,10 @@ import CreateSubjectModal from '../components/CreateSubjectModal';
 
 /**
  * =============================================================================
- * PAGE: CourseCatalog (Danh Mục Môn Học & Lọc Theo Khóa Học - FE Only)
+ * PAGE: CourseCatalog (Danh Mục Môn Học & Lọc Theo Môn Học - FE Only)
  * =============================================================================
+ * Mỗi khóa học thuộc về một môn học cụ thể. Người dùng vào môn học sẽ xem được
+ * danh sách toàn bộ bài giảng và có thể lọc danh mục theo Môn Học.
  */
 export default function CourseCatalog() {
   const { lang } = useParams();
@@ -43,7 +49,7 @@ export default function CourseCatalog() {
   const [isLoading, setIsLoading] = useState(true);
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCourseFilter, setSelectedCourseFilter] = useState('');
+  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState('');
 
   const [showCreateCourseModal, setShowCreateCourseModal] = useState(false);
   const [showCreateSubjectModal, setShowCreateSubjectModal] = useState(false);
@@ -70,25 +76,26 @@ export default function CourseCatalog() {
     return groupCoursesBySubjects(allCourses);
   }, [allCourses, subjectVersion]);
 
+  // Bộ lọc danh mục theo Môn Học & Tìm kiếm từ khóa
   const filteredSubjects = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
 
     return displaySubjects.filter((subject) => {
-      const subjectCourses = subject.courses || [];
-
-      if (selectedCourseFilter) {
-        const hasSelectedCourse = subjectCourses.some(
-          (c) => String(c.id || c.ID) === String(selectedCourseFilter)
-        );
-        if (!hasSelectedCourse) return false;
+      // 1. Lọc theo Môn Học đã chọn
+      if (selectedSubjectFilter) {
+        if (String(subject.id) !== String(selectedSubjectFilter)) {
+          return false;
+        }
       }
 
+      // 2. Tìm kiếm theo từ khóa
       if (!term) return true;
 
       const matchSubject =
         (subject.name || '').toLowerCase().includes(term) ||
         (subject.description || '').toLowerCase().includes(term);
 
+      const subjectCourses = subject.courses || [];
       const matchCourse = subjectCourses.some(
         (c) =>
           (c.title || c.Title || '').toLowerCase().includes(term) ||
@@ -98,7 +105,7 @@ export default function CourseCatalog() {
 
       return matchSubject || matchCourse;
     });
-  }, [displaySubjects, searchTerm, selectedCourseFilter]);
+  }, [displaySubjects, searchTerm, selectedSubjectFilter]);
 
   const handleOpenSubject = (subjectId, courseId = '') => {
     const query = courseId ? `?courseId=${encodeURIComponent(courseId)}` : '';
@@ -132,6 +139,12 @@ ${t('catalog.delete_subject_cascade_warning', 'Thao tác này sẽ XÓA VĨNH VI
     }
   };
 
+<<<<<<< HEAD
+  const selectedSubjectObj = useMemo(() => {
+    if (!selectedSubjectFilter) return null;
+    return displaySubjects.find((s) => String(s.id) === String(selectedSubjectFilter)) || null;
+  }, [displaySubjects, selectedSubjectFilter]);
+=======
   const selectedCourseObj = useMemo(() => {
     if (!selectedCourseFilter) return null;
     const found = allCourses.find(
@@ -146,6 +159,7 @@ ${t('catalog.delete_subject_cascade_warning', 'Thao tác này sẽ XÓA VĨNH VI
       subjectName: subObj?.name || '',
     };
   }, [allCourses, selectedCourseFilter, displaySubjects]);
+>>>>>>> 1657229ae49b33ab0d8b659d341745d429148a48
 
   const canManage =
     isAuthenticated && (user?.role === 'Instructor' || user?.role === 'Administrator');
@@ -163,14 +177,15 @@ ${t('catalog.delete_subject_cascade_warning', 'Thao tác này sẽ XÓA VĨNH VI
         <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed">
           {t(
             'catalog.subjects_subtitle',
-            'Chọn môn học để khám phá toàn bộ bài giảng và lọc nhanh theo từng khóa học.'
+            'Chọn môn học để khám phá toàn bộ bài giảng và học tập theo lộ trình rõ ràng.'
           )}
         </p>
       </div>
 
-      {/* 2. BỘ TÌM KIẾM & LỌC THEO KHÓA HỌC */}
+      {/* 2. BỘ TÌM KIẾM & LỌC THEO MÔN HỌC */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-5 shadow-sm border border-slate-200/80 dark:border-slate-800 mb-8 space-y-4">
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+          {/* Ô tìm kiếm */}
           <div className="relative flex-1">
             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
               <Search className="h-4 w-4" />
@@ -196,17 +211,25 @@ ${t('catalog.delete_subject_cascade_warning', 'Thao tác này sẽ XÓA VĨNH VI
             )}
           </div>
 
+          {/* Dropdown Lọc Theo Môn Học */}
           <div className="flex items-center gap-2 min-w-[240px]">
             <Filter className="h-4 w-4 text-slate-400 shrink-0" />
             <select
-              value={selectedCourseFilter}
-              onChange={(e) => setSelectedCourseFilter(e.target.value)}
-              aria-label={t('catalog.filter_by_course', 'Lọc theo khóa học')}
-              className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60 px-3.5 py-2.5 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              value={selectedSubjectFilter}
+              onChange={(e) => setSelectedSubjectFilter(e.target.value)}
+              aria-label={t('catalog.filter_by_subject', 'Lọc theo môn học')}
+              className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60 px-3.5 py-2.5 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer"
             >
               <option value="">
-                {t('catalog.all_courses_filter', 'Lọc theo khóa học: Tất cả')} ({allCourses.length})
+                {t('catalog.all_subjects_filter', 'Lọc theo môn học: Tất cả')} ({displaySubjects.length})
               </option>
+<<<<<<< HEAD
+              {displaySubjects.map((subject) => (
+                <option key={subject.id} value={subject.id}>
+                  {subject.name} ({subject.courseCount || subject.courses?.length || 0} {t('subject_lectures.courses_label', 'khóa học')})
+                </option>
+              ))}
+=======
               {allCourses.map((course) => {
                 const subId = course.subjectId;
                 const subName = subId
@@ -219,9 +242,11 @@ ${t('catalog.delete_subject_cascade_warning', 'Thao tác này sẽ XÓA VĨNH VI
                   </option>
                 );
               })}
+>>>>>>> 1657229ae49b33ab0d8b659d341745d429148a48
             </select>
           </div>
 
+          {/* Các nút hành động quản lý cho Instructor / Admin */}
           {canManage && (
             <div className="flex flex-wrap items-center gap-2 shrink-0">
               <button
@@ -244,36 +269,71 @@ ${t('catalog.delete_subject_cascade_warning', 'Thao tác này sẽ XÓA VĨNH VI
           )}
         </div>
 
-        {selectedCourseObj && (
+        {/* Thanh nút lọc nhanh Môn Học (Pills) */}
+        {displaySubjects.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mr-1">
+              {t('catalog.filter_by_subject', 'Lọc môn học')}:
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedSubjectFilter('')}
+              className={`rounded-full px-3 py-1 text-xs font-semibold transition-all cursor-pointer ${
+                !selectedSubjectFilter
+                  ? 'bg-slate-900 dark:bg-blue-600 text-white shadow-xs'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+            >
+              {t('catalog.filter_all', 'Tất cả')} ({displaySubjects.length})
+            </button>
+            {displaySubjects.map((sub) => {
+              const active = String(selectedSubjectFilter) === String(sub.id);
+              const count = sub.courseCount || sub.courses?.length || 0;
+              return (
+                <button
+                  key={sub.id}
+                  type="button"
+                  onClick={() => setSelectedSubjectFilter(active ? '' : sub.id)}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-all cursor-pointer ${
+                    active
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  <BookOpen className="h-3 w-3" />
+                  <span>{sub.name}</span>
+                  <span className="opacity-75">({count})</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Banner thông báo trạng thái lọc theo môn học cụ thể */}
+        {selectedSubjectObj && (
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/70 dark:border-blue-800/70 text-xs">
             <div>
               <span className="text-slate-500 dark:text-slate-400">
-                {t('catalog.filtering_course', 'Đang lọc khóa học:')}{' '}
+                {t('catalog.filtering_subject', 'Đang lọc môn học:')}{' '}
               </span>
-              <strong className="text-slate-900 dark:text-white">{selectedCourseObj.title}</strong>
-              {selectedCourseObj.subjectName && (
-                <span className="text-blue-600 dark:text-blue-400 ml-1.5">
-                  ({selectedCourseObj.subjectName})
-                </span>
-              )}
+              <strong className="text-slate-900 dark:text-white">{selectedSubjectObj.name}</strong>
+              <span className="text-blue-600 dark:text-blue-400 ml-1.5">
+                ({selectedSubjectObj.courseCount || selectedSubjectObj.courses?.length || 0}{' '}
+                {t('subject_lectures.courses_label', 'khóa học')})
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() =>
-                  handleOpenSubject(
-                    selectedCourseObj.subjectId,
-                    selectedCourseObj.id || selectedCourseObj.ID
-                  )
-                }
+                onClick={() => handleOpenSubject(selectedSubjectObj.id)}
                 className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 px-4 py-1.5 text-xs font-semibold text-white shadow-xs cursor-pointer"
               >
                 <Play className="h-3 w-3 fill-white" />
-                <span>{t('catalog.view_course_lectures', 'Xem bài giảng của khóa học này')}</span>
+                <span>{t('catalog.view_subject_lectures', 'Vào xem bài giảng')}</span>
               </button>
               <button
                 type="button"
-                onClick={() => setSelectedCourseFilter('')}
+                onClick={() => setSelectedSubjectFilter('')}
                 className="rounded-full px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-800 cursor-pointer"
               >
                 {t('catalog.clear_filter')}
@@ -300,12 +360,12 @@ ${t('catalog.delete_subject_cascade_warning', 'Thao tác này sẽ XÓA VĨNH VI
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-6">
             {t('catalog.no_results_desc')}
           </p>
-          {(searchTerm || selectedCourseFilter) && (
+          {(searchTerm || selectedSubjectFilter) && (
             <button
               type="button"
               onClick={() => {
                 setSearchTerm('');
-                setSelectedCourseFilter('');
+                setSelectedSubjectFilter('');
               }}
               className="inline-flex items-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 px-5 py-2.5 text-xs font-semibold text-white shadow-xs"
             >
@@ -318,24 +378,22 @@ ${t('catalog.delete_subject_cascade_warning', 'Thao tác này sẽ XÓA VĨNH VI
           {filteredSubjects.map((subject) => {
             const subjectCourses = subject.courses || [];
             const term = searchTerm.trim().toLowerCase();
-            const matchingCourses = selectedCourseFilter
-              ? subjectCourses.filter(
-                  (c) => String(c.id || c.ID) === String(selectedCourseFilter)
-                )
-              : term
+            const matchingCourses = term
               ? subjectCourses.filter((c) =>
-                  (c.title || c.Title || '').toLowerCase().includes(term)
+                  (c.title || c.Title || '').toLowerCase().includes(term) ||
+                  (c.description || c.Description || '').toLowerCase().includes(term) ||
+                  (c.instructor || c.Instructor || '').toLowerCase().includes(term)
                 )
               : subjectCourses;
             const previewCourses = (matchingCourses.length > 0 ? matchingCourses : subjectCourses).slice(
               0,
-              3
+              4
             );
 
             return (
               <div
                 key={subject.id}
-                onClick={() => handleOpenSubject(subject.id, selectedCourseFilter || '')}
+                onClick={() => handleOpenSubject(subject.id)}
                 className="group flex flex-col rounded-3xl overflow-hidden bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 cursor-pointer"
               >
                 {/* Header thẻ Môn học */}
@@ -376,7 +434,7 @@ ${t('catalog.delete_subject_cascade_warning', 'Thao tác này sẽ XÓA VĨNH VI
                       )}
                   </p>
 
-                  {/* Thống kê */}
+                  {/* Thống kê khóa học */}
                   <div className="flex items-center gap-2 mb-4">
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-semibold">
                       <Layers className="h-3 w-3 text-blue-500" />
@@ -406,7 +464,7 @@ ${t('catalog.delete_subject_cascade_warning', 'Thao tác này sẽ XÓA VĨNH VI
                             <span className="truncate max-w-[160px]">{c.title}</span>
                           </button>
                         ))}
-                        {subjectCourses.length > previewCourses.length && !selectedCourseFilter && (
+                        {subjectCourses.length > previewCourses.length && (
                           <span className="inline-flex items-center px-2 py-1 text-[11px] text-slate-400">
                             +{subjectCourses.length - previewCourses.length}
                           </span>
