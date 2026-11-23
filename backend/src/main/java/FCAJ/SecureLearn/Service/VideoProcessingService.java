@@ -34,7 +34,7 @@ public class VideoProcessingService {
 
     private final S3Template s3Template;
 
-    @Value("${r2.bucket-name}")
+    @Value("${s3.bucket-name}")
     private String bucketName;
 
     public VideoProcessingService(

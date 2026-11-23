@@ -19,7 +19,7 @@ public class PlaybackTokenService {
     private final long ttlSeconds;
 
     public PlaybackTokenService(
-            @Value("${playback.token-secret:${r2.secret-key}}") String secret,
+            @Value("${playback.token-secret}") String secret,
             @Value("${playback.token-ttl-seconds:7200}") long ttlSeconds) {
         this.secret = secret.getBytes(StandardCharsets.UTF_8);
         this.ttlSeconds = ttlSeconds;

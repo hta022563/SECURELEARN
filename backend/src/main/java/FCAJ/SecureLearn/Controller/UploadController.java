@@ -47,7 +47,7 @@ public class UploadController {
     private final VideoProcessingService processingService;
     private final LessonService lessonService;
 
-    @Value("${r2.bucket-name}")
+    @Value("${s3.bucket-name}")
     private String bucketName;
 
     public UploadController(R2Service r2Service,
