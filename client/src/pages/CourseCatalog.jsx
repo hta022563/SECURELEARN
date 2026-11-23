@@ -20,10 +20,6 @@ import { getCourses } from '../services/courseService';
 import {
   loadSubjects,
   groupCoursesBySubjects,
-<<<<<<< HEAD
-  getSubjects,
-=======
->>>>>>> 1657229ae49b33ab0d8b659d341745d429148a48
   deleteSubject,
 } from '../services/subjectService';
 import CreateCourseModal from '../components/CreateCourseModal';
@@ -139,27 +135,10 @@ ${t('catalog.delete_subject_cascade_warning', 'Thao tác này sẽ XÓA VĨNH VI
     }
   };
 
-<<<<<<< HEAD
   const selectedSubjectObj = useMemo(() => {
     if (!selectedSubjectFilter) return null;
     return displaySubjects.find((s) => String(s.id) === String(selectedSubjectFilter)) || null;
   }, [displaySubjects, selectedSubjectFilter]);
-=======
-  const selectedCourseObj = useMemo(() => {
-    if (!selectedCourseFilter) return null;
-    const found = allCourses.find(
-      (c) => String(c.id || c.ID) === String(selectedCourseFilter)
-    );
-    if (!found) return null;
-    const subId = found.subjectId;
-    const subObj = displaySubjects.find((s) => String(s.id) === String(subId));
-    return {
-      ...found,
-      subjectId: subId,
-      subjectName: subObj?.name || '',
-    };
-  }, [allCourses, selectedCourseFilter, displaySubjects]);
->>>>>>> 1657229ae49b33ab0d8b659d341745d429148a48
 
   const canManage =
     isAuthenticated && (user?.role === 'Instructor' || user?.role === 'Administrator');
@@ -223,26 +202,11 @@ ${t('catalog.delete_subject_cascade_warning', 'Thao tác này sẽ XÓA VĨNH VI
               <option value="">
                 {t('catalog.all_subjects_filter', 'Lọc theo môn học: Tất cả')} ({displaySubjects.length})
               </option>
-<<<<<<< HEAD
               {displaySubjects.map((subject) => (
                 <option key={subject.id} value={subject.id}>
                   {subject.name} ({subject.courseCount || subject.courses?.length || 0} {t('subject_lectures.courses_label', 'khóa học')})
                 </option>
               ))}
-=======
-              {allCourses.map((course) => {
-                const subId = course.subjectId;
-                const subName = subId
-                  ? displaySubjects.find((s) => String(s.id) === String(subId))?.name
-                  : null;
-                return (
-                  <option key={course.id || course.ID} value={course.id || course.ID}>
-                    {course.title}
-                    {subName ? ` — ${subName}` : ''}
-                  </option>
-                );
-              })}
->>>>>>> 1657229ae49b33ab0d8b659d341745d429148a48
             </select>
           </div>
 
