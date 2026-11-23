@@ -69,7 +69,7 @@ Conditions:
 
 Globals:
   Function:
-    CodeUri: s3://securelearn-fcaj-2026/SecureLearn-0.0.1-SNAPSHOT-lambda-packagev3.zip
+    CodeUri: s3://securelearn-fcaj-2026/SecureLearn-0.0.1-SNAPSHOT-lambda-packagev4.zip
     # The adapter's own handler: starts SecureLearnApplication (MAIN_CLASS) and turns each
     # API Gateway event into an HttpServletRequest for the controllers.
     Handler: com.amazonaws.serverless.proxy.spring.SpringDelegatingLambdaContainerHandler::handleRequest
@@ -255,7 +255,10 @@ Resources:
           Properties:
             ApiId: !Ref SecureLearnApi
             Path: '/api/v1/lesson/{id}/{proxy+}'
-            Method: GET
+            # ANY, not GET: hls.js and axios send Authorization (+ X-Device-Fingerprint), so the
+            # browser preflights with OPTIONS first. A GET-only route makes that OPTIONS a 404 and
+            # the real request is blocked by CORS. Spring permits OPTIONS and adds the CORS headers.
+            Method: ANY
             # 1.0: the adapter answers in the 1.0 shape (multiValueHeaders); 2.0 would drop every header
             PayloadFormatVersion: '1.0'
 

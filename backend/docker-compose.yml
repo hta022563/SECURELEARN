@@ -28,12 +28,13 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      # PostgreSQL
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-SecureLearn}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the .env file}
+      # PostgreSQL: the local container by default. Set DB_URL / DB_USERNAME / DB_PASSWORD in .env
+      # to use RDS instead, so this backend shares one database with the Lambda functions.
+      SPRING_DATASOURCE_URL: ${DB_URL:-jdbc:postgresql://postgres:5432/${POSTGRES_DB:-SecureLearn}}
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-${POSTGRES_USER:-postgres}}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the .env file}}
 
-      # JPA/Hibernate
+      # JPA/Hibernate (set HIBERNATE_DDL_AUTO=validate when using RDS, so a local run never alters the shared schema)
       SPRING_JPA_HIBERNATE_DDL_AUTO: ${HIBERNATE_DDL_AUTO:-update}
       SPRING_JPA_SHOW_SQL: ${SHOW_SQL:-false}
 

@@ -1,8 +1,9 @@
 /**
  * Where each part of the API lives during the Lambda migration.
  *
- * - LAMBDA_API_URL: groups already moved to AWS Lambda behind API Gateway (auth, admin).
- * - LOCAL_API_URL:  everything else (course, enrollment, playback, payment, upload, ai)
+ * - LAMBDA_API_URL: groups already moved to AWS Lambda behind API Gateway
+ *                   (auth, admin, course incl. subjects and /enrollment/me, playback; both use RDS).
+ * - LOCAL_API_URL:  everything else (payment, upload, ai)
  *                   still runs on the local Spring Boot backend + local Postgres.
  *
  * Override either with VITE_LAMBDA_API_URL / VITE_API_URL (e.g. in .env.local for `npm run dev`).
@@ -15,11 +16,21 @@ export const LAMBDA_API_URL =
 
 export const LOCAL_API_URL = env.VITE_API_URL || 'http://localhost:8080/api/v1';
 
-// Paths (relative to /api/v1) served by Lambda. Add a prefix here when its group goes live.
-const LAMBDA_PREFIXES = ['/auth/', '/admin/'];
+// Paths (relative to /api/v1) served by Lambda. Mirror the group's routes in backend/template.yaml
+// when it goes live. `(?:[/?]|$)` = the path ends there or continues with a sub-path / query string.
+const LAMBDA_ROUTES = [
+  /^\/auth\//, // account
+  /^\/admin\//, // admin
+  // course group
+  /^\/(?:course|subject|chapter)(?:[/?]|$)/,
+  /^\/allcourses(?:\?|$)/,
+  // course: POST /lesson, /lesson/{id}; playback: /lesson/{id}/<playback|manifest|key|segment/n>
+  /^\/lesson(?:[/?]|$)/,
+  /^\/enrollment\/me(?:\?|$)/, // POST /enrollment/{courseId} is payment, stays local
+];
 
 /** Base URL for a request path such as '/admin/user' or 'admin/user'. */
 export function baseUrlFor(path = '') {
   const normalized = path.startsWith('/') ? path : `/${path}`;
-  return LAMBDA_PREFIXES.some((prefix) => normalized.startsWith(prefix)) ? LAMBDA_API_URL : LOCAL_API_URL;
+  return LAMBDA_ROUTES.some((route) => route.test(normalized)) ? LAMBDA_API_URL : LOCAL_API_URL;
 }
