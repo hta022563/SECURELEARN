@@ -2,8 +2,8 @@
  * Where each part of the API lives during the Lambda migration.
  *
  * - LAMBDA_API_URL: groups already moved to AWS Lambda behind API Gateway
- *                   (auth, admin, course incl. subjects and /enrollment/me, playback; both use RDS).
- * - LOCAL_API_URL:  everything else (payment, upload, ai)
+ *                   (auth, admin, course incl. subjects and /enrollment/me; course uses RDS).
+ * - LOCAL_API_URL:  everything else (playback, payment, upload, ai)
  *                   still runs on the local Spring Boot backend + local Postgres.
  *
  * Override either with VITE_LAMBDA_API_URL / VITE_API_URL (e.g. in .env.local for `npm run dev`).
@@ -24,8 +24,7 @@ const LAMBDA_ROUTES = [
   // course group
   /^\/(?:course|subject|chapter)(?:[/?]|$)/,
   /^\/allcourses(?:\?|$)/,
-  // course: POST /lesson, /lesson/{id}; playback: /lesson/{id}/<playback|manifest|key|segment/n>
-  /^\/lesson(?:[/?]|$)/,
+  /^\/lesson(?:\/[^/?]+)?(?:\?|$)/, // POST /lesson and /lesson/{id} only; /lesson/{id}/playback etc. stay local
   /^\/enrollment\/me(?:\?|$)/, // POST /enrollment/{courseId} is payment, stays local
 ];
 

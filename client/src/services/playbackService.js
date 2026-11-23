@@ -1,5 +1,5 @@
 import apiClient from '../api/axiosClient.js';
-import { baseUrlFor } from '../api/apiConfig.js';
+import { LOCAL_API_URL } from '../api/apiConfig.js';
 
 /**
  * =============================================================================
@@ -83,8 +83,8 @@ export async function getLessonPlayback(lessonId) {
  * @returns {string} URL manifest hoàn chỉnh
  */
 export function buildManifestUrl(lessonId, token) {
-  // Same host as /lesson/{id}/playback, so the token is checked by the backend that issued it
-  const baseUrl = baseUrlFor(`/lesson/${lessonId}/manifest`);
+  // Playback still runs on the local backend (see api/apiConfig.js)
+  const baseUrl = LOCAL_API_URL;
   return `${baseUrl}/lesson/${lessonId}/manifest?token=${encodeURIComponent(token)}`;
 }
 

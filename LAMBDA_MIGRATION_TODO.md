@@ -6,7 +6,7 @@
 - [ ] Check key/segment bytes arrive intact through API Gateway
 - [ ] Check largest segment fits Lambda's 6 MB response limit (after base64, ~4.5 MB raw)
 - [ ] Manifest URLs point at API Gateway, not localhost
-- [x] Frontend: playback routes + `buildManifestUrl` → Lambda
+- [ ] Frontend: playback routes + `buildManifestUrl` → Lambda
 - [ ] Redeploy template (playback route GET → ANY so the CORS preflight reaches Spring)
 - [ ] Test enrolled / unenrolled / expired token
 
