@@ -108,3 +108,25 @@ export async function deleteAdminUser(email) {
     headers: { 'Content-Type': 'text/plain' },
   });
 }
+
+/**
+ * Lấy danh sách AccessLog trong ngày từ AIController (GET /api/v1/ai/logs)
+ * @returns {Promise<Array>}
+ */
+export async function getAiAccessLogs() {
+  const res = await apiClient.get('/ai/logs');
+  const rawLogs = Array.isArray(res) ? res : res?.logs || res?.data || [];
+  return rawLogs.map((log, idx) => ({
+    logId: log.logId || log.id || `log-${idx}`,
+    userEmail: (log.userEmail || log.email || '').trim(),
+    accessedTime: log.accessedTime || log.timestamp || null,
+    actionType: log.actionType || 'UNKNOWN',
+    ipAddress: log.ipAddress || '',
+    userAgent: log.userAgent || '',
+    deviceFingerprint: log.device_fingerprint || log.deviceFingerprint || '',
+    downloadInterval: Number(log.downloadInterval || 0),
+    statusCode: Number(log.statusCode || 200),
+    segmentCount: Number(log.segmentCount || 0),
+    lessonId: log.lessonId || null,
+  }));
+}

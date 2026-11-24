@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Fingerprint,
@@ -9,74 +9,172 @@ import {
   ShieldAlert,
   X,
   Lock,
-  ShieldCheck,
   Loader2,
   Sparkles,
+  RefreshCw,
 } from 'lucide-react';
-import {
-  anomalyAlerts as dbAlerts,
-  accessLogs as dbLogs,
-  users as dbUsers,
-  courses as dbCourses,
-  entitlements as dbEntitlements,
-  sessions as dbSessions,
-} from '../data/mockDatabase';
+import { getAiAccessLogs, getAdminUsers } from '../services/adminService';
+import { getCourses } from '../services/courseService';
 import { useToast } from '../context/ToastContext';
+
+const RESOLVED_ALERTS_KEY = 'securelearn_resolved_alerts_v1';
+
+function readResolvedIds() {
+  try {
+    if (typeof localStorage === 'undefined') return new Set();
+    const raw = localStorage.getItem(RESOLVED_ALERTS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(parsed) ? parsed : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function writeResolvedIds(idsSet) {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(RESOLVED_ALERTS_KEY, JSON.stringify(Array.from(idsSet)));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function formatNameFromEmail(email) {
+  if (!email) return '';
+  const local = email.split('@')[0] || '';
+  return local
+    .split(/[._-]/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
+/**
+ * Phân tích danh sách AccessLog thật từ Backend (/api/v1/ai/logs) theo từng người dùng
+ * để phát hiện các hành vi bất thường (nhiều IP, nhiều thiết bị, spam key/manifest, lỗi truy cập, tua nhanh).
+ */
+function buildAnomalyAlertsFromLogs(logs, usersList, coursesList, resolvedIds) {
+  if (!Array.isArray(logs) || logs.length === 0) return [];
+
+  const usersByEmail = new Map();
+  usersList.forEach((u) => {
+    if (u.email) usersByEmail.set(u.email.toLowerCase(), u);
+  });
+
+  const groupedByEmail = new Map();
+  logs.forEach((log) => {
+    const emailKey = (log.userEmail || 'anonymous').toLowerCase();
+    if (!groupedByEmail.has(emailKey)) {
+      groupedByEmail.set(emailKey, []);
+    }
+    groupedByEmail.get(emailKey).push(log);
+  });
+
+  const alerts = [];
+
+  groupedByEmail.forEach((userLogs, emailKey) => {
+    const uniqueIps = new Set();
+    const uniqueDevices = new Set();
+    let keyRequests = 0;
+    let errorLogs = 0;
+    let rapidIntervals = 0;
+    let latestLog = userLogs[0];
+    let latestTimeMs = latestLog?.accessedTime ? new Date(latestLog.accessedTime).getTime() : 0;
+
+    userLogs.forEach((l) => {
+      if (l.ipAddress) uniqueIps.add(l.ipAddress);
+      const dev = l.deviceFingerprint || l.userAgent;
+      if (dev) uniqueDevices.add(dev);
+
+      if (l.actionType === 'KEY' || l.actionType === 'KEY_REQUEST') {
+        keyRequests += 1;
+      }
+      if (l.statusCode >= 400) {
+        errorLogs += 1;
+      }
+      if (l.downloadInterval > 0 && l.downloadInterval < 500) {
+        rapidIntervals += 1;
+      }
+
+      const tMs = l.accessedTime ? new Date(l.accessedTime).getTime() : 0;
+      if (tMs >= latestTimeMs) {
+        latestTimeMs = tMs;
+        latestLog = l;
+      }
+    });
+
+    let score = 0;
+    if (uniqueIps.size > 1) score += Math.min(45, (uniqueIps.size - 1) * 25);
+    if (uniqueDevices.size > 1) score += Math.min(35, (uniqueDevices.size - 1) * 20);
+    if (keyRequests >= 5) score += Math.min(35, (keyRequests - 4) * 7);
+    if (errorLogs >= 2) score += Math.min(30, errorLogs * 10);
+    if (rapidIntervals >= 2) score += Math.min(30, rapidIntervals * 10);
+
+    const riskScore = Math.min(100, Math.round(score));
+    if (riskScore < 25) return;
+
+    let anomalyTypeKey = 'admin_alerts.account_sharing';
+    let detailsKey = 'admin_alerts.account_sharing_desc';
+    if (keyRequests >= 5 || errorLogs >= 3) {
+      anomalyTypeKey = 'admin_alerts.spam_ecdh';
+      detailsKey = 'admin_alerts.spam_ecdh_desc';
+    } else if (uniqueIps.size > 1 && uniqueDevices.size > 1) {
+      anomalyTypeKey = 'admin_alerts.account_sharing';
+      detailsKey = 'admin_alerts.account_sharing_desc';
+    } else if (rapidIntervals >= 2) {
+      anomalyTypeKey = 'admin_alerts.bot_viewing';
+      detailsKey = 'admin_alerts.bot_viewing_desc';
+    } else if (uniqueIps.size > 1) {
+      anomalyTypeKey = 'admin_alerts.geo_anomaly';
+      detailsKey = 'admin_alerts.geo_anomaly_desc';
+    }
+
+    const matchedUser = usersByEmail.get(emailKey);
+    const displayEmail = matchedUser?.email || latestLog?.userEmail || emailKey;
+    const displayName = matchedUser?.fullName || formatNameFromEmail(displayEmail);
+    const alertId = `al-${emailKey}`;
+
+    alerts.push({
+      id: alertId,
+      studentId: matchedUser?.id || displayEmail,
+      studentName: displayName,
+      studentEmail: displayEmail,
+      courseId: coursesList[0]?.id || coursesList[0]?.ID || null,
+      courseTitle: coursesList[0]?.title || coursesList[0]?.Title || null,
+      anomalyTypeKey,
+      detailsKey,
+      riskScore,
+      rawTimestamp: latestTimeMs ? new Date(latestTimeMs) : null,
+      status: resolvedIds.has(alertId) ? 'Resolved' : 'open',
+      accessLogId: latestLog?.logId || '',
+      uniqueIpCount: uniqueIps.size,
+      uniqueDeviceCount: uniqueDevices.size,
+      totalEvents: userLogs.length,
+    });
+  });
+
+  return alerts.sort((a, b) => {
+    if (b.riskScore !== a.riskScore) return b.riskScore - a.riskScore;
+    const ta = a.rawTimestamp ? a.rawTimestamp.getTime() : 0;
+    const tb = b.rawTimestamp ? b.rawTimestamp.getTime() : 0;
+    return tb - ta;
+  });
+}
 
 /**
  * =============================================================================
- * COMPONENT: AdminAnomalyDashboard (Pure Tailwind CSS)
+ * COMPONENT: AdminAnomalyDashboard (Dữ liệu thực từ Backend /api/v1/ai/logs & /api/v1/admin/user)
  * =============================================================================
  */
 export default function AdminAnomalyDashboard() {
   const { t, i18n } = useTranslation();
   const { showToast } = useToast();
 
-  // Chuyển đổi dữ liệu cảnh báo từ bảng anomalyAlerts thành format đầy đủ
-  const [alerts, setAlerts] = useState(() => {
-    return dbAlerts.map((item, idx) => {
-      const relatedCourse = dbCourses.find((c) => c.AnomalyAlertID === item.ID) || dbCourses[idx % dbCourses.length];
-      const students = dbUsers.filter((u) => (u.Role || '').toLowerCase() === 'student');
-      const student = students[idx % students.length] || dbUsers[3];
-      const riskScore = Math.round(item.Score * 100);
-
-      let anomalyTypeKey = 'admin_alerts.account_sharing';
-      let detailsKey = 'admin_alerts.account_sharing_desc';
-      if (item.Score >= 0.8) {
-        anomalyTypeKey = 'admin_alerts.spam_ecdh';
-        detailsKey = 'admin_alerts.spam_ecdh_desc';
-      } else if (item.Score >= 0.5) {
-        anomalyTypeKey = 'admin_alerts.bot_viewing';
-        detailsKey = 'admin_alerts.bot_viewing_desc';
-      } else {
-        anomalyTypeKey = 'admin_alerts.geo_anomaly';
-        detailsKey = 'admin_alerts.geo_anomaly_desc';
-      }
-
-      const rawUsername = student?.Username ? student.Username.split('@')[0] : '';
-      const formattedName = student?.Name || (rawUsername
-        ? rawUsername
-            .split('.')
-            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-            .join(' ')
-        : '');
-
-      return {
-        id: item.ID,
-        studentId: student?.ID || 'u-004',
-        studentName: formattedName,
-        studentEmail: student?.Email || student?.Username || 'student@securelearn.edu',
-        courseId: relatedCourse?.ID || 'c-001',
-        courseTitle: relatedCourse?.Title || null,
-        anomalyTypeKey,
-        detailsKey,
-        riskScore,
-        rawTimestamp: item.Timestamp ? new Date(item.Timestamp) : new Date(Date.now() - idx * 3600000 * 4),
-        status: item.Status || 'open',
-        accessLogId: item.AccessLogID,
-      };
-    });
-  });
+  const [alerts, setAlerts] = useState([]);
+  const [accessLogs, setAccessLogs] = useState([]);
+  const [usersList, setUsersList] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState('');
 
   // State tìm kiếm dấu vân tay Watermark
   const [searchWatermarkId, setSearchWatermarkId] = useState('');
@@ -93,6 +191,56 @@ export default function AdminAnomalyDashboard() {
 
   // State tìm kiếm theo tên học viên
   const [userSearchTerm, setUserSearchTerm] = useState('');
+
+  const loadDashboardData = useCallback(async () => {
+    setIsLoading(true);
+    setFetchError('');
+    try {
+      const [logsRes, usersRes, coursesRes] = await Promise.allSettled([
+        getAiAccessLogs(),
+        getAdminUsers({ limit: 60 }),
+        getCourses(),
+      ]);
+
+      if (logsRes.status === 'rejected') {
+        throw logsRes.reason;
+      }
+
+      const fetchedLogs = logsRes.value || [];
+      const fetchedUsers = usersRes.status === 'fulfilled' ? usersRes.value?.users || [] : [];
+      const fetchedCourses = coursesRes.status === 'fulfilled' && Array.isArray(coursesRes.value)
+        ? coursesRes.value
+        : [];
+
+      setAccessLogs(fetchedLogs);
+      setUsersList(fetchedUsers);
+
+      const resolvedIds = readResolvedIds();
+      const computedAlerts = buildAnomalyAlertsFromLogs(
+        fetchedLogs,
+        fetchedUsers,
+        fetchedCourses,
+        resolvedIds
+      );
+      setAlerts(computedAlerts);
+    } catch (err) {
+      console.error('[AdminAnomalyDashboard] Lỗi tải dữ liệu từ Backend:', err);
+      const errMsg =
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        err?.message ||
+        'Không thể tải dữ liệu cảnh báo bất thường từ Backend.';
+      setFetchError(errMsg);
+      setAccessLogs([]);
+      setAlerts([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
 
   // Lọc danh sách cảnh báo chưa xử lý
   const pendingAlerts = useMemo(() => {
@@ -124,7 +272,7 @@ export default function AdminAnomalyDashboard() {
       });
   }, [alerts, userSearchTerm]);
 
-  // Xử lý truy vết dấu vết Watermark từ DB
+  // Xử lý truy vết dấu vết Watermark từ dữ liệu người dùng & AccessLog thực tế
   const handleTraceLeak = (e) => {
     e.preventDefault();
     if (!searchWatermarkId.trim()) {
@@ -136,50 +284,71 @@ export default function AdminAnomalyDashboard() {
     setIsSearching(true);
     setTraceError('');
 
-    setTimeout(() => {
-      const keyword = searchWatermarkId.trim().toLowerCase();
-      const matchedUser = dbUsers.find(
-        (u) =>
-          u.ID.toLowerCase() === keyword ||
-          (u.Name && u.Name.toLowerCase().includes(keyword)) ||
-          (u.Email && u.Email.toLowerCase().includes(keyword))
+    const keyword = searchWatermarkId.trim().toLowerCase();
+
+    // Tìm trong danh sách user thật từ Cognito (/api/v1/admin/user)
+    const matchedUser = usersList.find(
+      (u) =>
+        (u.id && u.id.toLowerCase() === keyword) ||
+        (u.email && u.email.toLowerCase().includes(keyword)) ||
+        (u.fullName && u.fullName.toLowerCase().includes(keyword))
+    );
+
+    // Tìm trong AccessLog thật từ Backend (/api/v1/ai/logs)
+    const matchedLogs = accessLogs.filter((l) => {
+      const email = (l.userEmail || '').toLowerCase();
+      const fp = (l.deviceFingerprint || '').toLowerCase();
+      if (matchedUser?.email && email === matchedUser.email.toLowerCase()) return true;
+      return email.includes(keyword) || fp === keyword;
+    });
+
+    if (matchedUser || matchedLogs.length > 0) {
+      const latestLog = matchedLogs[matchedLogs.length - 1];
+      const email = matchedUser?.email || latestLog?.userEmail || searchWatermarkId.trim();
+      const name = matchedUser?.fullName || formatNameFromEmail(email) || t('admin_alerts.anonymous_student');
+      const id = matchedUser?.id || email;
+
+      const matchedAlert = alerts.find(
+        (a) => a.studentEmail?.toLowerCase() === email.toLowerCase()
       );
 
-      if (matchedUser) {
-        const studentLogs = dbLogs.filter((l) => l.UserID === matchedUser.ID);
-        const latestLog = studentLogs[studentLogs.length - 1];
-        const studentEntitlements = dbEntitlements.filter((en) => en.UserID === matchedUser.ID);
-        const enrolledCourseIds = studentEntitlements.map((en) => en.CoursesID);
-        const enrolledCourses = dbCourses.filter((c) => enrolledCourseIds.includes(c.ID));
-        const courseNames = enrolledCourses.map((c) => c.Title).join(', ') || t('admin_alerts.no_course_records');
-        const session = dbSessions.find((s) => s.UserID === matchedUser.ID);
+      setTracedStudent({
+        id,
+        name,
+        email,
+        course: matchedAlert?.courseTitle || t('admin_alerts.no_course_records'),
+        ip: latestLog?.ipAddress || '—',
+        device: latestLog?.userAgent || latestLog?.deviceFingerprint || '—',
+        timestamp: latestLog?.accessedTime
+          ? new Date(latestLog.accessedTime).toLocaleString(i18n.language === 'en' ? 'en-US' : 'vi-VN')
+          : '—',
+        riskLevel:
+          matchedAlert && matchedAlert.riskScore >= 80
+            ? t('admin_alerts.risk_critical')
+            : matchedAlert
+            ? t('admin_alerts.risk_elevated')
+            : t('admin_alerts.safe', 'An toàn'),
+      });
+      showToast(
+        `${t('admin_alerts.toast_watermark_matched')} ${name} (${id})`,
+        'success',
+        t('admin_alerts.toast_watermark_title')
+      );
+    } else {
+      setTraceError(
+        `${t('admin_alerts.error_watermark_not_found_1')} "${searchWatermarkId.trim()}" ${t('admin_alerts.error_watermark_not_found_2')}`
+      );
+      setTracedStudent(null);
+    }
 
-        setTracedStudent({
-          id: matchedUser.ID,
-          name: matchedUser.Name,
-          email: matchedUser.Email,
-          course: courseNames,
-          ip: latestLog?.IPAddress || session?.IPAddress || '118.69.182.45 (Viettel Corp)',
-          device: latestLog?.UserAgent || session?.DeviceInfo || 'Chrome 122.0.0 Win10 x64',
-          timestamp: latestLog?.Timestamp || new Date().toLocaleString('vi-VN'),
-          riskLevel: latestLog?.Action === 'ANOMALY_SHARE' ? t('admin_alerts.risk_critical') : t('admin_alerts.risk_elevated'),
-        });
-        showToast(
-          `${t('admin_alerts.toast_watermark_matched')} ${matchedUser.Name} (${matchedUser.ID})`,
-          'success',
-          t('admin_alerts.toast_watermark_title')
-        );
-      } else {
-        setTraceError(
-          `${t('admin_alerts.error_watermark_not_found_1')} "${searchWatermarkId.trim()}" ${t('admin_alerts.error_watermark_not_found_2')}`
-        );
-        setTracedStudent(null);
-      }
-      setIsSearching(false);
-    }, 600);
+    setIsSearching(false);
   };
 
   const handleResolveAlert = (alertId) => {
+    const resolvedIds = readResolvedIds();
+    resolvedIds.add(alertId);
+    writeResolvedIds(resolvedIds);
+
     setAlerts((prev) =>
       prev.map((item) =>
         item.id === alertId ? { ...item, status: 'Resolved' } : item
@@ -193,6 +362,10 @@ export default function AdminAnomalyDashboard() {
   };
 
   const handleReopenAlert = (alertId) => {
+    const resolvedIds = readResolvedIds();
+    resolvedIds.delete(alertId);
+    writeResolvedIds(resolvedIds);
+
     setAlerts((prev) =>
       prev.map((item) =>
         item.id === alertId ? { ...item, status: 'open' } : item
@@ -214,6 +387,12 @@ export default function AdminAnomalyDashboard() {
     if (!selectedUserToBan) return;
     const targetId = selectedUserToBan.studentId || selectedUserToBan.id;
     const targetName = selectedUserToBan.studentName || selectedUserToBan.name;
+
+    const resolvedIds = readResolvedIds();
+    alerts.forEach((a) => {
+      if (a.studentId === targetId) resolvedIds.add(a.id);
+    });
+    writeResolvedIds(resolvedIds);
 
     setAlerts((prev) =>
       prev.map((a) =>
@@ -295,7 +474,34 @@ export default function AdminAnomalyDashboard() {
             {t('admin_alerts.sync_desc')}
           </p>
         </div>
+
+        <button
+          type="button"
+          onClick={loadDashboardData}
+          disabled={isLoading}
+          className="inline-flex items-center gap-1.5 self-start sm:self-auto rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-xs disabled:opacity-50 cursor-pointer"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+          <span>{t('common.refresh', 'Làm mới')}</span>
+        </button>
       </div>
+
+      {/* Backend Fetch Error */}
+      {fetchError && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 p-4 text-xs text-rose-700 dark:text-rose-300">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span>{fetchError}</span>
+          </div>
+          <button
+            type="button"
+            onClick={loadDashboardData}
+            className="self-start sm:self-auto rounded-full bg-rose-600 hover:bg-rose-700 px-3.5 py-1.5 text-xs font-semibold text-white cursor-pointer"
+          >
+            {t('common.retry', 'Thử lại')}
+          </button>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -303,21 +509,27 @@ export default function AdminAnomalyDashboard() {
           <span className="text-xs text-slate-500 dark:text-slate-400 block mb-1">
             {t('admin_alerts.total_ai_alerts')}
           </span>
-          <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white">{totalAlerts}</h3>
+          <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white">
+            {isLoading ? '—' : totalAlerts}
+          </h3>
         </div>
 
         <div className="rounded-2xl border border-rose-200 dark:border-rose-900 bg-white dark:bg-slate-900 p-4 shadow-sm">
           <span className="text-xs font-semibold text-rose-600 dark:text-rose-400 block mb-1">
             {t('admin_alerts.new_alerts')}
           </span>
-          <h3 className="text-2xl font-extrabold text-rose-600 dark:text-rose-400">{newAlertsCount}</h3>
+          <h3 className="text-2xl font-extrabold text-rose-600 dark:text-rose-400">
+            {isLoading ? '—' : newAlertsCount}
+          </h3>
         </div>
 
         <div className="rounded-2xl border border-amber-200 dark:border-amber-900 bg-white dark:bg-slate-900 p-4 shadow-sm">
           <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 block mb-1">
             {t('admin_alerts.high_risk')}
           </span>
-          <h3 className="text-2xl font-extrabold text-amber-600 dark:text-amber-400">{highRiskCount}</h3>
+          <h3 className="text-2xl font-extrabold text-amber-600 dark:text-amber-400">
+            {isLoading ? '—' : highRiskCount}
+          </h3>
         </div>
 
         <div className="rounded-2xl border border-blue-200 dark:border-blue-900 bg-white dark:bg-slate-900 p-4 shadow-sm">
@@ -325,7 +537,7 @@ export default function AdminAnomalyDashboard() {
             {t('admin_alerts.access_logs')}
           </span>
           <h3 className="text-2xl font-extrabold text-blue-600 dark:text-blue-400">
-            {dbLogs.length} {t('admin_alerts.events')}
+            {isLoading ? '—' : `${accessLogs.length} ${t('admin_alerts.events')}`}
           </h3>
         </div>
       </div>
@@ -345,8 +557,7 @@ export default function AdminAnomalyDashboard() {
         </div>
 
         <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-          {t('admin_alerts.leak_desc_1')} <strong>{t('admin_alerts.watermark_code')}</strong> {t('admin_alerts.eg')}
-          <code className="text-blue-600 font-bold mx-1">u-004</code>, <code className="text-blue-600 font-bold mx-1">u-005</code>
+          {t('admin_alerts.leak_desc_1')} <strong>{t('admin_alerts.watermark_code')}</strong>{' '}
           {t('admin_alerts.leak_desc_2')}
         </p>
 
@@ -363,7 +574,7 @@ export default function AdminAnomalyDashboard() {
           </div>
           <button
             type="submit"
-            disabled={isSearching}
+            disabled={isSearching || isLoading}
             className="inline-flex items-center justify-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 text-xs font-semibold shadow-md shadow-blue-500/20 disabled:opacity-50"
           >
             {isSearching ? (
@@ -384,7 +595,7 @@ export default function AdminAnomalyDashboard() {
           </div>
         )}
 
-        {/* KẾT QUẢ ĐỐI SOÁT WATERMARK TỪ DB */}
+        {/* KẾT QUẢ ĐỐI SOÁT WATERMARK TỪ BACKEND */}
         {tracedStudent && (
           <div className="rounded-2xl border border-blue-200 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/30 p-5 space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -443,7 +654,7 @@ export default function AdminAnomalyDashboard() {
               {t('admin_alerts.ai_anomaly_subtitle')}
             </p>
           </div>
-          <span className="text-xs font-mono text-slate-400">ERD Table: anomalyAlerts</span>
+          <span className="text-xs font-mono text-slate-400">API: GET /api/v1/ai/logs</span>
         </div>
 
         {/* Controls Bar: Tabs & Search */}
@@ -517,7 +728,16 @@ export default function AdminAnomalyDashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {(activeTableTab === 'pending' ? pendingAlerts : resolvedAlerts).length === 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td colSpan="8" className="py-12 text-center text-slate-400">
+                    <div className="inline-flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                      <span>{t('common.loading', 'Đang tải dữ liệu từ máy chủ...')}</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : (activeTableTab === 'pending' ? pendingAlerts : resolvedAlerts).length === 0 ? (
                 <tr>
                   <td colSpan="8" className="py-8 text-center text-slate-400">
                     {userSearchTerm ? (
@@ -542,7 +762,7 @@ export default function AdminAnomalyDashboard() {
                       <div className="font-bold text-slate-900 dark:text-white">
                         {item.studentName || t('admin_alerts.anonymous_student')}
                       </div>
-                      <div className="text-[11px] text-slate-400 font-mono">{item.studentId}</div>
+                      <div className="text-[11px] text-slate-400 font-mono">{item.studentEmail || item.studentId}</div>
                     </td>
                     <td className="py-3 px-3">
                       <div className="font-semibold text-slate-800 dark:text-slate-200">
