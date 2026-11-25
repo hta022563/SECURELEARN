@@ -17,7 +17,6 @@ import {
   FileVideo,
   Link2,
   Zap,
-  Sparkles,
 } from 'lucide-react';
 import { useVideoUpload, UPLOAD_STATUS } from '../hooks/useVideoUpload';
 import { useToast } from '../context/ToastContext';

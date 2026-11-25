@@ -227,18 +227,21 @@ export default function UserProfile() {
 
   return (
     <div className="py-8 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-      {/* Header Banner */}
-      <div className="mb-8 pb-4 border-b border-slate-200/80 dark:border-slate-800">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 text-xs font-semibold mb-2">
-          <UserCircle className="h-4 w-4" />
-          <span>{t('profile.user_account')}</span>
+      {/* Header Banner (Unified Deep-Blue Editorial Stage) */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 p-6 sm:p-8 text-white shadow-xl border border-blue-900/50 mb-8">
+        <div className="pointer-events-none absolute -right-12 -top-12 h-48 w-48 rounded-full bg-blue-500/20 blur-3xl" />
+        <div className="relative">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-blue-200 text-xs font-semibold mb-3">
+            <UserCircle className="h-4 w-4 text-cyan-300" />
+            <span>{t('profile.user_account')}</span>
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white mb-1">
+            {t('profile.user_profile')}
+          </h2>
+          <p className="text-xs sm:text-sm text-blue-100/80">
+            {t('profile.profile_desc')}
+          </p>
         </div>
-        <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-1">
-          {t('profile.user_profile')}
-        </h2>
-        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-          {t('profile.profile_desc')}
-        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

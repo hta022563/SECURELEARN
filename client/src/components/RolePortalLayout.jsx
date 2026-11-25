@@ -7,7 +7,7 @@ import {
   Video,
   GraduationCap,
   Users,
-  Sparkles,
+  ShieldAlert,
   Fingerprint,
   BookOpen,
   PlayCircle,
@@ -60,7 +60,7 @@ export default function RolePortalLayout({ role }) {
               id: 'alerts',
               title: t('navbar.ai_alerts', 'Cảnh Báo AI & Rò Rỉ'),
               path: `/${lang}/admin/alerts`,
-              icon: Sparkles,
+              icon: ShieldAlert,
             },
             {
               id: 'users',
@@ -190,18 +190,27 @@ export default function RolePortalLayout({ role }) {
        * - BÊN TRÁI: THANH NAV KÉO DÀI TỪ TRÊN XUỐNG DƯỚI (Full Height Left Sidebar)
        * - BÊN PHẢI: KHÔNG GIAN LÀM VIỆC ĐỂ TRỰC TIẾP DÙNG CHỨC NĂNG
        * ========================================================================= */}
-      {/* 1. THANH NAV CHỨC NĂNG: ĐỨNG IM (FIXED) TRONG SUỐT QUÁ TRÌNH LƯỚT */}
+      {/* Mobile Backdrop Overlay */}
+      {mobileMenuOpen && (
+        <div
+          onClick={() => setMobileMenuOpen(false)}
+          aria-hidden="true"
+          className="fixed inset-0 z-30 bg-slate-950/50 backdrop-blur-xs lg:hidden"
+        />
+      )}
+
+      {/* 1. THANH NAV CHỨC NĂNG: DRAWER TRÊN MOBILE, FIXED SIDEBAR TRÊN DESKTOP */}
       <aside
-        className={`w-full lg:w-60 xl:w-64 shrink-0 border-r border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md lg:fixed lg:top-[57px] lg:bottom-0 lg:left-0 z-30 flex flex-col p-4 transition-all duration-150 overflow-y-auto ${
-          mobileMenuOpen ? 'block' : 'hidden lg:flex'
+        className={`w-72 max-w-[82vw] lg:w-60 xl:w-64 shrink-0 border-r border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md fixed top-[61px] bottom-0 left-0 z-30 flex flex-col p-4 transition-transform duration-200 overflow-y-auto ${
+          mobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0'
         }`}
       >
-        {/* Tiêu đề Cổng vai trò */}
-        <div className="pb-3.5 mb-3 border-b border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between gap-2">
-          <span className="text-xs font-bold text-slate-900 dark:text-white tracking-tight">
+        {/* Tiêu đề Cổng vai trò (Deep Blue Editorial Header) */}
+        <div className="rounded-2xl bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 p-3.5 mb-4 text-white shadow-sm border border-blue-900/50 flex items-center justify-between gap-2">
+          <span className="text-xs font-extrabold tracking-tight truncate">
             {config.title}
           </span>
-          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${config.badgeClass}`}>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/15 text-blue-200 border border-white/15 shrink-0">
             {currentRole}
           </span>
         </div>
@@ -243,9 +252,9 @@ export default function RolePortalLayout({ role }) {
       </aside>
 
       {/* 2. KHÔNG GIAN LÀM VIỆC (WORKSPACE NẰM BÊN PHẢI) - BÙ ĐỘ RỘNG SIDEBAR FIXED */}
-      <main className="flex-1 min-w-0 w-full lg:pl-60 xl:lg:pl-64 p-4 sm:p-6 lg:p-8">
+      <div className="flex-1 min-w-0 w-full lg:pl-60 xl:pl-64 p-4 sm:p-6 lg:p-8">
         <Outlet />
-      </main>
+      </div>
     </div>
   );
 }

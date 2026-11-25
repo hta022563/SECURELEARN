@@ -7,7 +7,7 @@ import {
   Video,
   GraduationCap,
   Users,
-  Sparkles,
+  ShieldAlert,
   Fingerprint,
   BookOpen,
   PlayCircle,
@@ -86,7 +86,7 @@ export default function UserPortal({ defaultRole }) {
           icon: Shield,
           stats: [
             { label: t('portal.stat_users', 'Người dùng hệ thống'), value: '12', sub: '3 QTV • 3 GV • 6 HV', icon: Users, color: 'text-blue-600' },
-            { label: t('portal.stat_alerts', 'Cảnh báo AI cần xử lý'), value: '4', sub: '2 Rủi ro cao', icon: Sparkles, color: 'text-amber-500' },
+            { label: t('portal.stat_alerts', 'Cảnh báo AI cần xử lý'), value: '4', sub: '2 Rủi ro cao', icon: ShieldAlert, color: 'text-amber-500' },
             { label: t('portal.stat_drm', 'Bản ghi Watermark DRM'), value: '16', sub: '100% Khớp dấu vân tay', icon: Fingerprint, color: 'text-rose-600' },
           ],
           pages: [
@@ -102,7 +102,7 @@ export default function UserPortal({ defaultRole }) {
               title: t('navbar.ai_alerts', 'Cảnh Báo AI & Rò Rỉ'),
               desc: t('navbar.ai_alerts_desc', 'Phát hiện gian lận & bất thường từ mô hình AI'),
               path: `/${lang}/admin/alerts`,
-              icon: Sparkles,
+              icon: ShieldAlert,
               iconColor: 'text-amber-600 bg-amber-50 dark:bg-amber-950/60 dark:text-amber-400',
               highlight: 'Live Detection',
             },

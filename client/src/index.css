@@ -28,10 +28,14 @@
 
 html {
   background-color: #f8faff;
+  scroll-behavior: smooth;
 }
 
 html[data-bs-theme="dark"], html.dark {
   background-color: #0f172a;
+  --sl-text-heading: #f8fafc;
+  --sl-text-body: #cbd5e1;
+  --sl-text-muted: #94a3b8;
 }
 
 body.theme-light, body {
@@ -41,6 +45,34 @@ body.theme-light, body {
   margin: 0;
   padding: 0;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* International Accessibility Standard (WCAG 2.1 AA): Clear Keyboard Focus Ring & Reduced Motion */
+@layer base {
+  :focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: rgba(37, 99, 235, 0.2);
+    color: inherit;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* Page Background Wrapper */
@@ -49,17 +81,19 @@ body.theme-light, body {
   min-height: 100vh;
 }
 
-/* Typography Overrides */
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  font-family: var(--sl-font-family);
-  color: var(--sl-text-heading);
-  font-weight: 700;
-  letter-spacing: -0.02em;
+/* Typography Overrides (inside @layer base so Tailwind utilities like text-white take precedence) */
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--sl-font-family);
+    color: var(--sl-text-heading);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
 }
 
 /* Logo Brand Text */

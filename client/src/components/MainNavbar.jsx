@@ -17,7 +17,6 @@ import {
   UploadCloud,
   Eye,
   Users,
-  Sparkles,
   Sliders,
   Fingerprint,
 } from 'lucide-react';

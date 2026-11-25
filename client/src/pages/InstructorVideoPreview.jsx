@@ -59,9 +59,6 @@ export default function InstructorVideoPreview() {
   const { user } = useAuth();
   const [showReuploadModal, setShowReuploadModal] = useState(false);
 
-  // Tab State
-  const [activeTab, setActiveTab] = useState('overview');
-
   // Accordion State
   const [openChapters, setOpenChapters] = useState({ 0: true });
 
@@ -373,101 +370,60 @@ export default function InstructorVideoPreview() {
             </div>
           )}
 
-          {/* TABS CHI TIẾT */}
+          {/* TỔNG QUAN BÀI GIẢNG */}
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm">
-            {/* Tab Buttons */}
-            <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3 mb-5 overflow-x-auto">
-              {[
-                { id: 'overview', label: 'Tổng quan bài giảng' },
-                { id: 'security', label: 'Kiểm định DRM & Watermark' },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`rounded-full px-4 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
-                    activeTab === tab.id
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+            <div className="border-b border-slate-100 dark:border-slate-800 pb-3 mb-5">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                Tổng quan bài giảng
+              </h3>
             </div>
 
-            {/* Tab Contents */}
-            {activeTab === 'overview' && (
-              <div className="space-y-4">
-                {activeLecture && (
-                  <h4 className="text-base font-bold text-slate-900 dark:text-white">
-                    {activeLecture.Title}
-                  </h4>
-                )}
+            <div className="space-y-4">
+              {activeLecture && (
+                <h4 className="text-base font-bold text-slate-900 dark:text-white">
+                  {activeLecture.Title}
+                </h4>
+              )}
 
-                {activeLecture?.chapterTitle && (
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Thuộc chương:{' '}
-                    <strong className="text-slate-700 dark:text-slate-300">
-                      Chương {activeLecture.chapterNumber}: {activeLecture.chapterTitle}
-                    </strong>
+              {activeLecture?.chapterTitle && (
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Thuộc chương:{' '}
+                  <strong className="text-slate-700 dark:text-slate-300">
+                    Chương {activeLecture.chapterNumber}: {activeLecture.chapterTitle}
+                  </strong>
+                </p>
+              )}
+
+              {activeLecture?.chapterDescription && (
+                <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 text-xs">
+                  <strong className="text-slate-900 dark:text-white block mb-1">Mục tiêu chương:</strong>
+                  <p className="text-slate-500 dark:text-slate-400 mb-0">
+                    {activeLecture.chapterDescription}
                   </p>
-                )}
+                </div>
+              )}
 
-                {activeLecture?.chapterDescription && (
-                  <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 text-xs">
-                    <strong className="text-slate-900 dark:text-white block mb-1">Mục tiêu chương:</strong>
-                    <p className="text-slate-500 dark:text-slate-400 mb-0">
-                      {activeLecture.chapterDescription}
-                    </p>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 text-xs">
-                  <div>
-                    <span className="text-slate-400 block mb-0.5">Thời lượng:</span>
-                    <strong className="text-slate-800 dark:text-slate-200 flex items-center gap-1">
-                      <Clock className="h-3.5 w-3.5 text-blue-500" />
-                      <span>{formatDuration(activeLecture?.Length)}</span>
-                    </strong>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block mb-0.5">Dung lượng file:</span>
-                    <strong className="text-slate-800 dark:text-slate-200 flex items-center gap-1">
-                      <HardDrive className="h-3.5 w-3.5 text-slate-400" />
-                      <span>{formatBytes(activeLecture?.Size)}</span>
-                    </strong>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block mb-0.5">Mã định danh (ID):</span>
-                    <code className="text-blue-600 font-mono">{activeLecture?.ID}</code>
-                  </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 text-xs">
+                <div>
+                  <span className="text-slate-400 block mb-0.5">Thời lượng:</span>
+                  <strong className="text-slate-800 dark:text-slate-200 flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5 text-blue-500" />
+                    <span>{formatDuration(activeLecture?.Length)}</span>
+                  </strong>
+                </div>
+                <div>
+                  <span className="text-slate-400 block mb-0.5">Dung lượng file:</span>
+                  <strong className="text-slate-800 dark:text-slate-200 flex items-center gap-1">
+                    <HardDrive className="h-3.5 w-3.5 text-slate-400" />
+                    <span>{formatBytes(activeLecture?.Size)}</span>
+                  </strong>
+                </div>
+                <div>
+                  <span className="text-slate-400 block mb-0.5">Mã định danh (ID):</span>
+                  <code className="text-blue-600 font-mono">{activeLecture?.ID}</code>
                 </div>
               </div>
-            )}
-
-            {activeTab === 'security' && (
-              <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 text-xs space-y-3">
-                <h5 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4 text-emerald-500" />
-                  <span>Cơ Chế Bảo Mật Video Bản Quyền SecureLearn</span>
-                </h5>
-                <ul className="text-slate-600 dark:text-slate-300 space-y-2 pl-4 list-disc">
-                  <li>
-                    <strong>Mã hóa phân đoạn AES-128:</strong> Toàn bộ video được chia thành các chunk .ts nhỏ 6 giây và mã hóa với khóa phiên riêng biệt.
-                  </li>
-                  <li>
-                    <strong>Watermark động chống quay trộm:</strong> Tự động hiển thị mờ tên tài khoản và mã định danh của giảng viên/học viên trôi ngẫu nhiên trên màn hình.
-                  </li>
-                  <li>
-                    <strong>Chống tải lậu & trích xuất URL:</strong> Đường dẫn video phát qua Signed URL với chữ ký HMAC SHA-256 có thời hạn ngắn, tự hết hạn sau 1 giờ.
-                  </li>
-                  <li>
-                    <strong>Chống tua lách bài:</strong> Khóa học theo dõi tiến độ thực tế, cảnh báo bất thường nếu có hành vi tua tốc độ gian lận.
-                  </li>
-                </ul>
-              </div>
-            )}
+            </div>
           </div>
         </div>
 

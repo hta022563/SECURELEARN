@@ -144,25 +144,37 @@ ${t('catalog.delete_subject_cascade_warning', 'Thao tác này sẽ XÓA VĨNH VI
     isAuthenticated && (user?.role === 'Instructor' || user?.role === 'Administrator');
 
   return (
-    <div className="py-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      {/* 1. HEADER BANNER */}
-      <div className="text-center mb-10">
-        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-3">
-          {t('catalog.title')}{' '}
-          <span className="text-blue-600 dark:text-blue-400">
-            {t('catalog.title_highlight')}
-          </span>
-        </h1>
-        <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed">
-          {t(
-            'catalog.subjects_subtitle',
-            'Chọn môn học để khám phá toàn bộ bài giảng và học tập theo lộ trình rõ ràng.'
-          )}
-        </p>
-      </div>
+    <div className="pb-12">
+      {/* 1. FULL-WIDTH DEEP-BLUE HERO BANNER (UNIFIED EDITORIAL FORMAT) */}
+      <section className="relative bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 text-white overflow-hidden">
+        <div className="pointer-events-none absolute -top-20 left-1/4 h-72 w-72 rounded-full bg-blue-500/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 right-1/4 h-72 w-72 rounded-full bg-cyan-500/15 blur-3xl" />
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.07]"
+          style={{
+            backgroundImage: 'radial-gradient(circle at 1px 1px, #93c5fd 1px, transparent 0)',
+            backgroundSize: '26px 26px',
+          }}
+        />
+        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-12 pb-16 sm:pt-14 sm:pb-20 text-center">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white mb-3">
+            {t('catalog.title')}{' '}
+            <span className="bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">
+              {t('catalog.title_highlight')}
+            </span>
+          </h1>
+          <p className="text-sm sm:text-base text-blue-100/80 max-w-2xl mx-auto leading-relaxed">
+            {t(
+              'catalog.subjects_subtitle',
+              'Chọn môn học để khám phá toàn bộ bài giảng và học tập theo lộ trình rõ ràng.'
+            )}
+          </p>
+        </div>
+      </section>
 
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-10">
       {/* 2. BỘ TÌM KIẾM & LỌC THEO MÔN HỌC */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-5 shadow-sm border border-slate-200/80 dark:border-slate-800 mb-8 space-y-4">
+      <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-3xl p-4 sm:p-5 shadow-lg border border-blue-100/90 dark:border-slate-800 mb-8 space-y-4">
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
           {/* Ô tìm kiếm */}
           <div className="relative flex-1">
@@ -170,14 +182,15 @@ ${t('catalog.delete_subject_cascade_warning', 'Thao tác này sẽ XÓA VĨNH VI
               <Search className="h-4 w-4" />
             </div>
             <input
-              type="text"
+              type="search"
+              aria-label={t('catalog.search_subject_or_course_placeholder', 'Tìm kiếm theo tên môn học hoặc tên khóa học...')}
               placeholder={t(
                 'catalog.search_subject_or_course_placeholder',
                 'Tìm kiếm theo tên môn học hoặc tên khóa học...'
               )}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-10 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+              className="w-full pl-10 pr-10 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60 text-base sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
             />
             {searchTerm && (
               <button
@@ -197,7 +210,7 @@ ${t('catalog.delete_subject_cascade_warning', 'Thao tác này sẽ XÓA VĨNH VI
               value={selectedSubjectFilter}
               onChange={(e) => setSelectedSubjectFilter(e.target.value)}
               aria-label={t('catalog.filter_by_subject', 'Lọc theo môn học')}
-              className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60 px-3.5 py-2.5 text-xs font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer"
+              className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60 px-3.5 py-2.5 text-base sm:text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer"
             >
               <option value="">
                 {t('catalog.all_subjects_filter', 'Lọc theo môn học: Tất cả')} ({displaySubjects.length})
@@ -309,11 +322,24 @@ ${t('catalog.delete_subject_cascade_warning', 'Thao tác này sẽ XÓA VĨNH VI
 
       {/* 3. DANH SÁCH MÔN HỌC */}
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-20">
-          <Loader2 className="h-10 w-10 text-blue-600 animate-spin mb-3" />
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            {t('common.loading', 'Đang nạp...')}
-          </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12" aria-busy="true">
+          {[0, 1, 2].map((sk) => (
+            <div
+              key={sk}
+              className="rounded-3xl overflow-hidden bg-white dark:bg-slate-900 border border-blue-100/80 dark:border-slate-800 shadow-sm animate-pulse"
+            >
+              <div className="h-20 bg-slate-200/80 dark:bg-slate-800" />
+              <div className="p-5 space-y-3">
+                <div className="h-3.5 w-full rounded-lg bg-slate-200 dark:bg-slate-800" />
+                <div className="h-3.5 w-2/3 rounded-lg bg-slate-100 dark:bg-slate-800/70" />
+                <div className="h-6 w-24 rounded-full bg-slate-200 dark:bg-slate-800" />
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                  <div className="h-3.5 w-28 rounded-lg bg-slate-200 dark:bg-slate-800" />
+                  <div className="h-8 w-8 rounded-full bg-slate-200 dark:bg-slate-800" />
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       ) : filteredSubjects.length === 0 ? (
         <div className="text-center py-16 px-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
@@ -357,20 +383,28 @@ ${t('catalog.delete_subject_cascade_warning', 'Thao tác này sẽ XÓA VĨNH VI
             return (
               <div
                 key={subject.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => handleOpenSubject(subject.id)}
-                className="group flex flex-col rounded-3xl overflow-hidden bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 cursor-pointer"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleOpenSubject(subject.id);
+                  }
+                }}
+                className="group flex flex-col rounded-3xl overflow-hidden bg-blue-50/30 dark:bg-slate-900 border border-blue-100/90 dark:border-slate-800 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 cursor-pointer"
               >
                 {/* Header thẻ Môn học */}
-                <div className="p-5 bg-gradient-to-br from-blue-50/80 to-indigo-50/50 dark:from-blue-950/40 dark:to-slate-900 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+                <div className="p-5 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white flex items-center justify-between gap-2">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 text-white shrink-0 shadow-xs">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-sm border border-white/20 text-white shrink-0">
                       <BookOpen className="h-5 w-5" />
                     </div>
                     <div className="min-w-0">
-                      <span className="block text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-blue-200">
                         {t('catalog.subject_badge', 'Môn học')}
                       </span>
-                      <h3 className="font-bold text-base text-slate-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                      <h3 className="font-bold text-base text-white truncate">
                         {subject.name}
                       </h3>
                     </div>
@@ -381,7 +415,7 @@ ${t('catalog.delete_subject_cascade_warning', 'Thao tác này sẽ XÓA VĨNH VI
                       type="button"
                       title={t('catalog.delete_subject', 'Xóa môn học')}
                       onClick={(e) => handleDeleteSubject(e, subject)}
-                      className="p-1.5 rounded-full text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors shrink-0"
+                      className="p-1.5 rounded-full text-blue-100/80 hover:text-white hover:bg-rose-500/80 transition-colors shrink-0"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -471,6 +505,7 @@ ${t('catalog.delete_subject_cascade_warning', 'Thao tác này sẽ XÓA VĨNH VI
           setSubjectVersion((v) => v + 1);
         }}
       />
+      </div>
     </div>
   );
 }

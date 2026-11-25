@@ -19,7 +19,6 @@ import {
   Eye,
   Shield,
   Users,
-  Sparkles,
   Sliders,
   Fingerprint,
 } from 'lucide-react';
@@ -29,16 +28,129 @@ import { useTheme } from '../context/ThemeContext';
 import Logo from './Logo';
 import { logoutBackendSession } from '../services/courseService';
 
-function AppFooter({ isPortal }) {
+function AppFooter({ isPortal, lang = 'vi' }) {
   const { t } = useTranslation();
+  const isEn = lang === 'en';
+
+  if (isPortal) {
+    return (
+      <footer className="mt-auto border-t border-slate-200/80 bg-white/90 py-4 text-center text-xs text-slate-500 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/95 dark:text-slate-400 lg:pl-60 xl:pl-64">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-4 sm:flex-row sm:px-6 lg:px-8">
+          <span className="font-bold text-slate-900 dark:text-white tracking-tight">
+            Secure<span className="text-blue-600 dark:text-blue-400">Learn</span>
+          </span>
+          <span className="text-slate-500 dark:text-slate-400">
+            {isEn ? 'Online Learning & Course Platform' : 'Nền tảng Khóa học & Học tập Trực tuyến'}
+          </span>
+          <span className="text-slate-400 dark:text-slate-500">© 2026 SecureLearn Inc.</span>
+        </div>
+      </footer>
+    );
+  }
+
   return (
-    <footer className={`mt-auto border-t border-slate-200/80 bg-white/80 py-5 text-center text-xs text-slate-500 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400 ${isPortal ? 'lg:pl-60 xl:lg:pl-64' : ''}`}>
-      <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 sm:flex-row sm:px-6 lg:px-8">
-        <Logo size="sm" showBadge={false} />
-        <span className="font-medium text-slate-600 dark:text-slate-300">
-          {t('footer_slogan', 'Nền tảng E-Learning Bản quyền số & Bảo mật Video')}
-        </span>
-        <span>© 2026 SecureLearn Inc. All rights reserved.</span>
+    <footer className="mt-auto border-t border-blue-100/90 bg-gradient-to-b from-blue-50/80 via-slate-50 to-white text-slate-600 dark:border-slate-800 dark:from-slate-900 dark:via-slate-950 dark:to-slate-950 dark:text-slate-300">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-10">
+          {/* Brand Column */}
+          <div className="lg:col-span-4 space-y-4">
+            <div className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+              Secure<span className="text-blue-600 dark:text-blue-400">Learn</span>
+            </div>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed max-w-sm">
+              {isEn
+                ? 'A modern online learning platform organizing courses by subject, structured chapters, and clear video lectures for learners everywhere.'
+                : 'Nền tảng học trực tuyến hiện đại tổ chức khóa học theo từng môn học, chương bài mạch lạc và video bài giảng chất lượng cao.'}
+            </p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 pt-1">
+              © 2026 SecureLearn Inc. All rights reserved.
+            </p>
+          </div>
+
+          {/* Column 2: Explore */}
+          <div className="lg:col-span-3 space-y-3">
+            <h4 className="text-sm font-bold text-slate-900 dark:text-white tracking-wide">
+              {isEn ? 'Explore' : 'Khám Phá'}
+            </h4>
+            <ul className="space-y-2 text-xs text-slate-500 dark:text-slate-400">
+              <li>
+                <Link to={`/${lang}/home`} className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors no-underline text-slate-500 dark:text-slate-400">
+                  {t('navbar.home', 'Trang Chủ')}
+                </Link>
+              </li>
+              <li>
+                <Link to={`/${lang}/catalog`} className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors no-underline text-slate-500 dark:text-slate-400">
+                  {t('navbar.courses', 'Khóa Học')}
+                </Link>
+              </li>
+              <li>
+                <Link to={`/${lang}/login`} className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors no-underline text-slate-500 dark:text-slate-400">
+                  {t('common.login', 'Đăng Nhập')}
+                </Link>
+              </li>
+              <li>
+                <Link to={`/${lang}/register`} className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors no-underline text-slate-500 dark:text-slate-400">
+                  {t('common.register', 'Đăng Ký')}
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Column 3: Learning */}
+          <div className="lg:col-span-2 space-y-3">
+            <h4 className="text-sm font-bold text-slate-900 dark:text-white tracking-wide">
+              {isEn ? 'Platform' : 'Nền Tảng'}
+            </h4>
+            <ul className="space-y-2 text-xs text-slate-500 dark:text-slate-400">
+              <li>
+                <Link to={`/${lang}/catalog`} className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors no-underline text-slate-500 dark:text-slate-400">
+                  {isEn ? 'Subjects & Courses' : 'Môn học & Khóa học'}
+                </Link>
+              </li>
+              <li>
+                <Link to={`/${lang}/student/courses`} className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors no-underline text-slate-500 dark:text-slate-400">
+                  {isEn ? 'My Learning' : 'Khóa học của tôi'}
+                </Link>
+              </li>
+              <li>
+                <Link to={`/${lang}/instructor/videos`} className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors no-underline text-slate-500 dark:text-slate-400">
+                  {isEn ? 'Instructor Studio' : 'Kênh Giảng viên'}
+                </Link>
+              </li>
+              <li>
+                <Link to={`/${lang}/profile`} className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors no-underline text-slate-500 dark:text-slate-400">
+                  {isEn ? 'Account & Security' : 'Tài khoản & Bảo mật'}
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Column 4: Contact */}
+          <div className="lg:col-span-3 space-y-3">
+            <h4 className="text-sm font-bold text-slate-900 dark:text-white tracking-wide">
+              {isEn ? 'Contact Us' : 'Liên Hệ'}
+            </h4>
+            <ul className="space-y-2 text-xs text-slate-500 dark:text-slate-400">
+              <li>{isEn ? 'Ho Chi Minh City, Vietnam' : 'TP. Hồ Chí Minh, Việt Nam'}</li>
+              <li>
+                <a
+                  href="mailto:support@securelearn.edu.vn"
+                  className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors no-underline text-slate-500 dark:text-slate-400"
+                >
+                  support@securelearn.edu.vn
+                </a>
+              </li>
+              <li>
+                <Link
+                  to={`/${lang}/home`}
+                  className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors no-underline text-slate-500 dark:text-slate-400"
+                >
+                  www.securelearn.edu.vn
+                </Link>
+              </li>
+            </ul>
+          </div>
+        </div>
       </div>
     </footer>
   );
@@ -65,29 +177,53 @@ export default function LayoutWithLanguage() {
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
-  const langDropdownRef = useRef(null);
+  const mobileLangDropdownRef = useRef(null);
+  const desktopLangDropdownRef = useRef(null);
   const userDropdownRef = useRef(null);
 
-  // Đóng dropdown khi click ra ngoài
+  // Đóng dropdown khi click ra ngoài hoặc nhấn phím Escape
   useEffect(() => {
     function handleClickOutside(event) {
-      if (langDropdownRef.current && !langDropdownRef.current.contains(event.target)) {
+      const outsideMobileLang =
+        !mobileLangDropdownRef.current || !mobileLangDropdownRef.current.contains(event.target);
+      const outsideDesktopLang =
+        !desktopLangDropdownRef.current || !desktopLangDropdownRef.current.contains(event.target);
+      if (outsideMobileLang && outsideDesktopLang) {
         setLangDropdownOpen(false);
       }
       if (userDropdownRef.current && !userDropdownRef.current.contains(event.target)) {
         setUserDropdownOpen(false);
       }
     }
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        setLangDropdownOpen(false);
+        setUserDropdownOpen(false);
+        setMobileMenuOpen(false);
+      }
+    }
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
 
-  // Tự động đóng mobile menu & popovers khi chuyển trang
+  // Tự động đóng mobile menu, popovers & cuộn lên đầu trang khi chuyển route
   useEffect(() => {
     setMobileMenuOpen(false);
     setUserDropdownOpen(false);
     setLangDropdownOpen(false);
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }, [location.pathname]);
+
+  // Đồng bộ thuộc tính lang trên thẻ <html> theo chuẩn quốc tế (SEO & Screen Reader)
+  useEffect(() => {
+    if (lang === 'vi' || lang === 'en') {
+      document.documentElement.lang = lang;
+    }
+  }, [lang]);
 
   useEffect(() => {
     if (lang !== 'vi' && lang !== 'en') {
@@ -166,8 +302,41 @@ export default function LayoutWithLanguage() {
   const isAdminPortalActive = location.pathname.includes('/admin');
   const isPortal = isStudentPortalActive || isInstructorPortalActive || isAdminPortalActive || location.pathname.includes('/portal');
 
+  const getWorkspaceLink = () => {
+    if (!isAuthenticated || !user) return null;
+    if (user.role === 'Administrator') {
+      return {
+        to: `/${lang}/admin/alerts`,
+        label: t('navbar.admin_portal', lang === 'en' ? 'Admin Workspace' : 'Trang Quản Trị'),
+        active: isAdminPortalActive,
+      };
+    }
+    if (user.role === 'Instructor') {
+      return {
+        to: `/${lang}/instructor/videos`,
+        label: t('navbar.instructor_portal', lang === 'en' ? 'Instructor Studio' : 'Trang Giảng Viên'),
+        active: isInstructorPortalActive,
+      };
+    }
+    return {
+      to: `/${lang}/student/courses`,
+      label: t('navbar.my_courses', lang === 'en' ? 'My Courses' : 'Khóa học của tôi'),
+      active: isStudentPortalActive,
+    };
+  };
+
+  const workspaceLink = getWorkspaceLink();
+
   return (
     <div className="flex flex-col min-h-screen">
+      {/* Skip-to-Content Link (WCAG 2.1 Keyboard Accessibility) */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-full focus:bg-blue-600 focus:px-4 focus:py-2 focus:text-xs focus:font-bold focus:text-white focus:shadow-lg no-underline"
+      >
+        {lang === 'en' ? 'Skip to main content' : 'Chuyển đến nội dung chính'}
+      </a>
+
       {/* =====================================================================
        * NAVBAR CHÍNH (PURE TAILWIND CSS)
        * ===================================================================== */}
@@ -187,6 +356,18 @@ export default function LayoutWithLanguage() {
               <Link to={`/${lang}/catalog`} className={getNavLinkClass('/catalog')}>
                 {t('navbar.courses', 'Khóa Học')}
               </Link>
+              {workspaceLink && (
+                <Link
+                  to={workspaceLink.to}
+                  className={
+                    workspaceLink.active
+                      ? 'px-3 xl:px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-semibold bg-blue-50 text-blue-600 dark:bg-blue-950/70 dark:text-blue-400 transition-all duration-200 no-underline whitespace-nowrap shrink-0'
+                      : 'px-3 xl:px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/60 transition-all duration-200 no-underline whitespace-nowrap shrink-0'
+                  }
+                >
+                  {workspaceLink.label}
+                </Link>
+              )}
             </div>
           </div>
 
@@ -195,18 +376,21 @@ export default function LayoutWithLanguage() {
             <button
               type="button"
               onClick={toggleTheme}
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200/80 bg-white/80 text-slate-700 shadow-xs dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-200"
+              aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/80 bg-white/80 text-slate-700 shadow-xs dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-200 cursor-pointer"
               title={theme === 'light' ? 'Chuyển sang chế độ tối' : 'Chuyển sang chế độ sáng'}
             >
               {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4 text-amber-400" />}
             </button>
 
             {/* Dropdown đổi ngôn ngữ Mobile */}
-            <div className="relative" ref={langDropdownRef}>
+            <div className="relative" ref={mobileLangDropdownRef}>
               <button
                 type="button"
                 onClick={() => setLangDropdownOpen(!langDropdownOpen)}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200/80 bg-white/80 text-slate-700 shadow-xs dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-200"
+                aria-expanded={langDropdownOpen}
+                aria-label="Change language"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/80 bg-white/80 text-slate-700 shadow-xs dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-200 cursor-pointer"
               >
                 <Languages className="h-4 w-4" />
               </button>
@@ -241,7 +425,8 @@ export default function LayoutWithLanguage() {
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200/80 bg-white/80 text-slate-700 shadow-xs dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-200"
+              aria-expanded={mobileMenuOpen}
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/80 bg-white/80 text-slate-700 shadow-xs dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-200 cursor-pointer"
               aria-label="Toggle navigation menu"
             >
               {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -255,18 +440,21 @@ export default function LayoutWithLanguage() {
             <button
               type="button"
               onClick={toggleTheme}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/80 bg-white/80 text-slate-700 shadow-xs backdrop-blur-md hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-300 dark:hover:bg-slate-800 transition-all duration-200"
+              aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/80 bg-white/80 text-slate-700 shadow-xs backdrop-blur-md hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-300 dark:hover:bg-slate-800 transition-all duration-200 cursor-pointer"
               title={theme === 'light' ? 'Chuyển sang chế độ tối' : 'Chuyển sang chế độ sáng'}
             >
               {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5 text-amber-400" />}
             </button>
 
             {/* Dropdown Đổi Ngôn Ngữ Desktop */}
-            <div className="relative" ref={langDropdownRef}>
+            <div className="relative" ref={desktopLangDropdownRef}>
               <button
                 type="button"
                 onClick={() => setLangDropdownOpen(!langDropdownOpen)}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/80 bg-white/80 text-slate-700 shadow-xs backdrop-blur-md hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-300 dark:hover:bg-slate-800 transition-all duration-200"
+                aria-expanded={langDropdownOpen}
+                aria-label="Change language"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/80 bg-white/80 text-slate-700 shadow-xs backdrop-blur-md hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-300 dark:hover:bg-slate-800 transition-all duration-200 cursor-pointer"
                 title="Đổi ngôn ngữ / Change language"
               >
                 <Languages className="h-5 w-5" />
@@ -494,12 +682,12 @@ export default function LayoutWithLanguage() {
       </nav>
 
       {/* Main Outlet */}
-      <main className="flex-1">
+      <main id="main-content" className="flex-1 focus:outline-none" tabIndex={-1}>
         <Outlet />
       </main>
 
       {/* Footer */}
-      <AppFooter isPortal={isPortal} />
+      <AppFooter isPortal={isPortal} lang={lang} />
     </div>
   );
 }

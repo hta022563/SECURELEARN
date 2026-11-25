@@ -11,8 +11,10 @@ export default function Logo({
   showBadge = true,
   badgeText = 'E-LEARNING',
   iconOnly = false,
+  variant = 'default',
   className = '',
 }) {
+  const isDarkBg = variant === 'dark';
   const sizeMap = {
     sm: { icon: 36, fontSize: 'text-lg', badgeSize: 'text-[10px]' },
     md: { icon: 42, fontSize: 'text-xl', badgeSize: 'text-[11px]' },
@@ -102,8 +104,14 @@ export default function Logo({
           <span
             className={`font-extrabold tracking-tight leading-none ${currentSize.fontSize}`}
           >
-            <span className="text-slate-900 dark:text-white">Secure</span>
-            <span className="bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
+            <span className={isDarkBg ? 'text-white' : 'text-slate-900 dark:text-white'}>
+              Secure
+            </span>
+            <span
+              className={`bg-gradient-to-r ${
+                isDarkBg ? 'from-blue-400 to-cyan-300' : 'from-blue-600 to-cyan-500'
+              } bg-clip-text text-transparent`}
+            >
               Learn
             </span>
           </span>
@@ -111,7 +119,11 @@ export default function Logo({
           {/* Micro Badge */}
           {showBadge && (
             <span
-              className={`ml-2 hidden sm:inline-flex items-center font-bold tracking-wider px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200/80 dark:border-blue-800 ${currentSize.badgeSize}`}
+              className={`ml-2 hidden sm:inline-flex items-center font-bold tracking-wider px-2 py-0.5 rounded-full border ${
+                isDarkBg
+                  ? 'bg-white/15 text-blue-100 border-white/20'
+                  : 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border-blue-200/80 dark:border-blue-800'
+              } ${currentSize.badgeSize}`}
             >
               {badgeText}
             </span>

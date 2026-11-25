@@ -317,35 +317,38 @@ export default function AdminUserManagement() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
-      {/* Header & Công cụ tìm kiếm / Thêm mới */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-white">
-            Quản Lý Người Dùng
-          </h1>
-          <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-            Quản trị danh sách tài khoản AWS Cognito, đặt lại mật khẩu và phân quyền khóa học
-          </p>
-        </div>
+      {/* Header & Công cụ tìm kiếm / Thêm mới (Unified Deep-Blue Editorial Stage) */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 p-6 sm:p-8 text-white shadow-xl border border-blue-900/50">
+        <div className="pointer-events-none absolute -right-12 -top-12 h-52 w-52 rounded-full bg-blue-500/20 blur-3xl" />
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+              Quản Lý <span className="bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">Người Dùng</span>
+            </h1>
+            <p className="text-blue-100/80 text-xs sm:text-sm mt-1">
+              Quản trị danh sách tài khoản AWS Cognito, đặt lại mật khẩu và phân quyền khóa học
+            </p>
+          </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={fetchUsers}
-            disabled={loadingUsers}
-            className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-200 rounded-lg text-sm font-medium transition disabled:opacity-50"
-            title="Làm mới danh sách từ AWS Cognito"
-          >
-            <RefreshCw size={16} className={loadingUsers ? 'animate-spin' : ''} />
-            <span className="hidden sm:inline">Làm Mới</span>
-          </button>
+          <div className="flex items-center gap-2.5 shrink-0">
+            <button
+              onClick={fetchUsers}
+              disabled={loadingUsers}
+              className="flex items-center gap-1.5 px-4 py-2 bg-white/10 hover:bg-white/15 border border-white/20 text-white rounded-full text-xs font-semibold transition disabled:opacity-50 cursor-pointer"
+              title="Làm mới danh sách từ AWS Cognito"
+            >
+              <RefreshCw size={15} className={loadingUsers ? 'animate-spin' : ''} />
+              <span className="hidden sm:inline">Làm Mới</span>
+            </button>
 
-          <button
-            onClick={handleOpenAddModal}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium shadow-sm transition"
-          >
-            <UserPlus size={18} />
-            <span>Thêm Giảng Viên</span>
-          </button>
+            <button
+              onClick={handleOpenAddModal}
+              className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 border border-blue-400/25 text-white rounded-full text-xs font-bold shadow-md shadow-blue-950/40 hover:shadow-blue-600/30 active:scale-[0.98] transition-all duration-200 cursor-pointer"
+            >
+              <UserPlus size={16} />
+              <span>Thêm Giảng Viên</span>
+            </button>
+          </div>
         </div>
       </div>
 

@@ -14,6 +14,8 @@ import {
   ArrowLeft,
   RotateCcw,
   CheckCircle2,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import Logo from '../components/Logo';
@@ -27,6 +29,7 @@ import {
 export default function Register() {
   const { lang } = useParams();
   const currentLang = lang || 'vi';
+  const isEn = currentLang === 'en';
 
   // Step state: 'form' | 'otp'
   const [step, setStep] = useState('form');
@@ -36,6 +39,8 @@ export default function Register() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // OTP State
   const [otp, setOtp] = useState('');
@@ -67,29 +72,37 @@ export default function Register() {
 
     // 1. Kiểm tra Họ và Tên
     if (!fullName.trim()) {
-      newErrors.fullName = 'Họ và tên không được để trống.';
+      newErrors.fullName = isEn ? 'Full name is required.' : 'Họ và tên không được để trống.';
     }
 
     // 2. Bắt lỗi Email không đúng định dạng regex
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email.trim()) {
-      newErrors.email = 'Vui lòng nhập địa chỉ email.';
+      newErrors.email = isEn ? 'Please enter your email address.' : 'Vui lòng nhập địa chỉ email.';
     } else if (!emailRegex.test(email.trim())) {
-      newErrors.email = 'Địa chỉ email không đúng định dạng (Ví dụ: user@domain.com).';
+      newErrors.email = isEn
+        ? 'Invalid email format (e.g., user@domain.com).'
+        : 'Địa chỉ email không đúng định dạng (Ví dụ: user@domain.com).';
     }
 
     // 3. Password phải từ 8 ký tự trở lên (chuẩn AWS Cognito)
     if (!password) {
-      newErrors.password = 'Vui lòng nhập mật khẩu.';
+      newErrors.password = isEn ? 'Please enter a password.' : 'Vui lòng nhập mật khẩu.';
     } else if (password.length < 8) {
-      newErrors.password = 'Mật khẩu phải có độ dài tối thiểu 8 ký tự theo chuẩn AWS Cognito.';
+      newErrors.password = isEn
+        ? 'Password must be at least 8 characters long.'
+        : 'Mật khẩu phải có độ dài tối thiểu 8 ký tự.';
     }
 
     // 4. Confirm Password phải khớp với Password
     if (!confirmPassword) {
-      newErrors.confirmPassword = 'Vui lòng nhập lại mật khẩu xác nhận.';
+      newErrors.confirmPassword = isEn
+        ? 'Please confirm your password.'
+        : 'Vui lòng nhập lại mật khẩu xác nhận.';
     } else if (confirmPassword !== password) {
-      newErrors.confirmPassword = 'Mật khẩu xác nhận không khớp với mật khẩu đã nhập.';
+      newErrors.confirmPassword = isEn
+        ? 'Passwords do not match.'
+        : 'Mật khẩu xác nhận không khớp với mật khẩu đã nhập.';
     }
 
     setErrors(newErrors);
@@ -196,22 +209,34 @@ export default function Register() {
 
   return (
     <div className="min-h-[85vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl shadow-xl shadow-slate-200/50 dark:shadow-slate-950/50 border border-slate-200/80 dark:border-slate-800 overflow-hidden transition-all">
-        {/* Header Card */}
-        <div className="bg-slate-50/50 dark:bg-slate-850 border-b border-slate-100 dark:border-slate-800 text-center py-6 px-6">
-          <div className="mb-3 flex justify-center">
+      <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl shadow-2xl shadow-blue-950/10 dark:shadow-slate-950/60 border border-blue-100/90 dark:border-slate-800 overflow-hidden transition-all">
+        {/* Header Card (Unified Deep-Blue Editorial Stage) */}
+        <div className="relative bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 text-white text-center py-8 px-6 overflow-hidden">
+          <div className="pointer-events-none absolute -top-10 -left-10 h-32 w-32 rounded-full bg-cyan-500/20 blur-2xl" />
+          <div className="relative mb-3 flex justify-center">
             <Logo
               size="lg"
               showBadge={true}
               badgeText={step === 'form' ? 'JOIN PLATFORM' : 'VERIFY EMAIL'}
+              variant="dark"
             />
           </div>
-          <h4 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white mb-1">
-            {step === 'form' ? 'Đăng Ký Tài Khoản Mới' : 'Xác Thực Tài Khoản (OTP)'}
-          </h4>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <h4 className="relative text-xl font-black tracking-tight text-white mb-1">
             {step === 'form'
-              ? 'Tham gia nền tảng video học tập trực tuyến SecureLearn'
+              ? isEn
+                ? 'Create a New Account'
+                : 'Đăng Ký Tài Khoản Mới'
+              : isEn
+              ? 'Verify Your Email (OTP)'
+              : 'Xác Thực Tài Khoản (OTP)'}
+          </h4>
+          <p className="relative text-xs text-blue-100/80">
+            {step === 'form'
+              ? isEn
+                ? 'Join SecureLearn online learning platform'
+                : 'Tham gia nền tảng học tập trực tuyến SecureLearn'
+              : isEn
+              ? 'Enter the 6-digit verification code sent to your email'
               : 'Nhập mã 6 chữ số đã được gửi đến email của bạn'}
           </p>
         </div>
@@ -224,13 +249,16 @@ export default function Register() {
             <form onSubmit={handleSubmit} noValidate className="space-y-4">
               {/* Họ và Tên */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Họ và Tên <span className="text-rose-500">*</span>
+                <label htmlFor="reg-fullname" className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  {isEn ? 'Full Name' : 'Họ và Tên'} <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
                   <input
+                    id="reg-fullname"
+                    name="name"
                     type="text"
-                    placeholder="Nguyễn Văn A"
+                    autoComplete="name"
+                    placeholder={isEn ? 'John Doe' : 'Nguyễn Văn A'}
                     value={fullName}
                     onChange={(e) => {
                       setFullName(e.target.value);
@@ -239,7 +267,7 @@ export default function Register() {
                     className={`w-full rounded-2xl border ${errors.fullName
                       ? 'border-rose-500 bg-rose-50/20'
                       : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60'
-                      } px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 ${errors.fullName
+                      } px-4 py-2.5 text-base sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 ${errors.fullName
                         ? 'focus:ring-rose-500/20 focus:border-rose-500'
                         : 'focus:ring-blue-500/20 focus:border-blue-500'
                       } transition-all`}
@@ -255,11 +283,14 @@ export default function Register() {
 
               {/* Địa chỉ Email */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Địa chỉ Email <span className="text-rose-500">*</span>
+                <label htmlFor="reg-email" className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  {isEn ? 'Email Address' : 'Địa chỉ Email'} <span className="text-rose-500">*</span>
                 </label>
                 <input
+                  id="reg-email"
+                  name="email"
                   type="email"
+                  autoComplete="email"
                   placeholder="name@example.com"
                   value={email}
                   onChange={(e) => {
@@ -269,7 +300,7 @@ export default function Register() {
                   className={`w-full rounded-2xl border ${errors.email
                     ? 'border-rose-500 bg-rose-50/20'
                     : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60'
-                    } px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 ${errors.email
+                    } px-4 py-2.5 text-base sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 ${errors.email
                       ? 'focus:ring-rose-500/20 focus:border-rose-500'
                       : 'focus:ring-blue-500/20 focus:border-blue-500'
                     } transition-all`}
@@ -284,25 +315,39 @@ export default function Register() {
 
               {/* Mật Khẩu (>= 8 ký tự) */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Mật khẩu (tối thiểu 8 ký tự) <span className="text-rose-500">*</span>
+                <label htmlFor="reg-password" className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  {isEn ? 'Password (min. 8 characters)' : 'Mật khẩu (tối thiểu 8 ký tự)'}{' '}
+                  <span className="text-rose-500">*</span>
                 </label>
-                <input
-                  type="password"
-                  placeholder="Mật khẩu..."
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    if (errors.password) setErrors({ ...errors, password: null });
-                  }}
-                  className={`w-full rounded-2xl border ${errors.password
-                    ? 'border-rose-500 bg-rose-50/20'
-                    : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60'
-                    } px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 ${errors.password
-                      ? 'focus:ring-rose-500/20 focus:border-rose-500'
-                      : 'focus:ring-blue-500/20 focus:border-blue-500'
-                    } transition-all`}
-                />
+                <div className="relative">
+                  <input
+                    id="reg-password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    placeholder={isEn ? 'Create a password...' : 'Mật khẩu...'}
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (errors.password) setErrors({ ...errors, password: null });
+                    }}
+                    className={`w-full rounded-2xl border ${errors.password
+                      ? 'border-rose-500 bg-rose-50/20'
+                      : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60'
+                      } pl-4 pr-11 py-2.5 text-base sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 ${errors.password
+                        ? 'focus:ring-rose-500/20 focus:border-rose-500'
+                        : 'focus:ring-blue-500/20 focus:border-blue-500'
+                      } transition-all`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
                 {errors.password && (
                   <div className="flex items-center gap-1.5 text-rose-500 text-xs mt-1.5">
                     <AlertCircle className="h-3.5 w-3.5 shrink-0" />
@@ -313,26 +358,39 @@ export default function Register() {
 
               {/* Nhập Lại Mật Khẩu */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Xác nhận mật khẩu <span className="text-rose-500">*</span>
+                <label htmlFor="reg-confirm-password" className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  {isEn ? 'Confirm Password' : 'Xác nhận mật khẩu'} <span className="text-rose-500">*</span>
                 </label>
-                <input
-                  type="password"
-                  placeholder="Nhập lại mật khẩu..."
-                  value={confirmPassword}
-                  onChange={(e) => {
-                    setConfirmPassword(e.target.value);
-                    if (errors.confirmPassword)
-                      setErrors({ ...errors, confirmPassword: null });
-                  }}
-                  className={`w-full rounded-2xl border ${errors.confirmPassword
-                    ? 'border-rose-500 bg-rose-50/20'
-                    : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60'
-                    } px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 ${errors.confirmPassword
-                      ? 'focus:ring-rose-500/20 focus:border-rose-500'
-                      : 'focus:ring-blue-500/20 focus:border-blue-500'
-                    } transition-all`}
-                />
+                <div className="relative">
+                  <input
+                    id="reg-confirm-password"
+                    name="confirmPassword"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    placeholder={isEn ? 'Re-enter your password...' : 'Nhập lại mật khẩu...'}
+                    value={confirmPassword}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      if (errors.confirmPassword)
+                        setErrors({ ...errors, confirmPassword: null });
+                    }}
+                    className={`w-full rounded-2xl border ${errors.confirmPassword
+                      ? 'border-rose-500 bg-rose-50/20'
+                      : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60'
+                      } pl-4 pr-11 py-2.5 text-base sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 ${errors.confirmPassword
+                        ? 'focus:ring-rose-500/20 focus:border-rose-500'
+                        : 'focus:ring-blue-500/20 focus:border-blue-500'
+                      } transition-all`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword((prev) => !prev)}
+                    aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                  >
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
                 {errors.confirmPassword && (
                   <div className="flex items-center gap-1.5 text-rose-500 text-xs mt-1.5">
                     <AlertCircle className="h-3.5 w-3.5 shrink-0" />
@@ -348,10 +406,13 @@ export default function Register() {
                 </div>
                 <div className="text-xs space-y-0.5">
                   <div className="font-bold text-slate-800 dark:text-slate-200">
-                    Đăng ký tài khoản Học Viên (Student)
+                    {isEn ? 'Student Account Registration' : 'Đăng ký tài khoản Học Viên (Student)'}
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                    Cổng đăng ký trực tuyến chỉ dành cho Học viên </p>
+                    {isEn
+                      ? 'Self-registration is for Students; Instructor accounts are provisioned by Administrators.'
+                      : 'Cổng đăng ký trực tuyến dành cho Học viên; tài khoản Giảng viên do Quản trị viên cấp.'}
+                  </p>
                 </div>
               </div>
 
@@ -359,15 +420,15 @@ export default function Register() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 px-5 py-3 text-xs font-bold text-white shadow-md shadow-blue-500/25 transition-all mt-3 cursor-pointer"
+                className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 border border-blue-400/25 disabled:opacity-60 px-5 py-3 text-xs sm:text-sm font-bold text-white shadow-md shadow-blue-500/25 active:scale-[0.99] transition-all mt-3 cursor-pointer"
               >
                 {isSubmitting ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Đang gửi thông tin đăng ký...</span>
+                    <span>{isEn ? 'Submitting registration...' : 'Đang gửi thông tin đăng ký...'}</span>
                   </>
                 ) : (
-                  <span>Tiếp Tục & Nhận Mã OTP</span>
+                  <span>{isEn ? 'Continue & Receive OTP' : 'Tiếp Tục & Nhận Mã OTP'}</span>
                 )}
               </button>
             </form>
@@ -466,14 +527,14 @@ export default function Register() {
           {/* Chuyển hướng sang Login nếu đã có tài khoản */}
           <div className="text-center pt-5 mt-5 border-t border-slate-100 dark:border-slate-800 text-xs">
             <span className="text-slate-500 dark:text-slate-400 mr-1.5">
-              Bạn đã có tài khoản?
+              {isEn ? 'Already have an account?' : 'Bạn đã có tài khoản?'}
             </span>
             <Link
               to={`/${currentLang}/login`}
               className="inline-flex items-center gap-1 font-semibold text-blue-600 dark:text-blue-400 hover:underline no-underline"
             >
               <LogIn className="h-3.5 w-3.5" />
-              <span>Đăng nhập tại đây</span>
+              <span>{isEn ? 'Sign in here' : 'Đăng nhập tại đây'}</span>
             </Link>
           </div>
         </div>

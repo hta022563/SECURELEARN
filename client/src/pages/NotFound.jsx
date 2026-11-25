@@ -1,19 +1,23 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Compass, ArrowLeft, Home } from 'lucide-react';
 
 /**
- * Component: NotFound (Trang lỗi 404)
+ * Component: NotFound (Trang lỗi 404 — Song ngữ VI/EN)
  * Pure Tailwind CSS & Lucide Icons
  */
 export default function NotFound() {
   const navigate = useNavigate();
+  const { lang } = useParams();
+  const location = useLocation();
+  const currentLang = lang || (location.pathname.startsWith('/en') ? 'en' : 'vi');
+  const isEn = currentLang === 'en';
 
   const handleBack = () => {
     if (window.history.length > 2) {
       navigate(-1);
     } else {
-      navigate('/');
+      navigate(`/${currentLang}/home`);
     }
   };
 
@@ -29,29 +33,31 @@ export default function NotFound() {
         </span>
 
         <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white mb-2">
-          Page Not Found
+          {isEn ? 'Page Not Found' : 'Không Tìm Thấy Trang'}
         </h2>
 
         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
-          Trang bạn đang tìm kiếm không tồn tại, đã bị đổi tên hoặc bạn chưa được phân quyền truy cập.
+          {isEn
+            ? 'The page you are looking for does not exist, was moved, or you do not have permission to view it.'
+            : 'Trang bạn đang tìm kiếm không tồn tại, đã bị đổi tên hoặc bạn chưa được phân quyền truy cập.'}
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <button
             type="button"
             onClick={handleBack}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 px-5 py-2.5 text-xs font-semibold text-white shadow-md shadow-blue-500/20 transition-all"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 px-5 py-2.5 text-xs font-semibold text-white shadow-md shadow-blue-500/20 transition-all cursor-pointer"
           >
             <ArrowLeft className="h-4 w-4" />
-            <span>Quay Lại</span>
+            <span>{isEn ? 'Go Back' : 'Quay Lại'}</span>
           </button>
           <button
             type="button"
-            onClick={() => navigate('/')}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-5 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 shadow-xs transition-all"
+            onClick={() => navigate(`/${currentLang}/home`)}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-5 py-2.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 shadow-xs transition-all cursor-pointer"
           >
             <Home className="h-4 w-4 text-slate-400" />
-            <span>Về Trang Chủ</span>
+            <span>{isEn ? 'Back to Home' : 'Về Trang Chủ'}</span>
           </button>
         </div>
       </div>

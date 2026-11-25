@@ -10,14 +10,12 @@ import {
   X,
   Lock,
   Loader2,
-  Sparkles,
   RefreshCw,
 } from 'lucide-react';
 import {
   getAccessLogs,
   getAnomalyAlerts,
   getAdminUsers,
-  ADMIN_ALERTS_ENDPOINT,
 } from '../services/adminService';
 import { useToast } from '../context/ToastContext';
 
@@ -504,31 +502,36 @@ export default function AdminAnomalyDashboard() {
 
   return (
     <div className="py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-6">
-      {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200/80 dark:border-slate-800">
-        <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 text-xs font-semibold mb-2">
-            <Sparkles className="h-3.5 w-3.5" />
-            <span>{t('admin_alerts.ai_anomaly_detection_erd')}</span>
+      {/* Header Banner (Unified Deep-Blue Editorial Stage) */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 p-6 sm:p-8 text-white shadow-xl border border-blue-900/50">
+        <div className="pointer-events-none absolute -right-12 -top-12 h-52 w-52 rounded-full bg-blue-500/20 blur-3xl" />
+        <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-blue-200 text-xs font-semibold mb-3">
+              <ShieldAlert className="h-3.5 w-3.5 text-cyan-300" />
+              <span>{t('admin_alerts.ai_anomaly_detection_erd')}</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+              {t('admin_alerts.anomaly_alerts_board')}{' '}
+              <span className="bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">
+                {t('admin_alerts.leak_tracing')}
+              </span>
+            </h1>
+            <p className="text-xs sm:text-sm text-blue-100/80 mt-1">
+              {t('admin_alerts.sync_desc')}
+            </p>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            {t('admin_alerts.anomaly_alerts_board')}{' '}
-            <span className="text-blue-600 dark:text-blue-400">{t('admin_alerts.leak_tracing')}</span>
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            {t('admin_alerts.sync_desc')}
-          </p>
-        </div>
 
-        <button
-          type="button"
-          onClick={loadDashboardData}
-          disabled={isLoading}
-          className="inline-flex items-center gap-1.5 self-start sm:self-auto rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-xs disabled:opacity-50 cursor-pointer"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-          <span>{t('common.refresh', 'Làm mới')}</span>
-        </button>
+          <button
+            type="button"
+            onClick={loadDashboardData}
+            disabled={isLoading}
+            className="inline-flex items-center gap-1.5 self-start sm:self-auto rounded-full border border-white/20 bg-white/10 hover:bg-white/15 backdrop-blur-sm px-4 py-2 text-xs font-semibold text-white shadow-xs disabled:opacity-50 cursor-pointer shrink-0"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+            <span>{t('common.refresh', 'Làm mới')}</span>
+          </button>
+        </div>
       </div>
 
       {/* Backend Fetch Error */}
@@ -699,7 +702,6 @@ export default function AdminAnomalyDashboard() {
               {t('admin_alerts.ai_anomaly_subtitle')}
             </p>
           </div>
-          <span className="text-xs font-mono text-slate-400">API: GET /api/v1{ADMIN_ALERTS_ENDPOINT}</span>
         </div>
 
         {/* Controls Bar: Tabs & Search */}

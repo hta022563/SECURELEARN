@@ -401,38 +401,39 @@ export default function SubjectLectures() {
 
   return (
     <div className="py-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      {/* 1. BREADCRUMB & SUBJECT HEADER */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200/80 dark:border-slate-800 mb-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* 1. BREADCRUMB & SUBJECT HERO HEADER */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 p-6 sm:p-8 text-white shadow-xl border border-blue-900/50 mb-8">
+        <div className="pointer-events-none absolute -right-16 -top-16 h-60 w-60 rounded-full bg-blue-500/20 blur-3xl" />
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <Link
               to={`/${currentLang}/catalog`}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline no-underline mb-3"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-300 hover:text-white hover:underline no-underline mb-3"
             >
               <ChevronLeft className="h-4 w-4" />
               <span>{t('subject_lectures.back_to_subjects', 'Quay lại Danh Sách Môn Học')}</span>
             </Link>
 
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-2">
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white mb-2">
               {subjectMeta.name}
             </h1>
             {subjectMeta.description && (
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-2xl leading-relaxed">
+              <p className="text-xs sm:text-sm text-blue-100/80 max-w-2xl leading-relaxed">
                 {subjectMeta.description}
               </p>
             )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-            <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 text-xs font-bold border border-blue-200/60 dark:border-blue-800">
-              <Layers className="h-3.5 w-3.5" />
+            <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-sm text-blue-100 text-xs font-bold border border-white/15">
+              <Layers className="h-3.5 w-3.5 text-cyan-300" />
               <span>
                 {courses.length} {t('subject_lectures.courses_label', 'khóa học')}
               </span>
             </span>
 
             {isAuthenticated && (
-              <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold border border-emerald-200/60 dark:border-emerald-800">
+              <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-500/20 backdrop-blur-sm text-emerald-200 text-xs font-bold border border-emerald-400/30">
                 <Play className="h-3.5 w-3.5" />
                 <span>
                   {lectures.length} {t('subject_lectures.lectures_label', 'bài giảng')}
@@ -444,7 +445,7 @@ export default function SubjectLectures() {
               <button
                 type="button"
                 onClick={() => setShowCreateCourseModal(true)}
-                className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 px-4 py-2 text-xs font-semibold text-white shadow-xs transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 border border-blue-400/25 px-4 py-2 text-xs font-bold text-white shadow-md shadow-blue-950/40 hover:shadow-blue-600/30 active:scale-[0.98] transition-all duration-200 cursor-pointer"
               >
                 <PlusCircle className="h-3.5 w-3.5" />
                 <span>{t('catalog.add_course', 'Thêm Khóa Học Mới')}</span>

@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import { Loader2 } from 'lucide-react';
 
 // 1. Context Providers & Guards
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -10,24 +10,38 @@ import ProtectedRoute from './components/ProtectedRoute';
 
 // 2. Navigation & Shared Components
 import LayoutWithLanguage from './components/LayoutWithLanguage';
-import SecureVideoPlayer from './components/SecureVideoPlayer';
 import MeshGradientBackground from './components/MeshGradientBackground';
-import Logo from './components/Logo';
 import ErrorBoundary from './components/ErrorBoundary';
+import RolePortalLayout from './components/RolePortalLayout';
 
-// 3. Guest / Public Pages
+// 3. Eager Public Entry Pages (Instant First Paint)
 import Home from './pages/Home';
 import CourseCatalog from './pages/CourseCatalog';
-import SubjectLectures from './pages/SubjectLectures';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import Unauthorized from './pages/Unauthorized';
-import NotFound from './pages/NotFound';
 
-// 4. Shared Protected Pages
-import UserProfile from './pages/UserProfile';
-import UserPortal from './pages/UserPortal';
-import RolePortalLayout from './components/RolePortalLayout';
+// 4. Lazy-Loaded Secondary & Role-Specific Pages (Code-Splitting for Fast Load)
+const SubjectLectures = lazy(() => import('./pages/SubjectLectures'));
+const Unauthorized = lazy(() => import('./pages/Unauthorized'));
+const NotFound = lazy(() => import('./pages/NotFound'));
+const UserProfile = lazy(() => import('./pages/UserProfile'));
+const MyCourses = lazy(() => import('./pages/MyCourses'));
+const StudentCoursePlayer = lazy(() => import('./pages/StudentCoursePlayer'));
+const InstructorVideos = lazy(() => import('./pages/InstructorVideos'));
+const UploadVideo = lazy(() => import('./components/UploadVideo'));
+const InstructorVideoPreview = lazy(() => import('./pages/InstructorVideoPreview'));
+const AdminUserManagement = lazy(() => import('./pages/AdminUserManagement'));
+const AdminAnomalyDashboard = lazy(() => import('./components/AdminAnomalyDashboard'));
+const LeakTracing = lazy(() => import('./pages/LeakTracing'));
+const DbExplorer = lazy(() => import('./pages/DbExplorer'));
+
+function PageLoadingFallback() {
+  return (
+    <div className="min-h-[55vh] flex flex-col items-center justify-center gap-3 py-16">
+      <Loader2 className="h-8 w-8 text-blue-600 dark:text-blue-400 animate-spin" />
+    </div>
+  );
+}
 
 /**
  * Helper điều hướng Portal theo Role người dùng
@@ -61,23 +75,6 @@ function ProfileRedirect() {
   return <Navigate to={`/${lang}/student/profile`} replace />;
 }
 
-// 5. Student Branch Pages
-import MyCourses from './pages/MyCourses';
-import StudentCoursePlayer from './pages/StudentCoursePlayer';
-
-// 6. Instructor Branch Pages
-import InstructorVideos from './pages/InstructorVideos';
-import UploadVideo from './components/UploadVideo';
-import InstructorVideoPreview from './pages/InstructorVideoPreview';
-
-// 7. Administrator Branch Pages
-import AdminUserManagement from './pages/AdminUserManagement';
-import AdminAnomalyDashboard from './components/AdminAnomalyDashboard';
-import LeakTracing from './pages/LeakTracing';
-
-// 8. Dev Tool — Mock Database Explorer
-import DbExplorer from './pages/DbExplorer';
-
 /**
  * =============================================================================
  * ROOT COMPONENT: App (Kiến Trúc Routing Toàn Diện Cho Dự Án SecureLearn)
@@ -101,6 +98,7 @@ export default function App() {
 
             <div className="min-h-screen bg-transparent text-slate-900 dark:text-slate-100 flex flex-col relative z-10">
               <ErrorBoundary>
+                <Suspense fallback={<PageLoadingFallback />}>
                 <Routes>
                   {/* Redirect / về mặc định /vi/home */}
                   <Route path="/" element={<Navigate to="/vi/home" replace />} />
@@ -221,6 +219,7 @@ export default function App() {
                       <Route path="*" element={<NotFound />} />
                     </Route>
                   </Routes>
+                </Suspense>
                 </ErrorBoundary>
             </div>
           </BrowserRouter>
