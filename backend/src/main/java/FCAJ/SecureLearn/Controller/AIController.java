@@ -33,4 +33,9 @@ public class AIController {
         }
         return ResponseEntity.ok(todaysLogs);
     }
+
+    @GetMapping("/alerts")
+    public ResponseEntity<?> getAlertsForLast24Hours() {
+        return ResponseEntity.ok(logService.getPast24HourLog());
+    }
 }

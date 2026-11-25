@@ -26,6 +26,7 @@ const LAMBDA_ROUTES = [
   /^\/allcourses(?:\?|$)/,
   /^\/lesson(?:\/[^/?]+)?(?:\?|$)/, // POST /lesson and /lesson/{id} only; /lesson/{id}/playback etc. stay local
   /^\/enrollment\/me(?:\?|$)/, // POST /enrollment/{courseId} is payment, stays local
+  /^\/upload\//
 ];
 
 /** Base URL for a request path such as '/admin/user' or 'admin/user'. */

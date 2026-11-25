@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
@@ -32,18 +33,19 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 public class PlaybackController {
     // FFmpeg writes HLS segments as MPEG-TS (segment_%03d.ts)
     private static final MediaType MPEG_TS = MediaType.parseMediaType("video/mp2t");
-
+    
     private final PlaybackService playbackService;
     private final AuthService authService;
     private final EnrollmentService enrollmentService;
     private final CourseService courseService;
-
+    private final String publicUrl;
     public PlaybackController(PlaybackService playbackService, AuthService authService,
-            EnrollmentService enrollmentService, CourseService courseService) {
+            EnrollmentService enrollmentService, CourseService courseService, @Value("${app.public-base-url}") String publicUrl) {
         this.playbackService = playbackService;
         this.authService = authService;
         this.enrollmentService = enrollmentService;
         this.courseService = courseService;
+        this.publicUrl = publicUrl;
     }
 
     @GetMapping("/playback")
@@ -52,9 +54,12 @@ public class PlaybackController {
             @PathVariable("id") UUID lessonId,
             HttpServletRequest servletRequest,
             @AuthenticationPrincipal Jwt jwt) {
-        String contextUrl = ServletUriComponentsBuilder.fromCurrentContextPath()
+        String contextUrl;
+        if(publicUrl.isEmpty() || publicUrl.isBlank()){
+         contextUrl = ServletUriComponentsBuilder.fromCurrentContextPath()
                 .build()
                 .toUriString();
+        }else contextUrl = publicUrl;
         String username = jwt.getClaimAsString("username");
         List<String> userGroups = jwt.getClaimAsStringList("cognito:groups");
         boolean isStudent = userGroups != null
@@ -82,9 +87,12 @@ public class PlaybackController {
             @RequestParam String token,
             @AuthenticationPrincipal Jwt jwt,
             HttpServletRequest servletRequest) {
-        String contextUrl = ServletUriComponentsBuilder.fromCurrentContextPath()
+        String contextUrl;
+        if(publicUrl.isEmpty() || publicUrl.isBlank()){
+         contextUrl = ServletUriComponentsBuilder.fromCurrentContextPath()
                 .build()
                 .toUriString();
+        }else contextUrl = publicUrl;
         String signedManifest = playbackService.getSignedManifest(lessonId, token, contextUrl, jwt.getClaimAsString("username"));
 
         return ResponseEntity.ok()

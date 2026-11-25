@@ -4,11 +4,11 @@ import java.net.URL;
 import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,8 +16,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import FCAJ.SecureLearn.Request.VideoUploadRequest;
 import FCAJ.SecureLearn.Service.LessonService;
+import FCAJ.SecureLearn.Service.LessonVideoService;
 import FCAJ.SecureLearn.Service.R2Service;
-import FCAJ.SecureLearn.Service.VideoProcessingService;
 import org.springframework.context.annotation.Profile;
 
 /**
@@ -31,30 +31,31 @@ import org.springframework.context.annotation.Profile;
  *  Step 2 — browser PUTs the file to R2 using the uploadUrl (no backend call)
  *
  *  Step 3 — POST /api/v1/upload/process
- *    Browser tells the backend the upload is done.
- *    Backend downloads the raw file from R2, runs FFmpeg → HLS, uploads
- *    the segments + playlist back to R2, creates the Lesson record, and
- *    stores the private playlist object key on the lesson and returns its ID.
- *    Returns: { lessonId }
+ *    Browser tells the backend the upload is done. The backend turns it into
+ *    encrypted HLS (LessonVideoService: FFmpeg locally, MediaConvert on Lambda)
+ *    and creates or updates the Lesson.
+ *    Returns: { lessonId, status }  — status READY (FFmpeg) or PROCESSING (MediaConvert)
+ *
+ *  Step 4 — GET /api/v1/upload/status/{lessonId}   (only needed while PROCESSING)
+ *    Browser polls until the status is READY or FAILED.
+ *    Returns: { lessonId, status, error }
  */
 @RestController
 @RequestMapping("/api/v1/upload")
 @Profile("upload")
 public class UploadController {
-    private static final Logger log = LoggerFactory.getLogger(UploadController.class);
-
     private final R2Service r2Service;
-    private final VideoProcessingService processingService;
+    private final LessonVideoService lessonVideoService;
     private final LessonService lessonService;
 
     @Value("${s3.bucket-name}")
     private String bucketName;
 
     public UploadController(R2Service r2Service,
-                            VideoProcessingService processingService,
+                            LessonVideoService lessonVideoService,
                             LessonService lessonService) {
         this.r2Service = r2Service;
-        this.processingService = processingService;
+        this.lessonVideoService = lessonVideoService;
         this.lessonService = lessonService;
     }
 
@@ -136,10 +137,10 @@ public class UploadController {
      *   "courseId":    "uuid"
      * }
      *
-    * Response: { "lessonId": "uuid" }
+     * Response: { "lessonId": "uuid", "status": "READY" | "PROCESSING" }
      *
-     * This call blocks while FFmpeg runs — for long videos consider making
-     * this async and polling a status endpoint instead.
+     * With FFmpeg this blocks until the video is done. With MediaConvert it returns as soon
+     * as the job is submitted (API Gateway cuts requests off after 30 s); poll /status.
      */
     @PostMapping("/process")
     public ResponseEntity<?> process(@RequestBody Map<String, String> body) {
@@ -189,24 +190,11 @@ public class UploadController {
         }
 
         try {
-            String playlistKey = processingService.processToHls(objectKey);
-            UUID lessonId;
-            if (replacingLesson) {
-                lessonId = lessonIdToReplace;
-                lessonService.updateLesson(courseId, lessonId, title, description, playlistKey);
-            } else {
-                lessonId = lessonService.addLessonReturningId(
-                    chapterId, title, description, playlistKey, courseId);
-            }
-
-            try {
-                r2Service.deleteObject(bucketName, objectKey);
-            } catch (RuntimeException cleanupError) {
-                log.warn("Processed video source could not be deleted from R2: {}", objectKey, cleanupError);
-            }
-
+            LessonVideoService.Started started = lessonVideoService.start(
+                    objectKey, title, description, chapterId, courseId, lessonIdToReplace);
             return ResponseEntity.ok(Map.of(
-                    "lessonId", lessonId.toString()
+                    "lessonId", started.lessonId().toString(),
+                    "status", started.status().name()
             ));
 
         } catch (RuntimeException e) {
@@ -215,6 +203,37 @@ public class UploadController {
         } catch (Exception e) {
             return ResponseEntity.internalServerError()
                     .body(Map.of("error", "Unexpected error during processing"));
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Step 4: has the video finished processing?
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * GET /api/v1/upload/status/{lessonId}
+     *
+     * Response: { "lessonId": "uuid", "status": "PROCESSING" | "READY" | "FAILED", "error": "..." }
+     *
+     * Asks MediaConvert about a running job and updates the lesson when it has finished, so
+     * polling this is what moves a lesson from PROCESSING to READY (no completion event).
+     */
+    @GetMapping("/status/{lessonId}")
+    public ResponseEntity<?> status(@PathVariable UUID lessonId) {
+        try {
+            LessonVideoService.Status status = lessonVideoService.refresh(lessonId);
+            Map<String, Object> body = new java.util.LinkedHashMap<>();
+            body.put("lessonId", status.lessonId().toString());
+            body.put("status", status.status().name());
+            if (status.error() != null) {
+                body.put("error", status.error());
+            }
+            return ResponseEntity.ok(body);
+        } catch (java.util.NoSuchElementException e) {
+            return ResponseEntity.status(404).body(Map.of("error", e.getMessage()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "Could not check processing status: " + e.getMessage()));
         }
     }
 

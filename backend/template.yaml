@@ -45,7 +45,7 @@ Parameters:
     Type: String
     AllowedValues: ['true', 'false']
     Default: 'false'
-    Description: /api/v1/upload/* (needs database secrets, write on the video bucket; no ffmpeg on Lambda yet)
+    Description: /api/v1/upload/* (needs database secrets, the video bucket, and creates the MediaConvert role)
   CognitoPoolId:
     Type: String
     Default: ap-southeast-1_ocn23tg3K
@@ -69,7 +69,7 @@ Conditions:
 
 Globals:
   Function:
-    CodeUri: s3://securelearn-fcaj-2026/SecureLearn-0.0.1-SNAPSHOT-lambda-packagev4.zip
+    CodeUri: s3://securelearn-fcaj-2026/SecureLearn-0.0.1-SNAPSHOT-lambda-packagev6.zip
     # The adapter's own handler: starts SecureLearnApplication (MAIN_CLASS) and turns each
     # API Gateway event into an HttpServletRequest for the controllers.
     Handler: com.amazonaws.serverless.proxy.spring.SpringDelegatingLambdaContainerHandler::handleRequest
@@ -107,6 +107,7 @@ Globals:
         MOMO_ACCESS_KEY: unused
         MOMO_SECRET_KEY: unused
         COGNITO_CLIENT_SECRET: unused
+        PUBLIC_BASE_URL: !Sub https://1rvav1l53e.execute-api.ap-southeast-1.amazonaws.com
 
 Resources:
   # One HTTP API for every group; each group only receives the routes listed on it.
@@ -288,33 +289,49 @@ Resources:
         Enroll:   { Type: HttpApi, Properties: { ApiId: !Ref SecureLearnApi, Path: '/api/v1/enrollment/{courseId}', Method: POST, PayloadFormatVersion: '1.0' } }
         MomoIpn:  { Type: HttpApi, Properties: { ApiId: !Ref SecureLearnApi, Path: /api/momo/ipn, Method: POST, PayloadFormatVersion: '1.0' } }
 
-  # --------------------------- upload: presign + FFmpeg ---------------------------
-  # /process runs FFmpeg inside the request, so it is bound by API Gateway's 30 s limit.
-  # Long videos need the worker split out (separate function, async) - not done here.
+  # --------------------------- upload: presign + MediaConvert ---------------------------
+  # /process only submits a MediaConvert job and returns (API Gateway cuts requests at 30 s);
+  # MediaConvert reads videos/... and writes hls/... itself with MediaConvertRole.
+  # GET /upload/status/{lessonId} asks MediaConvert whether the job is done and updates the lesson.
   UploadFunction:
     Type: AWS::Serverless::Function
     Condition: UploadOn
     Properties:
-      Description: Presigned upload URLs and HLS processing (UploadController)
-      MemorySize: 3008
-      EphemeralStorage:
-        Size: 4096
+      Description: Presigned upload URLs, MediaConvert job submit + status (UploadController)
       Environment:
         Variables:
           SPRING_PROFILES_ACTIVE: upload
           SPRING_DATASOURCE_URL: '{{resolve:secretsmanager:securelearn/database:SecretString:SPRING_DATASOURCE_URL}}'
           SPRING_DATASOURCE_USERNAME: '{{resolve:secretsmanager:securelearn/database:SecretString:SPRING_DATASOURCE_USERNAME}}'
           SPRING_DATASOURCE_PASSWORD: '{{resolve:secretsmanager:securelearn/database:SecretString:SPRING_DATASOURCE_PASSWORD}}'
+          VIDEO_PROCESSOR: mediaconvert
+          MEDIACONVERT_ROLE_ARN: !GetAtt MediaConvertRole.Arn
       Policies:
         - Statement:
-            # Raw upload: browser PUTs via a URL this role presigns; /process reads it, then deletes it
+            # Raw upload: browser PUTs via a URL this role presigns; deleted once the job completes.
+            # No GetObject: MediaConvert reads the file, this function never does.
             - Effect: Allow
-              Action: [s3:PutObject, s3:GetObject, s3:DeleteObject]
+              Action: [s3:PutObject, s3:DeleteObject]
               Resource: !Sub arn:aws:s3:::${VideoBucketName}/videos/*
-            # FFmpeg output: segments, playlist and content.key
+            # content.key is written by the function before the job starts (MediaConvert writes the rest)
             - Effect: Allow
               Action: s3:PutObject
               Resource: !Sub arn:aws:s3:::${VideoBucketName}/hls/*
+            # Submit jobs and poll them. CreateJob's resource-level support is unclear in the
+            # docs, so it is not narrowed; GetJob is limited to this account's jobs.
+            - Effect: Allow
+              Action: mediaconvert:CreateJob
+              Resource: '*'
+            - Effect: Allow
+              Action: mediaconvert:GetJob
+              Resource: !Sub arn:aws:mediaconvert:${AWS::Region}:${AWS::AccountId}:jobs/*
+            # CreateJob hands MediaConvertRole to MediaConvert; only that role, only to that service
+            - Effect: Allow
+              Action: iam:PassRole
+              Resource: !GetAtt MediaConvertRole.Arn
+              Condition:
+                StringEquals:
+                  iam:PassedToService: mediaconvert.amazonaws.com
       Events:
         Upload:
           Type: HttpApi
@@ -324,6 +341,30 @@ Resources:
             Method: ANY
             # 1.0: the adapter answers in the 1.0 shape (multiValueHeaders); 2.0 would drop every header
             PayloadFormatVersion: '1.0'
+
+  # The role MediaConvert itself runs jobs as (not a Lambda role): read the raw upload, write HLS.
+  MediaConvertRole:
+    Type: AWS::IAM::Role
+    Condition: UploadOn
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: mediaconvert.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: securelearn-video-transcode
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub arn:aws:s3:::${VideoBucketName}/videos/*
+              - Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub arn:aws:s3:::${VideoBucketName}/hls/*
 
 Outputs:
   ApiUrl:

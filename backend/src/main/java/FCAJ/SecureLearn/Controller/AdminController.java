@@ -1,6 +1,7 @@
 package FCAJ.SecureLearn.Controller;
 
 import FCAJ.SecureLearn.Configuration.LogAnnotationClass;
+import FCAJ.SecureLearn.Model.AccessLog;
 import FCAJ.SecureLearn.Model.ActionType;
 import FCAJ.SecureLearn.Request.LoginRequest;
 import FCAJ.SecureLearn.Request.RegisterRequest;
@@ -8,7 +9,9 @@ import FCAJ.SecureLearn.Response.UserAttributeDTO;
 import FCAJ.SecureLearn.Response.UserListDTO;
 import FCAJ.SecureLearn.Response.UserPage;
 import FCAJ.SecureLearn.Service.AuthService;
+import FCAJ.SecureLearn.Service.LogService;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.springframework.context.annotation.Profile;
@@ -33,9 +36,11 @@ import software.amazon.awssdk.services.cognitoidentityprovider.model.ListUsersRe
 @Profile("admin")
 public class AdminController {
     private final AuthService authService;
+    private final LogService logService;
 
-    public AdminController(AuthService authService) {
+    public AdminController(AuthService authService, LogService logService) {
         this.authService = authService;
+        this.logService = logService;
     }
 
     @PostMapping("/register")
@@ -134,5 +139,18 @@ public class AdminController {
             return ResponseEntity.internalServerError()
                     .body(Map.of("error", "Listing users failed: " + e.getMessage()));
         }
+    }
+    @GetMapping("/logs")
+    public ResponseEntity<?> getAllLogsForToday() {
+        List<AccessLog> todaysLogs = new ArrayList<>();
+        for (ActionType actionType : ActionType.values()) {
+            todaysLogs.addAll(logService.getLogsForToday(actionType));
+        }
+        return ResponseEntity.ok(todaysLogs);
+    }
+
+    @GetMapping("/alerts")
+    public ResponseEntity<?> getAlertsForLast24Hours() {
+        return ResponseEntity.ok(logService.getPast24HourLog());
     }
 }
