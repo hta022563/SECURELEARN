@@ -149,7 +149,7 @@ export function normalizeLesson(item, chapterId = null, courseId = null) {
     Length: Number(item.Length || item.length || 1200),
     Size: Number(item.Size || item.size || 150000000),
     UploadTime: item.UploadTime || item.uploadTime || new Date().toISOString(),
-    UploadedBy: item.UploadedBy || item.uploadedBy || 'Instructor',
+    UploadedBy: item.UploadedBy || item.uploadedBy || '',
     AccessLogID: item.AccessLogID || item.accessLogID || 'al-001',
   };
 }
@@ -559,12 +559,20 @@ export async function createVideo(data) {
   return createLesson(data);
 }
 
-export async function updateVideoTitle(videoId, newTitle, courseId = null, chapterId = null) {
+export async function updateVideoTitle(
+  videoId,
+  newTitle,
+  courseId = null,
+  chapterId = null,
+  description = '',
+  url = ''
+) {
   return updateLesson(videoId, {
     course_id: courseId,
     chapter_id: chapterId,
     title: newTitle,
-    description: '',
+    description,
+    url,
   });
 }
 
@@ -593,4 +601,128 @@ export async function getCourseByPk(partitionKey) {
 
 export async function getLesson(partitionKey, sortKey) {
   return getLessonById(sortKey || partitionKey);
+}
+
+// =============================================================================
+// 6. LESSON NOTES (KẾT NỐI BACKEND + DỰ PHÒNG LOCALSTORAGE)
+// =============================================================================
+
+const NOTES_STORAGE_KEY = 'securelearn_lesson_notes_v1';
+
+function readLocalNotesMap() {
+  try {
+    if (typeof localStorage === 'undefined') return {};
+    const raw = localStorage.getItem(NOTES_STORAGE_KEY);
+    return raw ? JSON.parse(raw) || {} : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeLocalNotesMap(map) {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(map));
+  } catch {
+    // ignore
+  }
+}
+
+function noteBucketKey(userId, lessonId) {
+  return `${userId || 'guest'}::${lessonId}`;
+}
+
+function normalizeNote(item, idx = 0, synced = true) {
+  const createdAt = item.createdAt || item.created_at || item.timestamp || new Date().toISOString();
+  return {
+    id: item.id || item.noteId || `note-${Date.now()}-${idx}`,
+    text: item.content || item.text || '',
+    time:
+      item.time ||
+      new Date(createdAt).toLocaleTimeString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }),
+    createdAt,
+    synced: item.synced !== undefined ? item.synced : synced,
+  };
+}
+
+/**
+ * Lấy danh sách ghi chú của một bài giảng từ Backend (GET /api/v1/lesson/{lessonId}/notes).
+ * Nếu Backend chưa hỗ trợ endpoint (404/405/501), đọc từ localStorage theo user + lesson.
+ */
+export async function getLessonNotes(lessonId, userId = 'guest') {
+  if (!lessonId) return { notes: [], backendAvailable: false };
+  const key = noteBucketKey(userId, lessonId);
+  const localMap = readLocalNotesMap();
+  const localNotes = Array.isArray(localMap[key]) ? localMap[key] : [];
+
+  try {
+    const res = await apiClient.get(`/lesson/${lessonId}/notes`);
+    const list = Array.isArray(res) ? res : res?.notes || res?.data || [];
+    const normalized = list.map((n, i) => normalizeNote(n, i, true));
+    localMap[key] = normalized;
+    writeLocalNotesMap(localMap);
+    return { notes: normalized, backendAvailable: true };
+  } catch (err) {
+    const status = err?.response?.status;
+    if (status === 404 || status === 405 || status === 501 || !status) {
+      return { notes: localNotes, backendAvailable: false };
+    }
+    throw err;
+  }
+}
+
+/**
+ * Lưu ghi chú mới lên Backend (POST /api/v1/lesson/{lessonId}/notes).
+ * Nếu Backend chưa hỗ trợ endpoint, lưu vào localStorage để không mất dữ liệu khi tải lại trang.
+ */
+export async function createLessonNote(lessonId, content, userId = 'guest') {
+  const text = (content || '').trim();
+  if (!lessonId || !text) return null;
+
+  const key = noteBucketKey(userId, lessonId);
+  const localMap = readLocalNotesMap();
+  const existing = Array.isArray(localMap[key]) ? localMap[key] : [];
+
+  try {
+    const res = await apiClient.post(`/lesson/${lessonId}/notes`, { content: text, text });
+    const saved = normalizeNote(res && typeof res === 'object' ? res : { content: text }, 0, true);
+    localMap[key] = [saved, ...existing];
+    writeLocalNotesMap(localMap);
+    return { note: saved, synced: true };
+  } catch (err) {
+    const status = err?.response?.status;
+    if (status === 404 || status === 405 || status === 501 || !status) {
+      const localNote = normalizeNote({ content: text }, 0, false);
+      localMap[key] = [localNote, ...existing];
+      writeLocalNotesMap(localMap);
+      return { note: localNote, synced: false };
+    }
+    throw err;
+  }
+}
+
+/**
+ * Xóa một ghi chú của bài giảng (DELETE /api/v1/lesson/{lessonId}/notes/{noteId}).
+ */
+export async function deleteLessonNote(lessonId, noteId, userId = 'guest') {
+  if (!lessonId || !noteId) return;
+  const key = noteBucketKey(userId, lessonId);
+  const localMap = readLocalNotesMap();
+  const existing = Array.isArray(localMap[key]) ? localMap[key] : [];
+
+  try {
+    await apiClient.delete(`/lesson/${lessonId}/notes/${noteId}`);
+  } catch (err) {
+    const status = err?.response?.status;
+    if (status !== 404 && status !== 405 && status !== 501 && status) {
+      throw err;
+    }
+  }
+
+  localMap[key] = existing.filter((n) => n.id !== noteId);
+  writeLocalNotesMap(localMap);
 }

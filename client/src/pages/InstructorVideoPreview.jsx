@@ -75,6 +75,7 @@ export default function InstructorVideoPreview() {
   // Nạp dữ liệu từ Backend API
   const [backendData, setBackendData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -84,7 +85,7 @@ export default function InstructorVideoPreview() {
         if (isMounted && res) {
           setBackendData(res);
           if (res.targetLessonId) {
-            setActiveLectureId(res.targetLessonId);
+            setActiveLectureId((prev) => prev || res.targetLessonId);
           }
         }
       })
@@ -100,7 +101,7 @@ export default function InstructorVideoPreview() {
     return () => {
       isMounted = false;
     };
-  }, [videoId]);
+  }, [videoId, reloadCount]);
 
   // 1. Xác định Khóa học hiện tại
   const currentCourse = useMemo(() => {
@@ -305,6 +306,7 @@ export default function InstructorVideoPreview() {
               </div>
             ) : activeLecture && (activeLecture.ID || activeLecture.id) ? (
               <SecureVideoPlayer
+                key={`${activeLecture.id || activeLecture.ID}-${reloadCount}`}
                 videoId={activeLecture.id || activeLecture.ID}
                 courseId={currentCourse?.ID || currentCourse?.id}
                 videoUrl={activeLecture.videoURL || activeLecture.videoUrl}
@@ -378,7 +380,6 @@ export default function InstructorVideoPreview() {
               {[
                 { id: 'overview', label: 'Tổng quan bài giảng' },
                 { id: 'security', label: 'Kiểm định DRM & Watermark' },
-                { id: 'logs', label: 'Nhật ký truy cập' },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -466,12 +467,6 @@ export default function InstructorVideoPreview() {
                   </li>
                 </ul>
               </div>
-            )}
-
-            {activeTab === 'logs' && (
-              <p className="text-xs text-slate-400 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800 mb-0">
-                Chưa có bản ghi nhật ký nào được ghi nhận cho bài học này.
-              </p>
             )}
           </div>
         </div>
@@ -577,11 +572,19 @@ export default function InstructorVideoPreview() {
       <ReuploadVideoModal
         show={showReuploadModal}
         onHide={() => setShowReuploadModal(false)}
-        video={activeLecture}
+        video={
+          activeLecture
+            ? {
+                ...activeLecture,
+                courseId: activeLecture.courseId || currentCourse?.ID || currentCourse?.id || '',
+              }
+            : null
+        }
         onSuccess={(updated) => {
           if (updated?.ID) {
             setActiveLectureId(updated.ID);
           }
+          setReloadCount((c) => c + 1);
         }}
       />
     </div>

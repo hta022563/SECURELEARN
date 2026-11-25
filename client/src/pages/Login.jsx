@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { users } from '../data/mockDatabase';
 import Logo from '../components/Logo';
 import ForgotPasswordModal from '../components/ForgotPasswordModal';
-import { login as apiLogin, me as apiMe, mapCognitoRoleToDisplayRole, ROLE_REDIRECT } from '../services/authService';
+import { login as apiLogin, me as apiMe, decodeJwtPayload, mapCognitoRoleToDisplayRole, ROLE_REDIRECT } from '../services/authService';
 
 // Map Role trong mockDb → Role trong RBAC routing (used for demo fallback)
 const ROLE_MAP = {
@@ -67,13 +67,22 @@ export default function Login() {
 
       // 2. Fetch the user's profile / role from the JWT claims using the freshly received accessToken
       const profile = await apiMe(tokens.accessToken);
+      const idClaims = decodeJwtPayload(tokens.idToken);
+      const resolvedEmail =
+        (profile.email && profile.email.includes('@') ? profile.email : null) ||
+        idClaims.email ||
+        cleanEmail;
+      const resolvedName =
+        profile.name ||
+        idClaims.name ||
+        resolvedEmail.split('@')[0];
 
       // 3. Build the userData shape AuthContext + axiosClient expect
       const displayRole = mapCognitoRoleToDisplayRole(profile.roles || []);
       const userData = {
-        userId: profile.sub,
-        name: profile.name || cleanEmail.split('@')[0],
-        email: profile.email || cleanEmail,
+        userId: profile.sub || idClaims.sub,
+        name: resolvedName,
+        email: resolvedEmail,
         role: displayRole,
         token: tokens.accessToken,
         idToken: tokens.idToken,

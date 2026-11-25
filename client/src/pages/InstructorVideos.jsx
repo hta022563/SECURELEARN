@@ -259,29 +259,56 @@ export default function InstructorVideos() {
     }
 
     const updatedTitle = formVideoTitle.trim();
-    await updateVideoTitle(editingVideo.ID, updatedTitle);
+    const targetCourseId =
+      editingVideo.course_id ||
+      editingVideo.courseId ||
+      selectedCourseForDetail?.ID ||
+      selectedCourseForDetail?.id ||
+      '';
+    const targetChapterId =
+      editingVideo.chapter_id || editingVideo.chapterId || editingVideo.Chapter || '';
 
-    setVideosList((prev) =>
-      prev.map((v) => (v.ID === editingVideo.ID ? { ...v, Title: updatedTitle } : v))
-    );
+    try {
+      await updateVideoTitle(
+        editingVideo.ID || editingVideo.id,
+        updatedTitle,
+        targetCourseId,
+        targetChapterId,
+        editingVideo.Description || editingVideo.description || '',
+        editingVideo.url || editingVideo.videoURL || editingVideo.videoUrl || ''
+      );
 
-    if (selectedCourseForDetail) {
-      setSelectedCourseForDetail((prev) => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          structuredChapters: prev.structuredChapters.map((chap) => ({
-            ...chap,
-            videos: chap.videos.map((vid) =>
-              vid.ID === editingVideo.ID ? { ...vid, Title: updatedTitle } : vid
-            ),
-          })),
-        };
-      });
+      setVideosList((prev) =>
+        prev.map((v) =>
+          (v.ID || v.id) === (editingVideo.ID || editingVideo.id)
+            ? { ...v, Title: updatedTitle, title: updatedTitle }
+            : v
+        )
+      );
+
+      if (selectedCourseForDetail) {
+        setSelectedCourseForDetail((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            structuredChapters: prev.structuredChapters.map((chap) => ({
+              ...chap,
+              videos: chap.videos.map((vid) =>
+                (vid.ID || vid.id) === (editingVideo.ID || editingVideo.id)
+                  ? { ...vid, Title: updatedTitle, title: updatedTitle }
+                  : vid
+              ),
+            })),
+          };
+        });
+      }
+
+      showToast(t('instructor.video_title_updated'), 'success', t('instructor.success'));
+      setEditingVideo(null);
+    } catch (err) {
+      const errMsg = err?.response?.data?.error || err?.message || 'Không thể cập nhật bài giảng.';
+      showToast(errMsg, 'danger', 'Lỗi');
     }
-
-    showToast(t('instructor.video_title_updated'), 'success', t('instructor.success'));
-    setEditingVideo(null);
   };
 
   const handleOpenCourseDetail = async (course) => {
@@ -323,22 +350,27 @@ export default function InstructorVideos() {
 
   const handleDeleteVideo = async (videoId, videoTitle) => {
     if (window.confirm(`${t('instructor.delete_video_confirm')} "${videoTitle}"?`)) {
-      await deleteVideo(videoId);
-      setVideosList((prev) => prev.filter((v) => v.ID !== videoId));
-      if (selectedCourseForDetail) {
-        setSelectedCourseForDetail((prev) => {
-          if (!prev) return null;
-          return {
-            ...prev,
-            videosCount: Math.max(0, prev.videosCount - 1),
-            structuredChapters: prev.structuredChapters.map((chap) => ({
-              ...chap,
-              videos: chap.videos.filter((vid) => vid.ID !== videoId),
-            })),
-          };
-        });
+      try {
+        await deleteVideo(videoId);
+        setVideosList((prev) => prev.filter((v) => v.ID !== videoId && v.id !== videoId));
+        if (selectedCourseForDetail) {
+          setSelectedCourseForDetail((prev) => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              videosCount: Math.max(0, prev.videosCount - 1),
+              structuredChapters: prev.structuredChapters.map((chap) => ({
+                ...chap,
+                videos: chap.videos.filter((vid) => vid.ID !== videoId && vid.id !== videoId),
+              })),
+            };
+          });
+        }
+        showToast(`${t('instructor.deleted_video')} ${videoTitle}`, 'info', t('instructor.deleted'));
+      } catch (err) {
+        const errMsg = err?.response?.data?.error || err?.message || 'Không thể xóa bài giảng.';
+        showToast(errMsg, 'danger', 'Lỗi');
       }
-      showToast(`${t('instructor.deleted_video')} ${videoTitle}`, 'info', t('instructor.deleted'));
     }
   };
 
@@ -358,31 +390,46 @@ export default function InstructorVideos() {
 
     const updatedTitle = chapterFormTitle.trim();
     const updatedDesc = chapterFormDesc.trim();
+    const targetChapterId = editingChapter.ID || editingChapter.id;
+    const targetCourseId =
+      editingChapter.course_id ||
+      editingChapter.courseId ||
+      editingChapter.CoursesID ||
+      selectedCourseForDetail?.ID ||
+      selectedCourseForDetail?.id ||
+      '';
 
-    await updateChapterTitle(editingChapter.ID, updatedTitle, updatedDesc);
+    try {
+      await updateChapterTitle(targetChapterId, updatedTitle, updatedDesc, targetCourseId);
 
-    setChaptersList((prev) =>
-      prev.map((c) =>
-        c.ID === editingChapter.ID ? { ...c, Title: updatedTitle, Description: updatedDesc } : c
-      )
-    );
+      setChaptersList((prev) =>
+        prev.map((c) =>
+          (c.ID || c.id) === targetChapterId
+            ? { ...c, Title: updatedTitle, title: updatedTitle, Description: updatedDesc, description: updatedDesc }
+            : c
+        )
+      );
 
-    if (selectedCourseForDetail) {
-      setSelectedCourseForDetail((prev) => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          structuredChapters: prev.structuredChapters.map((chap) =>
-            chap.ID === editingChapter.ID
-              ? { ...chap, Title: updatedTitle, Description: updatedDesc }
-              : chap
-          ),
-        };
-      });
+      if (selectedCourseForDetail) {
+        setSelectedCourseForDetail((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            structuredChapters: prev.structuredChapters.map((chap) =>
+              (chap.ID || chap.id) === targetChapterId
+                ? { ...chap, Title: updatedTitle, title: updatedTitle, Description: updatedDesc, description: updatedDesc }
+                : chap
+            ),
+          };
+        });
+      }
+
+      showToast(t('instructor.chapter_info_updated'), 'success', t('instructor.success'));
+      setEditingChapter(null);
+    } catch (err) {
+      const errMsg = err?.response?.data?.error || err?.message || 'Không thể cập nhật thông tin chương.';
+      showToast(errMsg, 'danger', 'Lỗi');
     }
-
-    showToast(t('instructor.chapter_info_updated'), 'success', t('instructor.success'));
-    setEditingChapter(null);
   };
 
   const handleDeleteChapter = async (chapterId, chapterTitle, e) => {
@@ -394,19 +441,26 @@ export default function InstructorVideos() {
         )}`
       )
     ) {
-      await deleteChapter(chapterId);
-      setChaptersList((prev) => prev.filter((c) => c.ID !== chapterId));
-      if (selectedCourseForDetail) {
-        setSelectedCourseForDetail((prev) => {
-          if (!prev) return null;
-          return {
-            ...prev,
-            chaptersCount: Math.max(0, prev.chaptersCount - 1),
-            structuredChapters: prev.structuredChapters.filter((chap) => chap.ID !== chapterId),
-          };
-        });
+      try {
+        await deleteChapter(chapterId);
+        setChaptersList((prev) => prev.filter((c) => c.ID !== chapterId && c.id !== chapterId));
+        if (selectedCourseForDetail) {
+          setSelectedCourseForDetail((prev) => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              chaptersCount: Math.max(0, prev.chaptersCount - 1),
+              structuredChapters: prev.structuredChapters.filter(
+                (chap) => chap.ID !== chapterId && chap.id !== chapterId
+              ),
+            };
+          });
+        }
+        showToast(`${t('instructor.deleted_chapter')} ${chapterTitle}`, 'info', t('instructor.deleted'));
+      } catch (err) {
+        const errMsg = err?.response?.data?.error || err?.message || 'Không thể xóa chương.';
+        showToast(errMsg, 'danger', 'Lỗi');
       }
-      showToast(`${t('instructor.deleted_chapter')} ${chapterTitle}`, 'info', t('instructor.deleted'));
     }
   };
 
@@ -936,7 +990,19 @@ export default function InstructorVideos() {
       <ReuploadVideoModal
         show={Boolean(reuploadingVideo)}
         onHide={() => setReuploadingVideo(null)}
-        video={reuploadingVideo}
+        video={
+          reuploadingVideo
+            ? {
+                ...reuploadingVideo,
+                courseId:
+                  reuploadingVideo.courseId ||
+                  reuploadingVideo.course_id ||
+                  selectedCourseForDetail?.ID ||
+                  selectedCourseForDetail?.id ||
+                  '',
+              }
+            : null
+        }
         onSuccess={handleReuploadSuccess}
       />
     </div>

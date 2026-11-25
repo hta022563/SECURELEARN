@@ -1,13 +1,29 @@
-import React, { useState } from 'react';
-import { UserCircle, Edit3, Key, AlertCircle, Loader2, Shield, Mail, Hash, Check } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { UserCircle, Edit3, Key, AlertCircle, Loader2, Mail, Hash, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useTranslation } from 'react-i18next';
+import {
+  me as apiMe,
+  changePassword as apiChangePassword,
+  decodeJwtPayload,
+  mapCognitoRoleToDisplayRole,
+} from '../services/authService';
+import { getAdminUsers } from '../services/adminService';
 
 export default function UserProfile() {
   const { user, login } = useAuth();
   const { showToast } = useToast();
   const { t } = useTranslation();
+
+  // Dữ liệu hồ sơ thật lấy từ Backend (/api/v1/auth/me + idToken / Cognito)
+  const [profile, setProfile] = useState({
+    userId: user?.userId || '',
+    name: user?.name || '',
+    email: user?.email && user.email.includes('@') ? user.email : '',
+    role: user?.role || '',
+  });
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
 
   // State Phần 1: Chỉnh sửa thông tin cá nhân (Edit Profile)
   const [isEditingInfo, setIsEditingInfo] = useState(false);
@@ -21,6 +37,86 @@ export default function UserProfile() {
   const [passwordErrors, setPasswordErrors] = useState({});
   const [isSavingPassword, setIsSavingPassword] = useState(false);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadProfileFromBackend() {
+      if (!user?.token || String(user.token).startsWith('mock_jwt_')) {
+        if (isMounted) setIsLoadingProfile(false);
+        return;
+      }
+
+      setIsLoadingProfile(true);
+      try {
+        const backendMe = await apiMe(user.token);
+        const idClaims = decodeJwtPayload(user.idToken);
+
+        let resolvedEmail =
+          (backendMe.email && backendMe.email.includes('@') ? backendMe.email : null) ||
+          (idClaims.email && idClaims.email.includes('@') ? idClaims.email : null) ||
+          (user.email && user.email.includes('@') ? user.email : null);
+
+        let resolvedName = backendMe.name || idClaims.name || user.name || '';
+        const resolvedSub = backendMe.sub || idClaims.sub || user.userId || '';
+        const resolvedRole = backendMe.roles?.length
+          ? mapCognitoRoleToDisplayRole(backendMe.roles)
+          : user.role || 'Student';
+
+        // Nếu vẫn chưa có email thật và là Admin, đối chiếu trực tiếp từ Cognito qua /admin/user
+        if ((!resolvedEmail || !resolvedName) && resolvedRole === 'Administrator') {
+          try {
+            const adminRes = await getAdminUsers({ limit: 60 });
+            const matched = (adminRes?.users || []).find(
+              (u) => u.sub === resolvedSub || u.id === resolvedSub
+            );
+            if (matched) {
+              if (!resolvedEmail && matched.email) resolvedEmail = matched.email;
+              if (!resolvedName && matched.fullName) resolvedName = matched.fullName;
+            }
+          } catch {
+            // Bỏ qua nếu không gọi được /admin/user
+          }
+        }
+
+        if (!resolvedName && resolvedEmail) {
+          resolvedName = resolvedEmail.split('@')[0];
+        }
+
+        const freshProfile = {
+          userId: resolvedSub,
+          name: resolvedName,
+          email: resolvedEmail || backendMe.email || '',
+          role: resolvedRole,
+        };
+
+        if (isMounted) {
+          setProfile(freshProfile);
+          setNameInput(freshProfile.name);
+          if (
+            freshProfile.userId !== user.userId ||
+            freshProfile.name !== user.name ||
+            freshProfile.email !== user.email ||
+            freshProfile.role !== user.role
+          ) {
+            login({
+              ...user,
+              ...freshProfile,
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('[UserProfile] Không thể tải hồ sơ từ Backend:', err?.message);
+      } finally {
+        if (isMounted) setIsLoadingProfile(false);
+      }
+    }
+
+    loadProfileFromBackend();
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.token]);
+
   /* =========================================================================
    * PHẦN 1: XỬ LÝ CẬP NHẬT THÔNG TIN CÁ NHÂN (USER INFO)
    * ========================================================================= */
@@ -33,40 +129,42 @@ export default function UserProfile() {
     }
 
     setIsSavingInfo(true);
-
-    setTimeout(() => {
-      setIsSavingInfo(false);
-
-      const updatedUser = {
-        ...user,
-        name: nameInput.trim(),
-      };
-      login(updatedUser);
-
-      setIsEditingInfo(false);
-      showToast(t('profile.name_updated_success'), 'success', t('profile.info_saved'));
-    }, 400);
+    const trimmedName = nameInput.trim();
+    const updatedProfile = {
+      ...profile,
+      name: trimmedName,
+    };
+    setProfile(updatedProfile);
+    login({
+      ...user,
+      ...updatedProfile,
+    });
+    setIsSavingInfo(false);
+    setIsEditingInfo(false);
+    showToast(t('profile.name_updated_success'), 'success', t('profile.info_saved'));
   };
 
   const handleCancelEdit = () => {
-    setNameInput(user?.name || '');
+    setNameInput(profile.name || '');
     setIsEditingInfo(false);
   };
 
   /* =========================================================================
-   * PHẦN 2: XỬ LÝ ĐỔI MẬT KHẨU (CHANGE PASSWORD)
+   * PHẦN 2: XỬ LÝ ĐỔI MẬT KHẨU (CHANGE PASSWORD - POST /api/v1/auth/password)
    * ========================================================================= */
   const validatePasswordForm = () => {
     const errors = {};
 
     if (!currentPassword) {
       errors.currentPassword = t('profile.current_pwd_empty');
+    } else if (currentPassword.length < 8) {
+      errors.currentPassword = t('profile.pwd_min_8', 'Mật khẩu phải có ít nhất 8 ký tự.');
     }
 
     if (!newPassword) {
       errors.newPassword = t('profile.new_pwd_empty');
-    } else if (newPassword.length <= 6) {
-      errors.newPassword = t('profile.new_pwd_length');
+    } else if (newPassword.length < 8) {
+      errors.newPassword = t('profile.pwd_min_8', 'Mật khẩu mới phải có ít nhất 8 ký tự.');
     }
 
     if (!confirmPassword) {
@@ -79,7 +177,7 @@ export default function UserProfile() {
     return Object.keys(errors).length === 0;
   };
 
-  const handleChangePassword = (e) => {
+  const handleChangePassword = async (e) => {
     e.preventDefault();
 
     if (!validatePasswordForm()) {
@@ -87,18 +185,28 @@ export default function UserProfile() {
     }
 
     setIsSavingPassword(true);
+    try {
+      await apiChangePassword({
+        accessToken: user?.token,
+        oldPassword: currentPassword,
+        newPassword,
+      });
 
-    setTimeout(() => {
-      setIsSavingPassword(false);
-
-      // Reset form
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
       setPasswordErrors({});
 
       showToast(t('profile.pwd_updated_success'), 'success', t('profile.change_pwd'));
-    }, 500);
+    } catch (err) {
+      showToast(
+        err?.message || t('profile.pwd_update_failed', 'Không thể cập nhật mật khẩu.'),
+        'danger',
+        t('profile.change_pwd')
+      );
+    } finally {
+      setIsSavingPassword(false);
+    }
   };
 
   return (
@@ -128,14 +236,14 @@ export default function UserProfile() {
             </h3>
             <span
               className={`inline-flex items-center px-3 py-1 text-xs font-bold rounded-full ${
-                user?.role === 'Administrator'
+                profile.role === 'Administrator'
                   ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300'
-                  : user?.role === 'Instructor'
+                  : profile.role === 'Instructor'
                   ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300'
                   : 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300'
               }`}
             >
-              {user?.role || t('profile.user_default')}
+              {profile.role || t('profile.user_default')}
             </span>
           </div>
 
@@ -145,20 +253,20 @@ export default function UserProfile() {
               <div
                 className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center text-white font-extrabold text-2xl sm:text-3xl shadow-md shrink-0 bg-gradient-to-tr from-blue-600 to-cyan-500"
               >
-                {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                {profile.name ? profile.name.charAt(0).toUpperCase() : 'U'}
               </div>
 
               <div>
                 <h4 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
-                  {user?.name || t('profile.name_not_updated')}
+                  {isLoadingProfile ? t('common.loading', 'Đang tải...') : (profile.name || t('profile.name_not_updated'))}
                 </h4>
                 <div className="text-xs text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1">
                   <Mail className="h-3 w-3" />
-                  <span>{user?.email}</span>
+                  <span>{isLoadingProfile ? '...' : (profile.email || '—')}</span>
                 </div>
                 <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[11px] font-mono text-slate-600 dark:text-slate-300">
                   <Hash className="h-3 w-3" />
-                  <span>{user?.userId || 'N/A'}</span>
+                  <span>{profile.userId || 'N/A'}</span>
                 </div>
               </div>
             </div>
@@ -172,7 +280,7 @@ export default function UserProfile() {
                       {t('profile.display_name')}
                     </span>
                     <span className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white">
-                      {user?.name}
+                      {isLoadingProfile ? t('common.loading', 'Đang tải...') : profile.name}
                     </span>
                   </div>
 
@@ -181,7 +289,7 @@ export default function UserProfile() {
                       {t('profile.linked_email')}
                     </span>
                     <span className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white">
-                      {user?.email}
+                      {isLoadingProfile ? t('common.loading', 'Đang tải...') : (profile.email || '—')}
                     </span>
                   </div>
 
@@ -190,7 +298,7 @@ export default function UserProfile() {
                       {t('profile.system_role')}
                     </span>
                     <span className="text-xs sm:text-sm font-bold text-blue-600 dark:text-blue-400">
-                      {user?.role}
+                      {profile.role}
                     </span>
                   </div>
                 </div>
@@ -228,7 +336,7 @@ export default function UserProfile() {
                   </label>
                   <input
                     type="email"
-                    value={user?.email || ''}
+                    value={profile.email || ''}
                     disabled
                     className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-4 py-2.5 text-xs text-slate-400 cursor-not-allowed"
                   />

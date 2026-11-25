@@ -13,8 +13,12 @@ import {
   Sparkles,
   RefreshCw,
 } from 'lucide-react';
-import { getAiAccessLogs, getAdminUsers } from '../services/adminService';
-import { getCourses } from '../services/courseService';
+import {
+  getAccessLogs,
+  getAnomalyAlerts,
+  getAdminUsers,
+  ADMIN_ALERTS_ENDPOINT,
+} from '../services/adminService';
 import { useToast } from '../context/ToastContext';
 
 const RESOLVED_ALERTS_KEY = 'securelearn_resolved_alerts_v1';
@@ -50,121 +54,97 @@ function formatNameFromEmail(email) {
 }
 
 /**
- * Phân tích danh sách AccessLog thật từ Backend (/api/v1/ai/logs) theo từng người dùng
- * để phát hiện các hành vi bất thường (nhiều IP, nhiều thiết bị, spam key/manifest, lỗi truy cập, tua nhanh).
+ * Chuẩn hóa dữ liệu Alert trả về từ Backend (hỗ trợ cả schema aiLog lẫn schema AnomalyAlert).
  */
-function buildAnomalyAlertsFromLogs(logs, usersList, coursesList, resolvedIds) {
-  if (!Array.isArray(logs) || logs.length === 0) return [];
+function normalizeAlerts(rawAlerts, usersList, resolvedIds) {
+  if (!Array.isArray(rawAlerts) || rawAlerts.length === 0) return [];
 
   const usersByEmail = new Map();
   usersList.forEach((u) => {
     if (u.email) usersByEmail.set(u.email.toLowerCase(), u);
   });
 
-  const groupedByEmail = new Map();
-  logs.forEach((log) => {
-    const emailKey = (log.userEmail || 'anonymous').toLowerCase();
-    if (!groupedByEmail.has(emailKey)) {
-      groupedByEmail.set(emailKey, []);
-    }
-    groupedByEmail.get(emailKey).push(log);
-  });
+  return rawAlerts
+    .map((item, idx) => {
+      const email = (item.userEmail || item.studentEmail || item.email || '').trim();
+      const matchedUser = email ? usersByEmail.get(email.toLowerCase()) : null;
 
-  const alerts = [];
+      const id = item.id || item.alertId || item.logId || `al-${email || idx}`;
+      const studentId = item.studentId || item.userId || matchedUser?.id || email || `user-${idx}`;
+      const studentName =
+        item.studentName ||
+        matchedUser?.fullName ||
+        formatNameFromEmail(email);
 
-  groupedByEmail.forEach((userLogs, emailKey) => {
-    const uniqueIps = new Set();
-    const uniqueDevices = new Set();
-    let keyRequests = 0;
-    let errorLogs = 0;
-    let rapidIntervals = 0;
-    let latestLog = userLogs[0];
-    let latestTimeMs = latestLog?.accessedTime ? new Date(latestLog.accessedTime).getTime() : 0;
-
-    userLogs.forEach((l) => {
-      if (l.ipAddress) uniqueIps.add(l.ipAddress);
-      const dev = l.deviceFingerprint || l.userAgent;
-      if (dev) uniqueDevices.add(dev);
-
-      if (l.actionType === 'KEY' || l.actionType === 'KEY_REQUEST') {
-        keyRequests += 1;
-      }
-      if (l.statusCode >= 400) {
-        errorLogs += 1;
-      }
-      if (l.downloadInterval > 0 && l.downloadInterval < 500) {
-        rapidIntervals += 1;
+      let riskScore = 0;
+      if (typeof item.riskScore === 'number') {
+        riskScore = Math.round(item.riskScore);
+      } else if (typeof item.score === 'number') {
+        riskScore = item.score <= 1 ? Math.round(item.score * 100) : Math.round(item.score);
+      } else if (typeof item.Score === 'number') {
+        riskScore = item.Score <= 1 ? Math.round(item.Score * 100) : Math.round(item.Score);
+      } else {
+        // Suy ra mức độ rủi ro nếu Backend trả về object aiLog
+        let computed = 0;
+        if ((item.uniqueIpCount || 0) > 1) computed += Math.min(45, (item.uniqueIpCount - 1) * 25);
+        if ((item.uniqueDeviceCount || 0) > 1) computed += Math.min(35, (item.uniqueDeviceCount - 1) * 20);
+        if ((item.errorRate || 0) > 0.2) computed += 25;
+        if ((item.manifestToChunkRatio || 0) > 0.5) computed += 25;
+        if (item.label === 1 || item.label === -1) computed = Math.max(computed, 75);
+        riskScore = Math.min(100, Math.round(computed));
       }
 
-      const tMs = l.accessedTime ? new Date(l.accessedTime).getTime() : 0;
-      if (tMs >= latestTimeMs) {
-        latestTimeMs = tMs;
-        latestLog = l;
+      let anomalyTypeKey = item.anomalyTypeKey || 'admin_alerts.account_sharing';
+      let detailsKey = item.detailsKey || 'admin_alerts.account_sharing_desc';
+      if (!item.anomalyTypeKey) {
+        if (riskScore >= 80 || (item.manifestToChunkRatio || 0) > 0.5 || (item.errorRate || 0) > 0.3) {
+          anomalyTypeKey = 'admin_alerts.spam_ecdh';
+          detailsKey = 'admin_alerts.spam_ecdh_desc';
+        } else if (riskScore >= 50 || ((item.avgDownloadInterval || 0) > 0 && item.avgDownloadInterval < 500)) {
+          anomalyTypeKey = 'admin_alerts.bot_viewing';
+          detailsKey = 'admin_alerts.bot_viewing_desc';
+        } else if ((item.uniqueIpCount || 0) > 1) {
+          anomalyTypeKey = 'admin_alerts.geo_anomaly';
+          detailsKey = 'admin_alerts.geo_anomaly_desc';
+        }
       }
+
+      const rawTs = item.timestamp || item.windowTimestamp || item.accessedTime || item.createdAt;
+      const backendStatus = item.status || item.Status;
+      const status = backendStatus || (resolvedIds.has(id) ? 'Resolved' : 'open');
+
+      return {
+        id,
+        studentId,
+        studentName,
+        studentEmail: email,
+        courseId: item.courseId || null,
+        courseTitle: item.courseTitle || null,
+        anomalyTypeKey,
+        detailsKey,
+        anomalyTypeLabel: item.anomalyType || null,
+        detailsLabel: item.details || item.description || null,
+        riskScore,
+        rawTimestamp: rawTs ? new Date(rawTs) : null,
+        status,
+        accessLogId: item.accessLogId || item.logId || '',
+      };
+    })
+    .sort((a, b) => {
+      if (b.riskScore !== a.riskScore) return b.riskScore - a.riskScore;
+      const ta = a.rawTimestamp ? a.rawTimestamp.getTime() : 0;
+      const tb = b.rawTimestamp ? b.rawTimestamp.getTime() : 0;
+      return tb - ta;
     });
-
-    let score = 0;
-    if (uniqueIps.size > 1) score += Math.min(45, (uniqueIps.size - 1) * 25);
-    if (uniqueDevices.size > 1) score += Math.min(35, (uniqueDevices.size - 1) * 20);
-    if (keyRequests >= 5) score += Math.min(35, (keyRequests - 4) * 7);
-    if (errorLogs >= 2) score += Math.min(30, errorLogs * 10);
-    if (rapidIntervals >= 2) score += Math.min(30, rapidIntervals * 10);
-
-    const riskScore = Math.min(100, Math.round(score));
-    if (riskScore < 25) return;
-
-    let anomalyTypeKey = 'admin_alerts.account_sharing';
-    let detailsKey = 'admin_alerts.account_sharing_desc';
-    if (keyRequests >= 5 || errorLogs >= 3) {
-      anomalyTypeKey = 'admin_alerts.spam_ecdh';
-      detailsKey = 'admin_alerts.spam_ecdh_desc';
-    } else if (uniqueIps.size > 1 && uniqueDevices.size > 1) {
-      anomalyTypeKey = 'admin_alerts.account_sharing';
-      detailsKey = 'admin_alerts.account_sharing_desc';
-    } else if (rapidIntervals >= 2) {
-      anomalyTypeKey = 'admin_alerts.bot_viewing';
-      detailsKey = 'admin_alerts.bot_viewing_desc';
-    } else if (uniqueIps.size > 1) {
-      anomalyTypeKey = 'admin_alerts.geo_anomaly';
-      detailsKey = 'admin_alerts.geo_anomaly_desc';
-    }
-
-    const matchedUser = usersByEmail.get(emailKey);
-    const displayEmail = matchedUser?.email || latestLog?.userEmail || emailKey;
-    const displayName = matchedUser?.fullName || formatNameFromEmail(displayEmail);
-    const alertId = `al-${emailKey}`;
-
-    alerts.push({
-      id: alertId,
-      studentId: matchedUser?.id || displayEmail,
-      studentName: displayName,
-      studentEmail: displayEmail,
-      courseId: coursesList[0]?.id || coursesList[0]?.ID || null,
-      courseTitle: coursesList[0]?.title || coursesList[0]?.Title || null,
-      anomalyTypeKey,
-      detailsKey,
-      riskScore,
-      rawTimestamp: latestTimeMs ? new Date(latestTimeMs) : null,
-      status: resolvedIds.has(alertId) ? 'Resolved' : 'open',
-      accessLogId: latestLog?.logId || '',
-      uniqueIpCount: uniqueIps.size,
-      uniqueDeviceCount: uniqueDevices.size,
-      totalEvents: userLogs.length,
-    });
-  });
-
-  return alerts.sort((a, b) => {
-    if (b.riskScore !== a.riskScore) return b.riskScore - a.riskScore;
-    const ta = a.rawTimestamp ? a.rawTimestamp.getTime() : 0;
-    const tb = b.rawTimestamp ? b.rawTimestamp.getTime() : 0;
-    return tb - ta;
-  });
 }
 
 /**
  * =============================================================================
- * COMPONENT: AdminAnomalyDashboard (Dữ liệu thực từ Backend /api/v1/ai/logs & /api/v1/admin/user)
+ * COMPONENT: AdminAnomalyDashboard
  * =============================================================================
+ * Gọi tách biệt 2 API:
+ * 1. getAccessLogs()   -> lấy dữ liệu từ bảng AccessLog
+ * 2. getAnomalyAlerts() -> lấy danh sách cảnh báo từ bảng Alert / aiLog
  */
 export default function AdminAnomalyDashboard() {
   const { t, i18n } = useTranslation();
@@ -196,43 +176,50 @@ export default function AdminAnomalyDashboard() {
     setIsLoading(true);
     setFetchError('');
     try {
-      const [logsRes, usersRes, coursesRes] = await Promise.allSettled([
-        getAiAccessLogs(),
+      const [alertsRes, logsRes, usersRes] = await Promise.allSettled([
+        getAnomalyAlerts(),
+        getAccessLogs(),
         getAdminUsers({ limit: 60 }),
-        getCourses(),
       ]);
 
-      if (logsRes.status === 'rejected') {
-        throw logsRes.reason;
-      }
-
-      const fetchedLogs = logsRes.value || [];
       const fetchedUsers = usersRes.status === 'fulfilled' ? usersRes.value?.users || [] : [];
-      const fetchedCourses = coursesRes.status === 'fulfilled' && Array.isArray(coursesRes.value)
-        ? coursesRes.value
-        : [];
-
-      setAccessLogs(fetchedLogs);
       setUsersList(fetchedUsers);
 
       const resolvedIds = readResolvedIds();
-      const computedAlerts = buildAnomalyAlertsFromLogs(
-        fetchedLogs,
-        fetchedUsers,
-        fetchedCourses,
-        resolvedIds
-      );
-      setAlerts(computedAlerts);
+
+      if (alertsRes.status === 'fulfilled') {
+        setAlerts(normalizeAlerts(alertsRes.value, fetchedUsers, resolvedIds));
+      } else {
+        setAlerts([]);
+      }
+
+      if (logsRes.status === 'fulfilled') {
+        setAccessLogs(logsRes.value || []);
+      } else {
+        setAccessLogs([]);
+      }
+
+      const errors = [];
+      if (alertsRes.status === 'rejected') {
+        const msg =
+          alertsRes.reason?.response?.data?.error ||
+          alertsRes.reason?.message ||
+          'Lỗi tải Alerts';
+        errors.push(`Alerts (${msg})`);
+      }
+      if (logsRes.status === 'rejected') {
+        const msg =
+          logsRes.reason?.response?.data?.error ||
+          logsRes.reason?.message ||
+          'Lỗi tải AccessLogs';
+        errors.push(`AccessLogs (${msg})`);
+      }
+      if (errors.length > 0) {
+        setFetchError(`Không thể tải dữ liệu từ Backend: ${errors.join(' | ')}`);
+      }
     } catch (err) {
       console.error('[AdminAnomalyDashboard] Lỗi tải dữ liệu từ Backend:', err);
-      const errMsg =
-        err?.response?.data?.error ||
-        err?.response?.data?.message ||
-        err?.message ||
-        'Không thể tải dữ liệu cảnh báo bất thường từ Backend.';
-      setFetchError(errMsg);
-      setAccessLogs([]);
-      setAlerts([]);
+      setFetchError(err?.message || 'Không thể tải dữ liệu từ Backend.');
     } finally {
       setIsLoading(false);
     }
@@ -286,7 +273,6 @@ export default function AdminAnomalyDashboard() {
 
     const keyword = searchWatermarkId.trim().toLowerCase();
 
-    // Tìm trong danh sách user thật từ Cognito (/api/v1/admin/user)
     const matchedUser = usersList.find(
       (u) =>
         (u.id && u.id.toLowerCase() === keyword) ||
@@ -294,7 +280,6 @@ export default function AdminAnomalyDashboard() {
         (u.fullName && u.fullName.toLowerCase().includes(keyword))
     );
 
-    // Tìm trong AccessLog thật từ Backend (/api/v1/ai/logs)
     const matchedLogs = accessLogs.filter((l) => {
       const email = (l.userEmail || '').toLowerCase();
       const fp = (l.deviceFingerprint || '').toLowerCase();
@@ -654,7 +639,7 @@ export default function AdminAnomalyDashboard() {
               {t('admin_alerts.ai_anomaly_subtitle')}
             </p>
           </div>
-          <span className="text-xs font-mono text-slate-400">API: GET /api/v1/ai/logs</span>
+          <span className="text-xs font-mono text-slate-400">API: GET /api/v1{ADMIN_ALERTS_ENDPOINT}</span>
         </div>
 
         {/* Controls Bar: Tabs & Search */}
@@ -766,10 +751,10 @@ export default function AdminAnomalyDashboard() {
                     </td>
                     <td className="py-3 px-3">
                       <div className="font-semibold text-slate-800 dark:text-slate-200">
-                        {t(item.anomalyTypeKey)}
+                        {item.anomalyTypeLabel || t(item.anomalyTypeKey)}
                       </div>
                       <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-xs">
-                        {t(item.detailsKey)}
+                        {item.detailsLabel || t(item.detailsKey)}
                       </div>
                     </td>
                     <td className="py-3 px-3 text-slate-600 dark:text-slate-300 whitespace-nowrap">

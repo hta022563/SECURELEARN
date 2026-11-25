@@ -20,6 +20,7 @@ import {
   Loader2,
   ExternalLink,
   RefreshCw,
+  Trash2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -29,7 +30,12 @@ import {
   fetchMyEnrollments,
   enrollInCourse,
 } from '../services/entitlementService';
-import { getCourseWithLessons } from '../services/courseService';
+import {
+  getCourseWithLessons,
+  getLessonNotes,
+  createLessonNote,
+  deleteLessonNote,
+} from '../services/courseService';
 
 /**
  * =============================================================================
@@ -159,9 +165,9 @@ export default function StudentCoursePlayer() {
     } catch (err) {
       setEnrollmentError(
         err?.response?.data?.error ||
-          err?.response?.data?.message ||
-          err?.message ||
-          'Không thể tạo thông tin thanh toán cho khóa học này.'
+        err?.response?.data?.message ||
+        err?.message ||
+        'Không thể tạo thông tin thanh toán cho khóa học này.'
       );
     } finally {
       setIsEnrolling(false);
@@ -278,23 +284,52 @@ export default function StudentCoursePlayer() {
   const [completedLectures, setCompletedLectures] = useState([]);
   const [notes, setNotes] = useState('');
   const [savedNotes, setSavedNotes] = useState([]);
+  const [isSavingNote, setIsSavingNote] = useState(false);
+  const [notesBackendAvailable, setNotesBackendAvailable] = useState(true);
 
   // Bài giảng đang được chọn
   const activeLecture = useMemo(() => {
     return allLectures.find((l) => l.ID === activeLectureId) || allLectures[0] || null;
   }, [allLectures, activeLectureId]);
 
+  // Nạp ghi chú theo từng bài giảng từ Backend (hoặc localStorage nếu BE chưa có endpoint /notes)
+  useEffect(() => {
+    let isMounted = true;
+    setNotes('');
+    const lessonId = activeLecture?.ID;
+    if (!lessonId) {
+      setSavedNotes([]);
+      return;
+    }
+
+    getLessonNotes(lessonId, user?.userId || user?.email)
+      .then((res) => {
+        if (isMounted && res) {
+          setSavedNotes(res.notes || []);
+          setNotesBackendAvailable(Boolean(res.backendAvailable));
+        }
+      })
+      .catch((err) => {
+        console.warn('[StudentCoursePlayer] Lỗi tải ghi chú:', err?.message);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeLecture?.ID, user?.userId, user?.email]);
+
   const currentIdx = allLectures.findIndex((l) => l.ID === activeLectureId);
   const hasPrev = currentIdx > 0;
   const hasNext = currentIdx >= 0 && currentIdx < allLectures.length - 1;
 
   const instructorName =
-    activeLecture?.uploadedBy ||
-    activeLecture?.UploadedBy ||
     currentCourse?.instructor ||
     currentCourse?.Instructor ||
     currentCourse?.owner ||
-    currentCourse?.Owner;
+    currentCourse?.Owner ||
+    activeLecture?.uploadedBy ||
+    activeLecture?.UploadedBy ||
+    '';
 
   const handleSelectLecture = (lectureId) => {
     setActiveLectureId(lectureId);
@@ -321,14 +356,49 @@ export default function StudentCoursePlayer() {
     );
   };
 
-  const handleSaveNote = (e) => {
+  const handleSaveNote = async (e) => {
     e.preventDefault();
-    if (!notes.trim()) return;
-    setSavedNotes([
-      { text: notes, time: new Date().toLocaleTimeString('vi-VN') },
-      ...savedNotes,
-    ]);
-    setNotes('');
+    if (!notes.trim() || !activeLecture?.ID) return;
+
+    setIsSavingNote(true);
+    try {
+      const res = await createLessonNote(
+        activeLecture.ID,
+        notes.trim(),
+        user?.userId || user?.email
+      );
+      if (res?.note) {
+        setSavedNotes((prev) => [res.note, ...prev]);
+        setNotesBackendAvailable(Boolean(res.synced));
+        setNotes('');
+        if (showToast) {
+          showToast(
+            res.synced
+              ? 'Đã lưu ghi chú lên hệ thống.'
+              : 'Backend chưa có API /notes — ghi chú đã được lưu trên trình duyệt.',
+            res.synced ? 'success' : 'info'
+          );
+        }
+      }
+    } catch (err) {
+      if (showToast) {
+        showToast(err?.message || 'Không thể lưu ghi chú.', 'danger');
+      }
+    } finally {
+      setIsSavingNote(false);
+    }
+  };
+
+  const handleDeleteNote = async (noteId) => {
+    if (!activeLecture?.ID) return;
+    try {
+      await deleteLessonNote(activeLecture.ID, noteId, user?.userId || user?.email);
+      setSavedNotes((prev) => prev.filter((n) => n.id !== noteId));
+    } catch (err) {
+      if (showToast) {
+        showToast(err?.message || 'Không thể xóa ghi chú.', 'danger');
+      }
+    }
   };
 
   const formatDuration = (seconds) => {
@@ -631,11 +701,10 @@ export default function StudentCoursePlayer() {
               <button
                 type="button"
                 onClick={() => toggleComplete(activeLecture.ID)}
-                className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
-                  completedLectures.includes(activeLecture.ID)
-                    ? 'bg-emerald-600 text-white shadow-xs'
-                    : 'border border-emerald-500/50 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30'
-                }`}
+                className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold transition-all cursor-pointer ${completedLectures.includes(activeLecture.ID)
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'border border-emerald-500/50 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30'
+                  }`}
               >
                 <CheckCircle className="h-3.5 w-3.5" />
                 <span>
@@ -665,17 +734,15 @@ export default function StudentCoursePlayer() {
                 { id: 'overview', label: 'Tổng quan' },
                 { id: 'instructor', label: 'Giảng viên' },
                 { id: 'notes', label: 'Ghi chú' },
-                { id: 'drm', label: 'Nhật ký truy cập' },
               ].map((tab) => (
                 <button
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
-                  className={`rounded-full px-4 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
-                    activeTab === tab.id
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
-                  }`}
+                  className={`rounded-full px-4 py-1.5 text-xs font-semibold transition-all cursor-pointer ${activeTab === tab.id
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    }`}
                 >
                   {tab.label}
                 </button>
@@ -742,6 +809,11 @@ export default function StudentCoursePlayer() {
 
             {activeTab === 'notes' && (
               <div className="space-y-4">
+                {!notesBackendAvailable && (
+                  <div className="p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200/70 dark:border-amber-800/60 text-[11px] text-amber-700 dark:text-amber-300">
+                    Backend hiện chưa có API <code>/api/v1/lesson/&#123;lessonId&#125;/notes</code> — ghi chú đang được lưu tạm trong trình duyệt theo từng bài giảng.
+                  </div>
+                )}
                 <form onSubmit={handleSaveNote} className="space-y-3">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
@@ -757,38 +829,49 @@ export default function StudentCoursePlayer() {
                   </div>
                   <button
                     type="submit"
-                    className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 px-4 py-2 text-xs font-semibold text-white shadow-xs"
+                    disabled={isSavingNote || !notes.trim()}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-4 py-2 text-xs font-semibold text-white shadow-xs cursor-pointer"
                   >
-                    <Save className="h-3.5 w-3.5" />
-                    <span>Lưu ghi chú</span>
+                    {isSavingNote ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Save className="h-3.5 w-3.5" />
+                    )}
+                    <span>{isSavingNote ? 'Đang lưu...' : 'Lưu ghi chú'}</span>
                   </button>
                 </form>
 
                 {savedNotes.length > 0 && (
                   <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
                     <h6 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                      Ghi chú đã ghi:
+                      Ghi chú đã ghi ({savedNotes.length}):
                     </h6>
                     {savedNotes.map((n, idx) => (
                       <div
-                        key={idx}
-                        className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl text-xs text-slate-600 dark:text-slate-300 border border-slate-100 dark:border-slate-800 flex items-start gap-2"
+                        key={n.id || idx}
+                        className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl text-xs text-slate-600 dark:text-slate-300 border border-slate-100 dark:border-slate-800 flex items-start justify-between gap-2"
                       >
-                        <span className="text-blue-600 dark:text-blue-400 font-semibold shrink-0">
-                          [{n.time}]
-                        </span>
-                        <span>{n.text}</span>
+                        <div className="flex items-start gap-2 min-w-0">
+                          <span className="text-blue-600 dark:text-blue-400 font-semibold shrink-0">
+                            [{n.time}]
+                          </span>
+                          <span className="break-words">{n.text}</span>
+                        </div>
+                        {n.id && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteNote(n.id)}
+                            title="Xóa ghi chú"
+                            className="text-slate-400 hover:text-rose-500 p-1 rounded-full shrink-0 cursor-pointer"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
                 )}
               </div>
-            )}
-
-            {activeTab === 'drm' && (
-              <p className="text-xs text-slate-400 mb-0">
-                Nhật ký truy cập chưa được kết nối với backend.
-              </p>
             )}
           </div>
         </div>
@@ -845,11 +928,10 @@ export default function StudentCoursePlayer() {
                             <div
                               key={vid.ID}
                               onClick={() => handleSelectLecture(vid.ID)}
-                              className={`flex items-center justify-between p-3.5 text-xs transition-colors cursor-pointer ${
-                                isActive
-                                  ? 'bg-blue-50/80 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-bold border-l-4 border-blue-600'
-                                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100/60 dark:hover:bg-slate-800/60'
-                              }`}
+                              className={`flex items-center justify-between p-3.5 text-xs transition-colors cursor-pointer ${isActive
+                                ? 'bg-blue-50/80 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-bold border-l-4 border-blue-600'
+                                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100/60 dark:hover:bg-slate-800/60'
+                                }`}
                             >
                               <div className="flex items-center gap-2.5 overflow-hidden mr-2">
                                 {isActive ? (

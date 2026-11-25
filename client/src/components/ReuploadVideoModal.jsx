@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { RefreshCw, X, Clock, HardDrive, AlertTriangle, UploadCloud, FileVideo, CheckCircle2, Loader2 } from 'lucide-react';
-import { getPresignedUploadUrl, uploadFileToR2 } from '../services/uploadService';
-import { reuploadVideo } from '../services/courseService';
+import { uploadVideoPipeline } from '../services/uploadService';
 import { useToast } from '../context/ToastContext';
 
 function formatDuration(seconds) {
@@ -77,54 +76,66 @@ export default function ReuploadVideoModal({ show, onHide, video, onSuccess }) {
       return;
     }
 
+    const targetCourseId = video?.courseId || video?.course_id || video?.CoursesID || '';
+    const targetChapterId = video?.chapterId || video?.chapter_id || video?.Chapter || '';
+    const targetLessonId = video?.ID || video?.id || '';
+
+    if (!targetCourseId || !targetLessonId) {
+      setErrorMessage('Thiếu mã khóa học hoặc mã bài giảng để thay thế video.');
+      return;
+    }
+
     setIsUploading(true);
     setErrorMessage('');
     setUploadProgress(0);
     setUploadStage('uploading');
 
     try {
-      const { uploadUrl, objectKey } = await getPresignedUploadUrl({
-        fileName: selectedFile.name,
-        contentType: selectedFile.type || 'video/mp4',
-        courseId: video.courseId || video.CoursesID || null,
-      });
-
-      await uploadFileToR2(uploadUrl, selectedFile, (progress) => {
-        setUploadProgress(progress);
-      });
-
-      setUploadStage('processing');
-      const updatedUrl = `https://stream.securelearn.edu/${objectKey}`;
-      const updatedRecord = await reuploadVideo(video.ID, {
-        url: updatedUrl,
-        videoURL: updatedUrl,
-        title: newTitle.trim(),
-      });
+      const trimmedTitle = newTitle.trim();
+      const result = await uploadVideoPipeline(
+        selectedFile,
+        {
+          title: trimmedTitle,
+          description: video?.Description || video?.description || `Bài giảng ${trimmedTitle}`,
+          courseId: targetCourseId,
+          chapterId: targetChapterId,
+          lessonId: targetLessonId,
+        },
+        {
+          onUploadProgress: (percent) => setUploadProgress(percent),
+          onProcessing: () => setUploadStage('processing'),
+        }
+      );
 
       setUploadStage('done');
       showToast(
-        `Đã tải lên và thay thế video "${newTitle.trim()}" trên Backend thành công!`,
+        `Đã tải lên, mã hóa HLS và thay thế video "${trimmedTitle}" trên Backend thành công!`,
         'success',
         'Thay Thế Video Thành Công'
       );
 
       if (onSuccess) {
-        onSuccess(
-          updatedRecord || {
-            ...video,
-            Title: newTitle.trim(),
-            Length: 1500,
-            Size: selectedFile.size,
-            UploadTime: new Date().toISOString(),
-          }
-        );
+        onSuccess({
+          ...video,
+          ID: targetLessonId,
+          id: targetLessonId,
+          Title: trimmedTitle,
+          title: trimmedTitle,
+          Size: selectedFile.size,
+          UploadTime: result?.uploadedAt || new Date().toISOString(),
+        });
       }
 
       setTimeout(() => {
         onHide();
       }, 700);
     } catch (err) {
-      setErrorMessage(err.message || 'Có lỗi xảy ra trong quá trình thay thế video.');
+      const errMsg =
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        err?.message ||
+        'Có lỗi xảy ra trong quá trình thay thế video.';
+      setErrorMessage(errMsg);
       setUploadStage('');
       setIsUploading(false);
     }

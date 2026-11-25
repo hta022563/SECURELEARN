@@ -109,12 +109,16 @@ export async function deleteAdminUser(email) {
   });
 }
 
+// Endpoint lấy AccessLog và Anomaly Alerts cho Admin (chỉnh path tại đây nếu BE đặt route khác)
+export const ADMIN_LOGS_ENDPOINT = '/admin/logs';
+export const ADMIN_ALERTS_ENDPOINT = '/admin/alerts';
+
 /**
- * Lấy danh sách AccessLog trong ngày từ AIController (GET /api/v1/ai/logs)
+ * Lấy danh sách AccessLog từ bảng AccessLog (không dùng /ai/logs vốn dành cho AI đọc raw log)
  * @returns {Promise<Array>}
  */
-export async function getAiAccessLogs() {
-  const res = await apiClient.get('/ai/logs');
+export async function getAccessLogs() {
+  const res = await apiClient.get(ADMIN_LOGS_ENDPOINT);
   const rawLogs = Array.isArray(res) ? res : res?.logs || res?.data || [];
   return rawLogs.map((log, idx) => ({
     logId: log.logId || log.id || `log-${idx}`,
@@ -129,4 +133,13 @@ export async function getAiAccessLogs() {
     segmentCount: Number(log.segmentCount || 0),
     lessonId: log.lessonId || null,
   }));
+}
+
+/**
+ * Lấy danh sách cảnh báo bất thường (AI Alerts / aiLog) từ Backend
+ * @returns {Promise<Array>}
+ */
+export async function getAnomalyAlerts() {
+  const res = await apiClient.get(ADMIN_ALERTS_ENDPOINT);
+  return Array.isArray(res) ? res : res?.alerts || res?.data || [];
 }

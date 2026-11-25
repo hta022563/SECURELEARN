@@ -36,6 +36,25 @@ function getAccessToken() {
   }
 }
 
+export function decodeJwtPayload(token) {
+  try {
+    if (!token || typeof token !== 'string') return {};
+    const parts = token.split('.');
+    if (parts.length < 2) return {};
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+    const json = decodeURIComponent(
+      atob(padded)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(json) || {};
+  } catch {
+    return {};
+  }
+}
+
 async function handleResponse(res) {
   const text = await res.text().catch(() => '');
   let data = {};
@@ -297,6 +316,32 @@ export async function me(tokenOverride) {
       'Authorization': `Bearer ${token}`,
       'X-Device-Fingerprint': deviceFingerprint,
     },
+  });
+  return handleResponse(res);
+}
+
+/**
+ * Changes the current user's password via Cognito.
+ * Endpoint: POST /api/v1/auth/password
+ * @param {{ accessToken?: string, oldPassword: string, newPassword: string }} payload
+ */
+export async function changePassword({ accessToken, oldPassword, newPassword }) {
+  const token = accessToken || getAccessToken();
+  if (!token) throw new Error('Not authenticated');
+
+  const deviceFingerprint = await getDeviceFingerprint();
+  const res = await fetch(`${BASE_URL}/auth/password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'X-Device-Fingerprint': deviceFingerprint,
+    },
+    body: JSON.stringify({
+      accessToken: token,
+      oldPassword,
+      newPassword,
+    }),
   });
   return handleResponse(res);
 }
