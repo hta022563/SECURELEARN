@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import {
   me as apiMe,
   changePassword as apiChangePassword,
+  updateProfile as apiUpdateProfile,
   decodeJwtPayload,
   mapCognitoRoleToDisplayRole,
 } from '../services/authService';
@@ -118,9 +119,9 @@ export default function UserProfile() {
   }, [user?.token]);
 
   /* =========================================================================
-   * PHẦN 1: XỬ LÝ CẬP NHẬT THÔNG TIN CÁ NHÂN (USER INFO)
+   * PHẦN 1: XỬ LÝ CẬP NHẬT THÔNG TIN CÁ NHÂN (POST /api/v1/auth/update)
    * ========================================================================= */
-  const handleSaveProfile = (e) => {
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
 
     if (!nameInput.trim()) {
@@ -130,18 +131,33 @@ export default function UserProfile() {
 
     setIsSavingInfo(true);
     const trimmedName = nameInput.trim();
-    const updatedProfile = {
-      ...profile,
-      name: trimmedName,
-    };
-    setProfile(updatedProfile);
-    login({
-      ...user,
-      ...updatedProfile,
-    });
-    setIsSavingInfo(false);
-    setIsEditingInfo(false);
-    showToast(t('profile.name_updated_success'), 'success', t('profile.info_saved'));
+    try {
+      await apiUpdateProfile({
+        accessToken: user?.token,
+        fullName: trimmedName,
+        name: trimmedName,
+      });
+
+      const updatedProfile = {
+        ...profile,
+        name: trimmedName,
+      };
+      setProfile(updatedProfile);
+      login({
+        ...user,
+        ...updatedProfile,
+      });
+      setIsEditingInfo(false);
+      showToast(t('profile.name_updated_success'), 'success', t('profile.info_saved'));
+    } catch (err) {
+      showToast(
+        err?.message || t('profile.name_update_failed', 'Không thể cập nhật tên người dùng.'),
+        'danger',
+        t('profile.edit_profile')
+      );
+    } finally {
+      setIsSavingInfo(false);
+    }
   };
 
   const handleCancelEdit = () => {

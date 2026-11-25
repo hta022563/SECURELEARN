@@ -346,6 +346,33 @@ export async function changePassword({ accessToken, oldPassword, newPassword }) 
   return handleResponse(res);
 }
 
+/**
+ * Updates the current user's display name via Backend / Cognito.
+ * Endpoint: POST /api/v1/auth/update
+ * @param {{ accessToken?: string, fullName?: string, name?: string }} payload
+ */
+export async function updateProfile({ accessToken, fullName, name }) {
+  const token = accessToken || getAccessToken();
+  if (!token) throw new Error('Not authenticated');
+
+  const displayName = (fullName || name || '').trim();
+  const deviceFingerprint = await getDeviceFingerprint();
+  const res = await fetch(`${BASE_URL}/auth/update`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'X-Device-Fingerprint': deviceFingerprint,
+    },
+    body: JSON.stringify({
+      accessToken: token,
+      fullName: displayName,
+      name: displayName,
+    }),
+  });
+  return handleResponse(res);
+}
+
 // ─── Cognito Hosted UI (browser redirect) ─────────────────────────────────────
 
 export const COGNITO_LOGIN_URL  = 'http://localhost:8080/oauth2/authorization/cognito';
