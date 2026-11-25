@@ -89,6 +89,7 @@ public class SecurityConfiguration {
                 // Upload pipeline — INSTRUCTOR or ADMIN only
                 .requestMatchers(HttpMethod.POST, "/api/v1/upload/presign").hasAnyRole("INSTRUCTOR", "ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/v1/upload/process").hasAnyRole("INSTRUCTOR", "ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/v1/upload/status/*").hasAnyRole("INSTRUCTOR", "ADMIN")
 
                 // Playback manifests use a short-lived signed token; playback URL issuance remains JWT-protected.
                 .requestMatchers(HttpMethod.GET, "/api/v1/lesson/*/manifest").authenticated()
@@ -152,6 +153,8 @@ public class SecurityConfiguration {
             .csrf(Customizer.withDefaults())
             .authorizeHttpRequests(authz -> authz
                 .requestMatchers("/").permitAll()
+                // ALB target-group health check (ecs-template.yaml); only "UP"/"DOWN", no details
+                .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/liveness").permitAll()
                 .anyRequest().authenticated()
             )
             .oauth2Login(Customizer.withDefaults())

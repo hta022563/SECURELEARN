@@ -1,10 +1,15 @@
 @echo off
+rem Backend the image talks to. Point LAMBDA_API_URL back at API Gateway to use the Lambda routes again:
+rem   set LAMBDA_API_URL=https://1rvav1l53e.execute-api.ap-southeast-1.amazonaws.com/api/v1
+set API_URL=http://localhost:8080/api/v1
+set LAMBDA_API_URL=http://localhost:8080/api/v1
+
 echo [1/3] Dang dung va xoa container cu (neu co)...
 docker stop fe-container 2>nul
 docker rm fe-container 2>nul
 
 echo [2/3] Dang build lai Docker Image cho Front-End (Vite)...
-docker build --no-cache -t securelearn-fe .
+docker build --no-cache --build-arg VITE_API_URL=%API_URL% --build-arg VITE_LAMBDA_API_URL=%LAMBDA_API_URL% -t securelearn-fe .
 
 if %errorlevel% neq 0 (
     echo.

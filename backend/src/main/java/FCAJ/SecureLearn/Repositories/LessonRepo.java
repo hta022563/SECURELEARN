@@ -13,4 +13,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface LessonRepo extends CrudRepository<Lesson, UUID> {
     List<Lesson> findByChapterId(UUID chapterId);
+
+    long countByChapterId(UUID chapterId);
 }

@@ -154,8 +154,34 @@ export async function processVideoOnBackend({ objectKey, title, description, cha
   const response = await apiClient.post('/upload/process', payload);
   return {
     lessonId: response.lessonId,
+    // READY (FFmpeg on the local backend) or PROCESSING (MediaConvert on Lambda)
+    status: response.status || 'READY',
     playlistUrl: response.playlistUrl,
   };
+}
+
+const STATUS_POLL_INTERVAL_MS = 5000;
+const STATUS_POLL_TIMEOUT_MS = 60 * 60 * 1000; // MediaConvert has no time limit; stop waiting after 1 h
+
+/**
+ * Bước 4 (chỉ khi MediaConvert): hỏi Backend đến khi video xử lý xong.
+ * GET /api/v1/upload/status/{lessonId} → { lessonId, status: PROCESSING | READY | FAILED, error }
+ * Each call also makes the backend check the MediaConvert job and update the lesson.
+ *
+ * @param {string} lessonId
+ * @returns {Promise<void>} resolves when READY, rejects when FAILED or after the timeout
+ */
+export async function waitForProcessing(lessonId) {
+  const deadline = Date.now() + STATUS_POLL_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, STATUS_POLL_INTERVAL_MS));
+    const response = await apiClient.get(`/upload/status/${lessonId}`);
+    if (response.status === 'READY') return;
+    if (response.status === 'FAILED') {
+      throw new Error(`Xử lý video thất bại: ${response.error || 'MediaConvert job failed'}`);
+    }
+  }
+  throw new Error('Video vẫn đang xử lý sau 1 giờ. Bài học đã được tạo; hãy kiểm tra lại sau.');
 }
 
 /**
@@ -197,6 +223,11 @@ export async function uploadVideoPipeline(file, metadata, callbacks = {}) {
     courseId: metadata.courseId,
     lessonId: metadata.lessonId || null,
   });
+
+  // MediaConvert returns before the video is ready; stay in the "processing" step until it is
+  if (processResult.status === 'PROCESSING') {
+    await waitForProcessing(processResult.lessonId);
+  }
 
   return {
     lessonId: processResult.lessonId,
