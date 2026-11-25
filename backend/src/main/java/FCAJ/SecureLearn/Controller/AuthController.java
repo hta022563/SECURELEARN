@@ -1,6 +1,7 @@
 package FCAJ.SecureLearn.Controller;
 
 import FCAJ.SecureLearn.Configuration.LogAnnotationClass;
+import FCAJ.SecureLearn.Model.AccessLog;
 import FCAJ.SecureLearn.Model.ActionType;
 import FCAJ.SecureLearn.Request.ConfirmRequest;
 import FCAJ.SecureLearn.Request.LoginRequest;
@@ -8,7 +9,9 @@ import FCAJ.SecureLearn.Request.PasswordChangeRequest;
 import FCAJ.SecureLearn.Request.RegisterRequest;
 import FCAJ.SecureLearn.Request.ResetPasswordRequest;
 import FCAJ.SecureLearn.Service.AuthService;
+import FCAJ.SecureLearn.Service.LogService;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.ArrayList;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -38,9 +41,11 @@ import org.springframework.context.annotation.Profile;
 public class AuthController {
 
     private final AuthService authService;
+    
 
     public AuthController(AuthService authService) {
         this.authService = authService;
+        
     }
 
     @PostMapping("/register")
@@ -229,12 +234,14 @@ public class AuthController {
                 "sub",    jwt.getSubject(),
                 "email",  jwt.getClaimAsString("email") != null
                             ? jwt.getClaimAsString("email")
-                            : jwt.getClaimAsString("username"),
+                            : authService.getEmailByUsername(jwt.getClaimAsString("username")),
                 "name",   jwt.getClaimAsString("name") != null
                             ? jwt.getClaimAsString("name")
                             : "",
                 "roles",  groups != null ? groups : List.of()
         ));
     }
+    
+    
 
 }

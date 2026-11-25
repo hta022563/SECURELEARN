@@ -1,6 +1,7 @@
 package FCAJ.SecureLearn.Service;
 
 import FCAJ.SecureLearn.Model.Lesson;
+import FCAJ.SecureLearn.Model.VideoStatus;
 import FCAJ.SecureLearn.Repositories.LessonRepo;
 import jakarta.persistence.EntityNotFoundException;
 import java.net.URI;
@@ -85,26 +86,21 @@ public class PlaybackService {
             throw new EntityNotFoundException("Lesson " + lessonId + " has no HLS playlist (expected .m3u8, got \"" + playlistKey + "\")");
         }
 
-        String playlist = r2Service.readObjectAsString(bucketName, playlistKey);
-        String parentKey = playlistKey.substring(0, playlistKey.lastIndexOf('/') + 1);
+        MediaPlaylist media = loadMediaPlaylist(playlistKey);
         StringBuilder rewritten = new StringBuilder();
-        for (String line : playlist.split("\\R", -1)) {
+        // Segments are addressed by their position in the playlist (0, 1, 2 ...), not by file
+        // name, so FFmpeg (segment_000.ts) and MediaConvert (master_video_00001.ts) output both work.
+        int segmentIndex = 0;
+        for (String line : media.text().split("\\R", -1)) {
             String trimmed = line.trim();
             if (trimmed.startsWith("#EXT-X-KEY:")) {
                 rewritten.append(rewriteKeyUri(line, lessonId, token, contextUrl));
             } else if (!trimmed.isEmpty() && !trimmed.startsWith("#")) {
-                String segmentKey = resolveSegmentKey(trimmed, parentKey);
-                int numberStart = segmentKey.lastIndexOf("segment_");
-                int numberEnd = segmentKey.lastIndexOf(".ts");
-                if (numberStart == -1 || numberEnd == -1) {
-                    throw new IllegalArgumentException("HLS segment \"" + segmentKey + "\" does not match the expected segment_NNN.ts naming");
-                }
-                numberStart += "segment_".length();
-                int segmentIndex = Integer.parseInt(segmentKey.substring(numberStart, numberEnd));
+                resolveSegmentKey(trimmed, media.parentKey()); // rejects segments outside the lesson's folder
                 String signedSegment = UriComponentsBuilder.fromUriString(contextUrl)
                         .path("/api/v1/lesson/{lessonId}/segment/{segmentIndex}")
                         .queryParam("token", token)
-                        .buildAndExpand(lessonId, segmentIndex)
+                        .buildAndExpand(lessonId, segmentIndex++)
                         .encode()
                         .toUriString();
                 rewritten.append(signedSegment);
@@ -130,8 +126,23 @@ public class PlaybackService {
         if (segmentIndex < 0) {
             throw new IllegalArgumentException("Segment index must be 0 or greater, got " + segmentIndex);
         }
-        String parentKey = playlistKey.substring(0, playlistKey.lastIndexOf('/') + 1);
-        String r2Key = parentKey + String.format("segment_%03d.ts", segmentIndex);
+        // Re-reads the playlist to find the index-th segment (one small S3 GET per segment)
+        MediaPlaylist media = loadMediaPlaylist(playlistKey);
+        String r2Key = null;
+        int position = 0;
+        for (String line : media.text().split("\\R")) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+                continue;
+            }
+            if (position++ == segmentIndex) {
+                r2Key = resolveSegmentKey(trimmed, media.parentKey());
+                break;
+            }
+        }
+        if (r2Key == null) {
+            throw new EntityNotFoundException("Segment " + segmentIndex + " not found for lesson " + lessonId);
+        }
         try {
             return r2Service.readObjectAsBytes(bucketName, r2Key);
         } catch (IllegalStateException e) {
@@ -170,9 +181,11 @@ public class PlaybackService {
         }
         int valueStart = uriStart + 5;
         int valueEnd = line.indexOf('"', valueStart);
-        if (valueEnd < 0 || !"securelearn-key".equals(line.substring(valueStart, valueEnd))) {
-            throw new IllegalArgumentException("Encrypted HLS playlist references an unsupported key");
+        if (valueEnd < 0) {
+            throw new IllegalArgumentException("Encrypted HLS playlist has an unterminated key URI");
         }
+        // Whatever the URI says (FFmpeg and MediaConvert are both told to write "securelearn-key"),
+        // the key is always the content.key next to the playlist, served by /key after the token check.
         String keyUrl = UriComponentsBuilder.fromUriString(contextUrl)
                 .path("/api/v1/lesson/{lessonId}/key")
                 .queryParam("token", token)
@@ -194,6 +207,10 @@ public class PlaybackService {
             lesson.setUrl(oldObjectKey);
             lessonRepo.save(lesson);
             return oldObjectKey;
+        }
+        if ((location == null || location.isBlank()) && lesson.getVideoStatus() == VideoStatus.PROCESSING) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Lesson " + lesson.getId() + " video is still processing");
         }
         if (location == null || location.isBlank()) {
             throw new EntityNotFoundException("Lesson " + lesson.getId() + " has no video location set");
@@ -236,6 +253,37 @@ public class PlaybackService {
             throw new IllegalArgumentException("HLS segment is outside its playlist directory");
         }
         return segmentKey;
+    }
+
+    /**
+     * Loads the playlist that lists the segments. FFmpeg's master.m3u8 already is that playlist;
+     * MediaConvert's master.m3u8 is a multivariant playlist (#EXT-X-STREAM-INF) pointing at one
+     * rendition playlist, which is loaded instead so the player only ever gets one level.
+     */
+    private MediaPlaylist loadMediaPlaylist(String playlistKey) {
+        String text = r2Service.readObjectAsString(bucketName, playlistKey);
+        String parentKey = playlistKey.substring(0, playlistKey.lastIndexOf('/') + 1);
+        if (!text.contains("#EXT-X-STREAM-INF")) {
+            return new MediaPlaylist(text, parentKey);
+        }
+        boolean nextLineIsVariant = false;
+        for (String line : text.split("\\R")) {
+            String trimmed = line.trim();
+            if (trimmed.startsWith("#EXT-X-STREAM-INF")) {
+                nextLineIsVariant = true;
+            } else if (nextLineIsVariant && !trimmed.isEmpty() && !trimmed.startsWith("#")) {
+                String variantKey = resolveSegmentKey(trimmed, parentKey);
+                if (!variantKey.endsWith(".m3u8")) {
+                    throw new IllegalArgumentException("HLS variant \"" + variantKey + "\" is not a playlist");
+                }
+                String variantText = r2Service.readObjectAsString(bucketName, variantKey);
+                return new MediaPlaylist(variantText, variantKey.substring(0, variantKey.lastIndexOf('/') + 1));
+            }
+        }
+        throw new IllegalArgumentException("HLS master playlist " + playlistKey + " lists no variant");
+    }
+
+    private record MediaPlaylist(String text, String parentKey) {
     }
 
     private boolean isHttpsUrl(String value) {

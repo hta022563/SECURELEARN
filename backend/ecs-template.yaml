@@ -1,0 +1,362 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  SecureLearn backend on ECS Fargate behind an Application Load Balancer (the HUB box of the
+  architecture diagram). One container runs every API group (the whole Spring Boot app, as in
+  local docker-compose). Videos are transcoded by AWS Elemental MediaConvert, not FFmpeg.
+  CloudFront, WAF and Route 53 are not part of this template yet.
+
+# ---------------------------------------------------------------------------
+# Before the first deploy (region ap-southeast-1):
+#   1. Secrets this template reads (ECS injects them at task start; they never appear in the task definition):
+#        securelearn/database   {"SPRING_DATASOURCE_URL", "SPRING_DATASOURCE_USERNAME", "SPRING_DATASOURCE_PASSWORD"}
+#        securelearn/cognito    {"COGNITO_CLIENT_SECRET"}
+#        securelearn/playback   {"PLAYBACK_TOKEN_SECRET"}
+#        securelearn/momo       {"MOMO_PARTNER_CODE", "MOMO_ACCESS_KEY", "MOMO_SECRET_KEY"}  (only if UseMomoSecret=true)
+#   2. Run backend/db/*.sql on the database (the app does not change the schema: ddl-auto=none).
+#   3. Deploy with DesiredCount=0 (creates the ECR repository), push the image, then update the
+#      stack with DesiredCount=1. The service cannot start before an image exists.
+# ---------------------------------------------------------------------------
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC of the RDS database (the default VPC is fine)
+  PublicSubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: At least two public subnets in different AZs (the ALB needs two; tasks run here too)
+  RdsSecurityGroupId:
+    Type: String
+    Default: ''
+    Description: Security group of the RDS instance. If set, tasks are allowed in on 5432. Leave empty if RDS already allows them.
+  ImageTag:
+    Type: String
+    Default: latest
+    Description: Tag in this stack's ECR repository to run
+  DesiredCount:
+    Type: Number
+    Default: 0
+    MinValue: 0
+    Description: Running tasks. 0 on the first deploy (no image yet), then 1.
+  TaskCpu:
+    Type: String
+    Default: '1024'
+    AllowedValues: ['512', '1024', '2048']
+  TaskMemory:
+    Type: String
+    Default: '2048'
+    AllowedValues: ['1024', '2048', '3072', '4096']
+  UseMomoSecret:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'false'
+    Description: true once securelearn/momo exists; until then payment gets placeholder values and will not work
+  CognitoPoolId:
+    Type: String
+    Default: ap-southeast-1_ocn23tg3K
+  CorsAllowedOrigins:
+    Type: String
+    Default: http://localhost:5173
+    Description: Comma-separated, no spaces
+  MomoUrl:
+    Type: String
+    Default: https://test-payment.momo.vn
+  VideoBucketName:
+    Type: String
+    Default: secure-learn-fcaj-2026-video
+
+Conditions:
+  HasRdsSg: !Not [!Equals [!Ref RdsSecurityGroupId, '']]
+  MomoOn: !Equals [!Ref UseMomoSecret, 'true']
+
+Resources:
+  # --------------------------- image + cluster ---------------------------
+  Repository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: securelearn-backend
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {"rules":[{"rulePriority":1,"description":"keep the last 10 images",
+            "selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":10},
+            "action":{"type":"expire"}}]}
+
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: securelearn
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/securelearn-backend
+      RetentionInDays: 14
+
+  # --------------------------- network ---------------------------
+  # Internet -> ALB on 80. HTTP only: HTTPS needs a certificate/domain; CloudFront will add it later.
+  AlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: SecureLearn ALB - HTTP from anywhere
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+  # Tasks have public IPs (so they reach Cognito, S3, MediaConvert, DynamoDB without a NAT
+  # gateway), but this group only lets the ALB in. Nothing on the internet can call them directly.
+  ServiceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: SecureLearn tasks - 8080 from the ALB only
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          SourceSecurityGroupId: !Ref AlbSecurityGroup
+
+  RdsIngressFromService:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: HasRdsSg
+    Properties:
+      GroupId: !Ref RdsSecurityGroupId
+      IpProtocol: tcp
+      FromPort: 5432
+      ToPort: 5432
+      SourceSecurityGroupId: !Ref ServiceSecurityGroup
+      Description: SecureLearn ECS tasks
+
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internet-facing
+      Type: application
+      Subnets: !Ref PublicSubnetIds
+      SecurityGroups: [!Ref AlbSecurityGroup]
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !Ref VpcId
+      TargetType: ip                 # Fargate tasks are registered by IP
+      Protocol: HTTP
+      Port: 8080
+      # Liveness = "the JVM and Tomcat are up", without the database. With /actuator/health a
+      # database outage would make ECS kill and restart every task, which cannot fix the database.
+      HealthCheckPath: /actuator/health/liveness
+      HealthCheckIntervalSeconds: 30
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: '30'
+
+  Listener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Protocol: HTTP
+      Port: 80
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+
+  # --------------------------- IAM ---------------------------
+  # Used by ECS itself to start the task: pull the image, write logs, read the secrets.
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ecs-tasks.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Policies:
+        - PolicyName: read-securelearn-secrets
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:securelearn/*
+
+  # Used by the app inside the container. The union of what the Lambda groups had, since one
+  # container now runs all of them.
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ecs-tasks.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: securelearn-app
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # AuthService / AdminController / LogInterceptor
+              - Effect: Allow
+                Action:
+                  - cognito-idp:AdminAddUserToGroup
+                  - cognito-idp:AdminCreateUser
+                  - cognito-idp:AdminDeleteUser
+                  - cognito-idp:AdminGetUser
+                  - cognito-idp:AdminListGroupsForUser
+                  - cognito-idp:AdminSetUserPassword
+                  - cognito-idp:ListUsers
+                  - cognito-idp:ListUsersInGroup
+                Resource: !Sub arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoPoolId}
+              # LogInterceptor writes AccessLog; AIController reads today's logs via the LogInADay index
+              - Effect: Allow
+                Action: dynamodb:PutItem
+                Resource: !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/AccessLog
+              - Effect: Allow
+                Action: dynamodb:Query
+                Resource: !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/AccessLog/index/LogInADay
+              # AIController reads the last 24 h of anomaly alerts via the StatusTime index
+              - Effect: Allow
+                Action: dynamodb:Query
+                Resource: !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/AnomalyAlert/index/StatusTime
+              # Upload: browser PUTs the raw file via a URL this role presigns; deleted once processed
+              - Effect: Allow
+                Action: [s3:PutObject, s3:DeleteObject]
+                Resource: !Sub arn:aws:s3:::${VideoBucketName}/videos/*
+              # Upload writes content.key; playback reads playlists, segments and the key
+              - Effect: Allow
+                Action: [s3:PutObject, s3:GetObject]
+                Resource: !Sub arn:aws:s3:::${VideoBucketName}/hls/*
+              # MediaConvert jobs (CreateJob's resource-level support is unclear, so not narrowed)
+              - Effect: Allow
+                Action: mediaconvert:CreateJob
+                Resource: '*'
+              - Effect: Allow
+                Action: mediaconvert:GetJob
+                Resource: !Sub arn:aws:mediaconvert:${AWS::Region}:${AWS::AccountId}:jobs/*
+              - Effect: Allow
+                Action: iam:PassRole
+                Resource: !GetAtt MediaConvertRole.Arn
+                Condition:
+                  StringEquals:
+                    iam:PassedToService: mediaconvert.amazonaws.com
+
+  # The role MediaConvert runs jobs as: read the raw upload, write the HLS output.
+  MediaConvertRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: mediaconvert.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: securelearn-video-transcode
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub arn:aws:s3:::${VideoBucketName}/videos/*
+              - Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub arn:aws:s3:::${VideoBucketName}/hls/*
+
+  # --------------------------- task + service ---------------------------
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: securelearn-backend
+      RequiresCompatibilities: [FARGATE]
+      NetworkMode: awsvpc
+      Cpu: !Ref TaskCpu
+      Memory: !Ref TaskMemory
+      RuntimePlatform:
+        OperatingSystemFamily: LINUX
+        CpuArchitecture: X86_64      # what `docker build` produces on a normal Windows/Intel machine
+      ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      ContainerDefinitions:
+        - Name: backend
+          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${Repository}:${ImageTag}
+          Essential: true
+          PortMappings:
+            - ContainerPort: 8080
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: backend
+          Environment:
+            # Every group in one process, like local docker-compose (but without "local").
+            - { Name: SPRING_PROFILES_ACTIVE, Value: 'account,admin,ai,course,payment,playback,upload' }
+            # The jar still contains the Lambda adapter; this keeps Tomcat listening on 8080.
+            - { Name: SPRING_AUTOCONFIGURE_EXCLUDE, Value: org.springframework.cloud.function.serverless.web.ServerlessAutoConfiguration }
+            - { Name: JAVA_TOOL_OPTIONS, Value: '-XX:MaxRAMPercentage=75' }
+            - { Name: AWS_REGION, Value: !Ref AWS::Region }
+            - { Name: COGNITO_POOL_ID, Value: !Ref CognitoPoolId }
+            - { Name: CORS_ALLOWED_ORIGINS, Value: !Ref CorsAllowedOrigins }
+            - { Name: S3_BUCKET_NAME, Value: !Ref VideoBucketName }
+            - { Name: VIDEO_PROCESSOR, Value: mediaconvert }
+            - { Name: MEDIACONVERT_ROLE_ARN, Value: !GetAtt MediaConvertRole.Arn }
+            # Manifest/key/segment URLs handed to the player. Change to the CloudFront URL later.
+            - { Name: PUBLIC_BASE_URL, Value: !Sub 'http://${LoadBalancer.DNSName}' }
+            # Schema is changed by the SQL files in backend/db, never by Hibernate in AWS.
+            - { Name: SPRING_JPA_HIBERNATE_DDL_AUTO, Value: none }
+            - { Name: MOMO_URL, Value: !Ref MomoUrl }
+            - !If [MomoOn, !Ref AWS::NoValue, { Name: MOMO_PARTNER_CODE, Value: unused }]
+            - !If [MomoOn, !Ref AWS::NoValue, { Name: MOMO_ACCESS_KEY, Value: unused }]
+            - !If [MomoOn, !Ref AWS::NoValue, { Name: MOMO_SECRET_KEY, Value: unused }]
+          # Read by ECS (ExecutionRole) at task start: <secret ARN>:<JSON key>::
+          Secrets:
+            - { Name: SPRING_DATASOURCE_URL,      ValueFrom: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:securelearn/database:SPRING_DATASOURCE_URL::' }
+            - { Name: SPRING_DATASOURCE_USERNAME, ValueFrom: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:securelearn/database:SPRING_DATASOURCE_USERNAME::' }
+            - { Name: SPRING_DATASOURCE_PASSWORD, ValueFrom: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:securelearn/database:SPRING_DATASOURCE_PASSWORD::' }
+            - { Name: COGNITO_CLIENT_SECRET,      ValueFrom: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:securelearn/cognito:COGNITO_CLIENT_SECRET::' }
+            - { Name: PLAYBACK_TOKEN_SECRET,      ValueFrom: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:securelearn/playback:PLAYBACK_TOKEN_SECRET::' }
+            - !If [MomoOn, { Name: MOMO_PARTNER_CODE, ValueFrom: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:securelearn/momo:MOMO_PARTNER_CODE::' }, !Ref AWS::NoValue]
+            - !If [MomoOn, { Name: MOMO_ACCESS_KEY,   ValueFrom: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:securelearn/momo:MOMO_ACCESS_KEY::' }, !Ref AWS::NoValue]
+            - !If [MomoOn, { Name: MOMO_SECRET_KEY,   ValueFrom: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:securelearn/momo:MOMO_SECRET_KEY::' }, !Ref AWS::NoValue]
+
+  Service:
+    Type: AWS::ECS::Service
+    DependsOn: Listener               # the target group must be attached to the ALB first
+    Properties:
+      ServiceName: securelearn-backend
+      Cluster: !Ref Cluster
+      LaunchType: FARGATE
+      TaskDefinition: !Ref TaskDefinition
+      DesiredCount: !Ref DesiredCount
+      HealthCheckGracePeriodSeconds: 180   # Spring Boot + JPA start slowly; don't kill it while it boots
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100         # start the new task before stopping the old one
+        MaximumPercent: 200
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets: !Ref PublicSubnetIds
+          SecurityGroups: [!Ref ServiceSecurityGroup]
+      LoadBalancers:
+        - ContainerName: backend
+          ContainerPort: 8080
+          TargetGroupArn: !Ref TargetGroup
+
+Outputs:
+  ApiUrl:
+    Description: Backend base URL (frontend VITE_API_URL = this + /api/v1)
+    Value: !Sub http://${LoadBalancer.DNSName}
+  RepositoryUri:
+    Description: docker tag/push target
+    Value: !GetAtt Repository.RepositoryUri
