@@ -530,6 +530,7 @@
     "alert_id": "Alert ID",
     "student_id": "Student (Student ID)",
     "abnormal_behavior": "Abnormal Behavior",
+    "key_metrics": "Key Metrics",
     "related_course": "Related Course",
     "risk_score": "Risk Score",
     "time": "Time",

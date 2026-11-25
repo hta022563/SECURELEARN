@@ -8,7 +8,6 @@ import {
   GraduationCap,
   Users,
   Sparkles,
-  Sliders,
   Fingerprint,
   BookOpen,
   PlayCircle,
@@ -68,12 +67,6 @@ export default function RolePortalLayout({ role }) {
               title: t('navbar.manage_users', 'Quản lý Người Dùng'),
               path: `/${lang}/admin/users`,
               icon: Users,
-            },
-            {
-              id: 'config',
-              title: t('navbar.r2_config', 'Cấu Hình & Ngân Sách R2'),
-              path: `/${lang}/admin/config`,
-              icon: Sliders,
             },
             {
               id: 'trace',

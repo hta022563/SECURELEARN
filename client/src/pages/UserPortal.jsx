@@ -8,7 +8,6 @@ import {
   GraduationCap,
   Users,
   Sparkles,
-  Sliders,
   Fingerprint,
   BookOpen,
   PlayCircle,
@@ -88,7 +87,6 @@ export default function UserPortal({ defaultRole }) {
           stats: [
             { label: t('portal.stat_users', 'Người dùng hệ thống'), value: '12', sub: '3 QTV • 3 GV • 6 HV', icon: Users, color: 'text-blue-600' },
             { label: t('portal.stat_alerts', 'Cảnh báo AI cần xử lý'), value: '4', sub: '2 Rủi ro cao', icon: Sparkles, color: 'text-amber-500' },
-            { label: t('portal.stat_budget', 'Chi phí R2 hiện tại'), value: '$42.50', sub: 'Trần: $100.00/tháng', icon: Sliders, color: 'text-emerald-600' },
             { label: t('portal.stat_drm', 'Bản ghi Watermark DRM'), value: '16', sub: '100% Khớp dấu vân tay', icon: Fingerprint, color: 'text-rose-600' },
           ],
           pages: [
@@ -107,14 +105,6 @@ export default function UserPortal({ defaultRole }) {
               icon: Sparkles,
               iconColor: 'text-amber-600 bg-amber-50 dark:bg-amber-950/60 dark:text-amber-400',
               highlight: 'Live Detection',
-            },
-            {
-              title: t('navbar.r2_config', 'Cấu Hình & Ngân Sách R2'),
-              desc: t('navbar.r2_config_desc', 'Cấu hình tham số KMS, Cloudflare R2 & ngân sách'),
-              path: `/${lang}/admin/config`,
-              icon: Sliders,
-              iconColor: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-400',
-              highlight: 'Cost Optimization',
             },
             {
               title: t('navbar.watermark_tracing', 'Truy Vết Watermark'),

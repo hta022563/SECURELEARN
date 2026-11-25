@@ -73,7 +73,6 @@ import InstructorVideoPreview from './pages/InstructorVideoPreview';
 // 7. Administrator Branch Pages
 import AdminUserManagement from './pages/AdminUserManagement';
 import AdminAnomalyDashboard from './components/AdminAnomalyDashboard';
-import AdminSystemConfig from './pages/AdminSystemConfig';
 import LeakTracing from './pages/LeakTracing';
 
 // 8. Dev Tool — Mock Database Explorer
@@ -88,7 +87,7 @@ import DbExplorer from './pages/DbExplorer';
  * - JWT Role Router: ProtectedRoute (kiểm tra Role từ JWT trong AuthContext)
  * - Student Branch: '/student/courses', '/student/player/:videoId'
  * - Instructor Branch: '/instructor/videos', '/instructor/upload', '/instructor/preview/:videoId'
- * - Admin Branch: '/admin/users', '/admin/alerts', '/admin/config'
+ * - Admin Branch: '/admin/users', '/admin/alerts', '/admin/trace'
  * - Shared Node: '/profile', '/catalog'
  */
 export default function App() {
@@ -184,7 +183,6 @@ export default function App() {
                         <Route path="portal" element={<Navigate to="../alerts" replace relative="path" />} />
                         <Route path="alerts" element={<AdminAnomalyDashboard />} />
                         <Route path="users" element={<AdminUserManagement />} />
-                        <Route path="config" element={<AdminSystemConfig />} />
                         <Route path="trace" element={<LeakTracing />} />
                         <Route path="profile" element={<UserProfile />} />
                       </Route>

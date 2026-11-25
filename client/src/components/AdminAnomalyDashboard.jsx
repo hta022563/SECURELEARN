@@ -53,8 +53,41 @@ function formatNameFromEmail(email) {
     .join(' ');
 }
 
+function normalizeRiskScore(item) {
+  if (typeof item.riskScore === 'number') {
+    return Math.min(100, Math.max(0, Math.round(item.riskScore)));
+  }
+
+  const rawScore =
+    typeof item.score === 'number'
+      ? item.score
+      : typeof item.Score === 'number'
+      ? item.Score
+      : null;
+
+  if (rawScore !== null) {
+    // Isolation Forest decision_function: giá trị âm càng nhỏ => mức độ bất thường càng cao
+    if (rawScore < 0) {
+      return Math.min(100, Math.max(50, Math.round(50 + Math.abs(rawScore) * 250)));
+    }
+    if (rawScore <= 1) {
+      return Math.min(100, Math.max(0, Math.round(rawScore * 100)));
+    }
+    return Math.min(100, Math.round(rawScore));
+  }
+
+  const f = item.features || item;
+  let computed = 0;
+  if ((f.uniqueIpCount || 0) > 1) computed += Math.min(45, (f.uniqueIpCount - 1) * 25);
+  if ((f.uniqueDeviceCount || 0) > 1) computed += Math.min(35, (f.uniqueDeviceCount - 1) * 20);
+  if ((f.errorRate || 0) > 0.2) computed += 25;
+  if ((f.manifestToChunkRatio || 0) > 0.5) computed += 25;
+  if (item.label === 1 || item.label === -1) computed = Math.max(computed, 75);
+  return Math.min(100, Math.round(computed));
+}
+
 /**
- * Chuẩn hóa dữ liệu Alert trả về từ Backend (hỗ trợ cả schema aiLog lẫn schema AnomalyAlert).
+ * Chuẩn hóa dữ liệu Alert trả về từ Backend (Isolation Forest alert schema + aiLog).
  */
 function normalizeAlerts(rawAlerts, usersList, resolvedIds) {
   if (!Array.isArray(rawAlerts) || rawAlerts.length === 0) return [];
@@ -66,64 +99,91 @@ function normalizeAlerts(rawAlerts, usersList, resolvedIds) {
 
   return rawAlerts
     .map((item, idx) => {
-      const email = (item.userEmail || item.studentEmail || item.email || '').trim();
+      const userIdRaw = (item.userId || item.userEmail || item.studentEmail || item.email || '').trim();
+      const email = userIdRaw.includes('@')
+        ? userIdRaw
+        : (item.userEmail || item.studentEmail || item.email || '').trim();
       const matchedUser = email ? usersByEmail.get(email.toLowerCase()) : null;
 
-      const id = item.id || item.alertId || item.logId || `al-${email || idx}`;
-      const studentId = item.studentId || item.userId || matchedUser?.id || email || `user-${idx}`;
+      const id = item.alertId || item.id || item.logId || `al-${email || idx}`;
+      const studentId = item.studentId || matchedUser?.id || userIdRaw || email || `user-${idx}`;
       const studentName =
         item.studentName ||
         matchedUser?.fullName ||
-        formatNameFromEmail(email);
+        (email ? formatNameFromEmail(email) : userIdRaw);
 
-      let riskScore = 0;
-      if (typeof item.riskScore === 'number') {
-        riskScore = Math.round(item.riskScore);
-      } else if (typeof item.score === 'number') {
-        riskScore = item.score <= 1 ? Math.round(item.score * 100) : Math.round(item.score);
-      } else if (typeof item.Score === 'number') {
-        riskScore = item.Score <= 1 ? Math.round(item.Score * 100) : Math.round(item.Score);
-      } else {
-        // Suy ra mức độ rủi ro nếu Backend trả về object aiLog
-        let computed = 0;
-        if ((item.uniqueIpCount || 0) > 1) computed += Math.min(45, (item.uniqueIpCount - 1) * 25);
-        if ((item.uniqueDeviceCount || 0) > 1) computed += Math.min(35, (item.uniqueDeviceCount - 1) * 20);
-        if ((item.errorRate || 0) > 0.2) computed += 25;
-        if ((item.manifestToChunkRatio || 0) > 0.5) computed += 25;
-        if (item.label === 1 || item.label === -1) computed = Math.max(computed, 75);
-        riskScore = Math.min(100, Math.round(computed));
-      }
+      const rawScore =
+        typeof item.score === 'number'
+          ? item.score
+          : typeof item.Score === 'number'
+          ? item.Score
+          : null;
+      const riskScore = normalizeRiskScore(item);
 
-      let anomalyTypeKey = item.anomalyTypeKey || 'admin_alerts.account_sharing';
-      let detailsKey = item.detailsKey || 'admin_alerts.account_sharing_desc';
+      const f = item.features || {};
+      const uniqueIps = f.uniqueIpCount ?? item.uniqueIpCount ?? null;
+      const uniqueDevices = f.uniqueDeviceCount ?? item.uniqueDeviceCount ?? null;
+      const errorRate = f.errorRate ?? item.errorRate ?? 0;
+      const manifestRatio = f.manifestToChunkRatio ?? item.manifestToChunkRatio ?? 0;
+      const avgInterval = f.avgDownloadInterval ?? item.avgDownloadInterval ?? null;
+      const seqRatio = f.sequentialRatio ?? item.sequentialRatio ?? null;
+      const totalRequests = f.totalRequests ?? item.totalRequests ?? null;
+
+      let anomalyTypeKey = item.anomalyTypeKey || 'admin_alerts.bot_viewing';
+      let detailsKey = item.detailsKey || 'admin_alerts.bot_viewing_desc';
       if (!item.anomalyTypeKey) {
-        if (riskScore >= 80 || (item.manifestToChunkRatio || 0) > 0.5 || (item.errorRate || 0) > 0.3) {
+        if ((uniqueIps || 0) > 1 || (uniqueDevices || 0) > 1) {
+          anomalyTypeKey = 'admin_alerts.account_sharing';
+          detailsKey = 'admin_alerts.account_sharing_desc';
+        } else if (manifestRatio > 0.3 || errorRate > 0.2) {
           anomalyTypeKey = 'admin_alerts.spam_ecdh';
           detailsKey = 'admin_alerts.spam_ecdh_desc';
-        } else if (riskScore >= 50 || ((item.avgDownloadInterval || 0) > 0 && item.avgDownloadInterval < 500)) {
+        } else if (
+          (seqRatio !== null && seqRatio >= 0.85) ||
+          (avgInterval !== null && avgInterval > 0 && avgInterval < 2)
+        ) {
           anomalyTypeKey = 'admin_alerts.bot_viewing';
           detailsKey = 'admin_alerts.bot_viewing_desc';
-        } else if ((item.uniqueIpCount || 0) > 1) {
-          anomalyTypeKey = 'admin_alerts.geo_anomaly';
-          detailsKey = 'admin_alerts.geo_anomaly_desc';
+        } else if (riskScore >= 80) {
+          anomalyTypeKey = 'admin_alerts.spam_ecdh';
+          detailsKey = 'admin_alerts.spam_ecdh_desc';
         }
       }
 
-      const rawTs = item.timestamp || item.windowTimestamp || item.accessedTime || item.createdAt;
+      const rawTs =
+        item.alertTime ||
+        item.timestamp ||
+        item.windowTimestamp ||
+        item.accessedTime ||
+        item.createdAt;
       const backendStatus = item.status || item.Status;
-      const status = backendStatus || (resolvedIds.has(id) ? 'Resolved' : 'open');
+      const isBackendResolved =
+        backendStatus && String(backendStatus).toLowerCase() === 'resolved';
+      const status = isBackendResolved
+        ? 'Resolved'
+        : resolvedIds.has(id)
+        ? 'Resolved'
+        : backendStatus || 'OPEN';
 
       return {
         id,
         studentId,
         studentName,
-        studentEmail: email,
-        courseId: item.courseId || null,
-        courseTitle: item.courseTitle || null,
+        studentEmail: email || userIdRaw,
+        modelKey: item.modelKey || '',
+        features: {
+          totalRequests,
+          avgDownloadInterval: avgInterval,
+          sequentialRatio: seqRatio,
+          uniqueIpCount: uniqueIps,
+          uniqueDeviceCount: uniqueDevices,
+          errorRate,
+        },
         anomalyTypeKey,
         detailsKey,
         anomalyTypeLabel: item.anomalyType || null,
         detailsLabel: item.details || item.description || null,
+        rawScore,
         riskScore,
         rawTimestamp: rawTs ? new Date(rawTs) : null,
         status,
@@ -131,10 +191,10 @@ function normalizeAlerts(rawAlerts, usersList, resolvedIds) {
       };
     })
     .sort((a, b) => {
-      if (b.riskScore !== a.riskScore) return b.riskScore - a.riskScore;
       const ta = a.rawTimestamp ? a.rawTimestamp.getTime() : 0;
       const tb = b.rawTimestamp ? b.rawTimestamp.getTime() : 0;
-      return tb - ta;
+      if (tb !== ta) return tb - ta;
+      return b.riskScore - a.riskScore;
     });
 }
 
@@ -705,7 +765,7 @@ export default function AdminAnomalyDashboard() {
                 <th className="py-3 px-3 font-semibold whitespace-nowrap">{t('admin_alerts.alert_id')}</th>
                 <th className="py-3 px-3 font-semibold whitespace-nowrap">{t('admin_alerts.student_id')}</th>
                 <th className="py-3 px-3 font-semibold min-w-[170px]">{t('admin_alerts.abnormal_behavior')}</th>
-                <th className="py-3 px-3 font-semibold whitespace-nowrap">{t('admin_alerts.related_course')}</th>
+                <th className="py-3 px-3 font-semibold whitespace-nowrap">{t('admin_alerts.key_metrics', 'Chỉ số hành vi')}</th>
                 <th className="py-3 px-3 font-semibold whitespace-nowrap text-center">{t('admin_alerts.risk_score')}</th>
                 <th className="py-3 px-3 font-semibold whitespace-nowrap text-center">{t('admin_alerts.time')}</th>
                 <th className="py-3 px-3 font-semibold whitespace-nowrap text-center">{t('admin_alerts.status')}</th>
@@ -742,7 +802,9 @@ export default function AdminAnomalyDashboard() {
                     key={item.id}
                     className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors"
                   >
-                    <td className="py-3 px-3 font-mono text-slate-500 whitespace-nowrap">{item.id}</td>
+                    <td className="py-3 px-3 font-mono text-slate-500 whitespace-nowrap" title={item.id}>
+                      {String(item.id).length > 14 ? `${String(item.id).slice(0, 8)}...` : item.id}
+                    </td>
                     <td className="py-3 px-3 whitespace-nowrap">
                       <div className="font-bold text-slate-900 dark:text-white">
                         {item.studentName || t('admin_alerts.anonymous_student')}
@@ -758,9 +820,32 @@ export default function AdminAnomalyDashboard() {
                       </div>
                     </td>
                     <td className="py-3 px-3 text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                      {item.courseTitle || t('admin_alerts.info_sec_course')}
+                      <div className="text-[11px] font-medium text-slate-700 dark:text-slate-200">
+                        {item.features?.totalRequests !== null
+                          ? `${Math.round(item.features.totalRequests)} req`
+                          : '—'}
+                        {item.features?.avgDownloadInterval !== null
+                          ? ` • ${Number(item.features.avgDownloadInterval).toFixed(2)}s/chunk`
+                          : ''}
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        {item.features?.uniqueIpCount !== null ? `${item.features.uniqueIpCount} IP` : ''}
+                        {item.features?.uniqueDeviceCount !== null
+                          ? ` • ${item.features.uniqueDeviceCount} Device`
+                          : ''}
+                        {item.features?.sequentialRatio !== null
+                          ? ` • Seq ${Math.round(item.features.sequentialRatio * 100)}%`
+                          : ''}
+                      </div>
                     </td>
-                    <td className="py-3 px-3 whitespace-nowrap text-center">{renderRiskScoreBadge(item.riskScore)}</td>
+                    <td className="py-3 px-3 whitespace-nowrap text-center">
+                      {renderRiskScoreBadge(item.riskScore)}
+                      {item.rawScore !== null && (
+                        <div className="text-[10px] font-mono text-slate-400 mt-0.5">
+                          score: {item.rawScore.toFixed(4)}
+                        </div>
+                      )}
+                    </td>
                     <td className="py-3 px-3 text-slate-400 text-[11px] whitespace-nowrap text-center">
                       {item.rawTimestamp ? (
                         <div className="leading-tight">

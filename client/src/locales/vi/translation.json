@@ -530,6 +530,7 @@
     "alert_id": "Alert ID",
     "student_id": "Học Viên (Student ID)",
     "abnormal_behavior": "Hành Vi Bất Thường",
+    "key_metrics": "Chỉ Số Hành Vi",
     "related_course": "Khóa Học Liên Quan",
     "risk_score": "Điểm Rủi Ro",
     "time": "Thời Gian",
