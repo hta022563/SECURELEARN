@@ -1,6 +1,7 @@
 package FCAJ.SecureLearn.Controller;
 
 import FCAJ.SecureLearn.Request.Ipn;
+import FCAJ.SecureLearn.Response.MomoPaymentCreationResponse;
 import FCAJ.SecureLearn.Service.AuthService;
 import FCAJ.SecureLearn.Service.EnrollmentService;
 import FCAJ.SecureLearn.Service.MomoService;
@@ -41,7 +42,11 @@ public class PaymentController {
     public ResponseEntity<?> createPayment(@PathVariable UUID courseId, @AuthenticationPrincipal Jwt jwt) {
         try {
             String studentEmail = authService.getEmailByUsername(jwt.getClaimAsString("username"));
-            return momoService.createPaymentRequest(courseId, pendingOrderEmails, pendingOrderCourseIds, studentEmail);
+            
+            ResponseEntity<MomoPaymentCreationResponse> response = momoService.createPaymentRequest(courseId, pendingOrderEmails, pendingOrderCourseIds, studentEmail);
+            if(response == null){
+                return ResponseEntity.ok("Successfully enrolled in free course");
+            }else return response;
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of(
                     "error", "Could not create MoMo payment for course " + courseId + ": " + e.getMessage()));

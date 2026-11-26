@@ -52,6 +52,11 @@ public class MomoService {
         Course enrollingCourse = courseRepo.findById(courseId)
                 .orElseThrow(() -> new NoSuchElementException(
                         "Cannot create payment: no course found with id " + courseId));
+        
+        if(enrollingCourse.getPrice() == 0){
+            enrollmentService.createEnrollment(studentEmail, courseId);
+            return null;
+        }
         String orderId = UUID.randomUUID().toString();
         String requestType = "captureWallet";
         String orderInfo = "Enrolling in " + enrollingCourse.getTitle() + " by " + enrollingCourse.getInstructor();
