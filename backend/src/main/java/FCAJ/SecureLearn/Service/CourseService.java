@@ -3,6 +3,7 @@ package FCAJ.SecureLearn.Service;
 import FCAJ.SecureLearn.Model.Course;
 import FCAJ.SecureLearn.Repositories.CourseRepo;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
@@ -59,6 +60,18 @@ public class CourseService {
             throw new NoSuchElementException("No course found containing lesson with id " + lessonId);
         }
         return course;
+    }
+    
+    public List<Course> getOwnedrCourse(String email){
+        List<Course> ownedCourse = new ArrayList();
+        List<Course> allCourse = getAllCourses();
+        for(Course course : allCourse){
+            if(course.getInstructor().equals(email)){
+                ownedCourse.add(course);
+            }
+        }
+        return ownedCourse;
+        
     }
 
     public void deleteCourse(UUID courseId) {

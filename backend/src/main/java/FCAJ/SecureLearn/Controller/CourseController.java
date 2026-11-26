@@ -83,6 +83,12 @@ public class CourseController {
         List<Course> courses = courseService.getAllCourses();
         return ResponseEntity.ok(courses);
     }
+    
+    @GetMapping("/courses")
+    public ResponseEntity<List<Course>> getCourse(@AuthenticationPrincipal Jwt jwt) {
+        List<Course> courses = courseService.getAllCourses();
+        return ResponseEntity.ok(courses);
+    }
 
     /**
      * Search courses by title (partial match)
