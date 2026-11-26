@@ -63,10 +63,10 @@ public class CourseController {
      */
     @PostMapping("/course")
     public ResponseEntity<?> createCourse(@RequestBody CourseCreationRequest request) {
-        if (request.getPrices() < 1000 || request.getPrices() > 50000000) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Price must be between 1000 and 50000000, got " + request.getPrices()));
-        }
         try {
+            if(request.getPrices() != 0 && request.getPrices() < 1000 || request.getPrices() > 50000000){
+                return ResponseEntity.badRequest().body(Map.of("Error", "Course price must either be free or between 1000 - 50000000 VND"));
+            }
             courseService.addNewCourse(request.getTitle(), request.getDescription(), request.getInstructor(), request.getPrices(), LocalDateTime.now(), LocalDateTime.now(), request.getSubjectId());
         } catch (IllegalArgumentException | NoSuchElementException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -80,6 +80,12 @@ public class CourseController {
      */
     @GetMapping("/allcourses")
     public ResponseEntity<List<Course>> getAllCourses() {
+        List<Course> courses = courseService.getAllCourses();
+        return ResponseEntity.ok(courses);
+    }
+    
+    @GetMapping("/courses")
+    public ResponseEntity<List<Course>> getCourse(@AuthenticationPrincipal Jwt jwt) {
         List<Course> courses = courseService.getAllCourses();
         return ResponseEntity.ok(courses);
     }
