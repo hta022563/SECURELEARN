@@ -21,7 +21,7 @@ import {
 import { useVideoUpload, UPLOAD_STATUS } from '../hooks/useVideoUpload';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
-import { getCourses, getChapters, createChapter, createLesson, getLessons } from '../services/courseService';
+import { getInstructorCourses, getChapters, createChapter, createLesson, getLessons } from '../services/courseService';
 import CreateCourseModal from './CreateCourseModal';
 
 /**
@@ -113,7 +113,7 @@ export default function UploadVideo() {
     async function fetchCourseList() {
       setIsLoadingCourses(true);
       try {
-        const data = await getCourses();
+        const data = await getInstructorCourses();
         if (isMounted && Array.isArray(data)) {
           setCourses(data);
           const queryParams = new URLSearchParams(location.search);

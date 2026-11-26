@@ -22,7 +22,7 @@ const LAMBDA_ROUTES = [
   /^\/auth\//, // account
   /^\/admin\//, // admin
   // course group
-  /^\/(?:course|subject|chapter)(?:[/?]|$)/,
+  /^\/(?:courses?|subject|chapter)(?:[/?]|$)/,
   /^\/allcourses(?:\?|$)/,
   /^\/lesson(?:\/[^/?]+)?(?:\?|$)/, // POST /lesson and /lesson/{id} only; /lesson/{id}/playback etc. stay local
   /^\/enrollment\/me(?:\?|$)/, // POST /enrollment/{courseId} is payment, stays local

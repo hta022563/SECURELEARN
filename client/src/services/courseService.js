@@ -9,6 +9,7 @@ import apiClient from '../api/axiosClient.js';
  *
  * 1. Course Management:
  *    - GET    /api/v1/allcourses                    -> Lấy tất cả khóa học
+ *    - GET    /api/v1/courses                       -> Lấy danh sách khóa học do giảng viên hiện tại tạo
  *    - GET    /api/v1/course/search?title={keyword} -> Tìm kiếm khóa học theo tiêu đề
  *    - POST   /api/v1/course                        -> Tạo khóa học mới ({ title, description, instructor, prices, subjectId })
  *    - PUT    /api/v1/course/{id}                   -> Cập nhật khóa học ({ title, description, instructor, prices, subjectId? })
@@ -171,6 +172,27 @@ export async function getCourses() {
     return [];
   } catch (err) {
     console.warn('[courseService] GET /allcourses không lấy được dữ liệu từ BE:', err.message);
+    return [];
+  }
+}
+
+/**
+ * Lấy danh sách khóa học do giảng viên hiện tại tạo từ Backend
+ * Backend: GET /api/v1/courses (xác định giảng viên qua JWT Bearer token)
+ */
+export async function getInstructorCourses() {
+  try {
+    const data = await apiClient.get('/courses');
+    const list = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.courses)
+        ? data.courses
+        : Array.isArray(data?.data)
+          ? data.data
+          : [];
+    return list.map(normalizeCourse).filter(Boolean);
+  } catch (err) {
+    console.warn('[courseService] GET /courses không lấy được dữ liệu từ BE:', err.message);
     return [];
   }
 }
@@ -475,15 +497,15 @@ export async function deleteLesson(id) {
  * Lấy toàn bộ cây nội dung khóa học: Khóa học -> Các chương -> Các bài học từ Backend
  * Hỗ trợ linh hoạt khi đầu vào là Course ID, Lesson ID, hoặc undefined / fallback
  */
-export async function getCourseWithLessons(courseOrLessonId) {
+export async function getCourseWithLessons(courseOrLessonId, preloadedCourse = null) {
   try {
-    let course = null;
+    let course = preloadedCourse ? normalizeCourse(preloadedCourse) : null;
     let targetLessonId = null;
 
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     const isPotentialUuid = Boolean(courseOrLessonId && uuidRegex.test(courseOrLessonId));
 
-    if (isPotentialUuid) {
+    if (!course && isPotentialUuid) {
       // 1. Thử tra cứu xem courseOrLessonId có phải là ID của khóa học không
       course = await getCourseById(courseOrLessonId);
 

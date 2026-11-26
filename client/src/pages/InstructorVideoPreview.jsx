@@ -21,7 +21,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import SecureVideoPlayer from '../components/SecureVideoPlayer';
 import ReuploadVideoModal from '../components/ReuploadVideoModal';
-import { getCourseWithLessons } from '../services/courseService';
+import { getCourseWithLessons, getInstructorCourses } from '../services/courseService';
 
 /**
  * Helper format thời lượng từ giây sang mm:ss hoặc X phút
@@ -77,23 +77,42 @@ export default function InstructorVideoPreview() {
   useEffect(() => {
     let isMounted = true;
     setIsLoading(true);
-    getCourseWithLessons(videoId)
-      .then((res) => {
+
+    async function loadPreviewData() {
+      try {
+        const myCourses = await getInstructorCourses();
+        let res = null;
+
+        if (videoId) {
+          const matchedCourse = myCourses.find(
+            (c) => String(c.id || c.ID) === String(videoId)
+          );
+          res = matchedCourse
+            ? await getCourseWithLessons(videoId, matchedCourse)
+            : await getCourseWithLessons(videoId);
+        } else if (myCourses.length > 0) {
+          const firstCourse = myCourses[0];
+          res = await getCourseWithLessons(firstCourse.id || firstCourse.ID, firstCourse);
+        } else {
+          res = { course: null, chapters: [], lessons: [], targetLessonId: null };
+        }
+
         if (isMounted && res) {
           setBackendData(res);
           if (res.targetLessonId) {
             setActiveLectureId((prev) => prev || res.targetLessonId);
           }
         }
-      })
-      .catch((err) => {
+      } catch (err) {
         console.warn('[InstructorVideoPreview] Lỗi tải từ Backend API:', err);
-      })
-      .finally(() => {
+      } finally {
         if (isMounted) {
           setIsLoading(false);
         }
-      });
+      }
+    }
+
+    loadPreviewData();
 
     return () => {
       isMounted = false;

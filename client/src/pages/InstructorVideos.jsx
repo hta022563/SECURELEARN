@@ -23,7 +23,7 @@ import {
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import {
-  getCourses,
+  getInstructorCourses,
   deleteCourse,
   updateCourse,
   updateVideoTitle,
@@ -78,7 +78,7 @@ export default function InstructorVideos() {
   useEffect(() => {
     let isMounted = true;
     // Nạp cache môn học trước khi đặt coursesList, để getSubjectForCourse() có dữ liệu khi render
-    Promise.all([getCourses(), loadSubjects()])
+    Promise.all([getInstructorCourses(), loadSubjects()])
       .then(([data]) => data)
       .then(async (data) => {
         if (!isMounted) return;
@@ -88,7 +88,7 @@ export default function InstructorVideos() {
           if (data.length > 0) {
             try {
               const courseDetails = await Promise.all(
-                data.map((c) => getCourseWithLessons(c.ID || c.id))
+                data.map((c) => getCourseWithLessons(c.ID || c.id, c))
               );
               if (isMounted) {
                 const allFetchedChapters = courseDetails.flatMap((cd) => cd.chapters || []);
@@ -170,14 +170,9 @@ export default function InstructorVideos() {
     }
   };
 
-  // Tính toán dữ liệu tổng hợp từng Khóa học (Parent Overview)
+  // Tính toán dữ liệu tổng hợp từng Khóa học (dữ liệu đã được lọc theo giảng viên từ GET /api/v1/courses)
   const courseSummaries = useMemo(() => {
-    const myCourses = coursesList.filter(
-      (c) => c.Owner === user?.userId || c.owner === user?.userId || c.instructor === user?.username
-    );
-    const targetCourses = myCourses.length > 0 ? myCourses : coursesList;
-
-    return targetCourses.map((course) => {
+    return coursesList.map((course) => {
       const courseId = course.ID || course.id;
       const courseChaps = chaptersList
         .filter((ch) => ch.CoursesID === courseId || ch.course_id === courseId || ch.courseId === courseId)
@@ -237,7 +232,7 @@ export default function InstructorVideos() {
         structuredChapters,
       };
     });
-  }, [coursesList, chaptersList, videosList, user]);
+  }, [coursesList, chaptersList, videosList]);
 
   const filteredCourses = courseSummaries.filter((c) => {
     const term = searchTerm.toLowerCase();
