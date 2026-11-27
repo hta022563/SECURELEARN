@@ -30,6 +30,8 @@ public class MomoService {
     private final String partnerCode;
     private final String accessKey;
     private final String secretKey;
+    private final String redirectUrl;
+    private final String ipnUrl;
     private final RestClient momoClient;
 
     public MomoService(
@@ -37,11 +39,15 @@ public class MomoService {
             @Value("${momo.partnerCode}") String partnerCode,
             @Value("${momo.accessKey}") String accessKey,
             @Value("${momo.secretKey}") String secretKey,
+            @Value("${momo.redirectUrl}") String redirectUrl,
+            @Value("${momo.ipnUrl}") String ipnUrl,
             CourseRepo courseRepo,
             EnrollmentService enrollmentService) {
         this.partnerCode = partnerCode;
         this.accessKey = accessKey;
         this.secretKey = secretKey;
+        this.redirectUrl = redirectUrl;
+        this.ipnUrl = ipnUrl;
         this.courseRepo = courseRepo;
         this.enrollmentService = enrollmentService;
         this.momoClient = RestClient.builder().baseUrl(endpoint).build();
@@ -61,8 +67,6 @@ public class MomoService {
         String requestType = "captureWallet";
         String orderInfo = "Enrolling in " + enrollingCourse.getTitle() + " by " + enrollingCourse.getInstructor();
         String extraData = "";
-        String redirectUrl = "http://localhost:3000";
-        String ipnUrl = "http://backend:8080/api/momo/ipn";
         if (enrollmentService.isEnrolledInCourse(studentEmail, courseId)) {
             throw new IllegalArgumentException(
                     "Student " + studentEmail + " is already enrolled in course " + courseId);
