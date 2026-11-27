@@ -12,9 +12,10 @@
 const env = (typeof import.meta !== 'undefined' && import.meta.env) || {};
 
 export const LAMBDA_API_URL =
-  env.VITE_LAMBDA_API_URL || 'https://1rvav1l53e.execute-api.ap-southeast-1.amazonaws.com/api/v1';
+  env.VITE_LAMBDA_API_URL || 'http://secure-LoadB-SsWjRv1pOUbL-1464083600.ap-southeast-1.elb.amazonaws.com/api/v1';
 
-export const LOCAL_API_URL = env.VITE_API_URL || 'http://localhost:8080/api/v1';
+export const LOCAL_API_URL =
+  env.VITE_API_URL || 'http://secure-LoadB-SsWjRv1pOUbL-1464083600.ap-southeast-1.elb.amazonaws.com/api/v1';
 
 // Paths (relative to /api/v1) served by Lambda. Mirror the group's routes in backend/template.yaml
 // when it goes live. `(?:[/?]|$)` = the path ends there or continues with a sub-path / query string.

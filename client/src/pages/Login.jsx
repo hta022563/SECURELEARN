@@ -1,28 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation, Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { AlertCircle, Zap, UserPlus, Grid, Loader2, X, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, UserPlus, Grid, Loader2, X, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { users } from '../data/mockDatabase';
 import Logo from '../components/Logo';
 import ForgotPasswordModal from '../components/ForgotPasswordModal';
 import { login as apiLogin, me as apiMe, decodeJwtPayload, mapCognitoRoleToDisplayRole, ROLE_REDIRECT } from '../services/authService';
-
-// Map Role trong mockDb → Role trong RBAC routing (used for demo fallback)
-const ROLE_MAP = {
-  admin: 'Administrator',
-  instructor: 'Instructor',
-  student: 'Student',
-};
-
-/**
- * Tài khoản demo để điền nhanh — lấy thẳng từ mockDb.users
- */
-const DEMO_ACCOUNTS = [
-  { label: 'Admin', user: users.find(u => u.Role === 'admin') },
-  { label: 'Instructor', user: users.find(u => u.Role === 'instructor') },
-  { label: 'Student', user: users.find(u => u.Role === 'student') },
-];
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -40,15 +23,7 @@ export default function Login() {
   const { t } = useTranslation();
   const currentLang = lang || 'vi';
 
-  /** Điền nhanh tài khoản demo */
-  const handleSelectDemo = (acc) => {
-    if (!acc.user) return;
-    setEmail(acc.user.Username);
-    setPassword('password123');
-    setErrorMessage(null);
-  };
-
-  /** Submit: call real backend, fall back to mock only for demo accounts */
+  /** Submit: call real backend */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -99,25 +74,7 @@ export default function Login() {
       navigate(finalPath, { replace: true });
 
     } catch (err) {
-      // If the backend is unreachable, fall back to mock demo accounts
-      const found = users.find((u) => u.Username.toLowerCase() === cleanEmail);
-      if (found) {
-        const rbacRole = { admin: 'Administrator', instructor: 'Instructor', student: 'Student' }[found.Role] || 'Student';
-        const userData = {
-          userId: found.ID,
-          name: found.Username.split('@')[0],
-          email: found.Username,
-          role: rbacRole,
-          token: `mock_jwt_${found.Role}_${found.ID}_${Date.now()}`,
-        };
-        login(userData);
-        const targetPath = ROLE_REDIRECT[rbacRole] || '/home';
-        const from = location.state?.from?.pathname || targetPath;
-        const finalPath = from.startsWith(`/${currentLang}`) ? from : `/${currentLang}${from}`;
-        navigate(finalPath, { replace: true });
-      } else {
-        setErrorMessage(err.message || t('login.login_failed'));
-      }
+      setErrorMessage(err.message || t('login.login_failed'));
     } finally {
       setIsSubmitting(false);
     }
@@ -227,42 +184,22 @@ export default function Login() {
             </button>
           </form>
 
-          {/* Khu vực Đăng nhập Nhanh Demo */}
-          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 text-center">
-            <div className="flex items-center justify-center gap-1 text-slate-500 dark:text-slate-400 text-xs font-medium mb-3">
-              <Zap className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
-              <span>{t('login.demo_accounts')}</span>
-            </div>
-            <div className="flex flex-wrap gap-2 justify-center mb-4">
-              {DEMO_ACCOUNTS.map((acc, index) => (
-                <button
-                  key={index}
-                  type="button"
-                  className="rounded-full border border-blue-200 dark:border-blue-900/60 bg-blue-50/50 dark:bg-blue-950/30 px-3 py-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all"
-                  onClick={() => handleSelectDemo(acc)}
-                >
-                  {acc.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Links điều hướng sang Đăng ký & Catalog */}
-            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-              <Link
-                to={`/${currentLang}/register`}
-                className="inline-flex items-center gap-1.5 font-semibold text-blue-600 dark:text-blue-400 hover:underline no-underline"
-              >
-                <UserPlus className="h-3.5 w-3.5" />
-                <span>{t('login.no_account')}</span>
-              </Link>
-              <Link
-                to={`/${currentLang}/catalog`}
-                className="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 no-underline"
-              >
-                <Grid className="h-3.5 w-3.5" />
-                <span>{t('login.explore_catalog')}</span>
-              </Link>
-            </div>
+          {/* Links điều hướng sang Đăng ký & Catalog */}
+          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+            <Link
+              to={`/${currentLang}/register`}
+              className="inline-flex items-center gap-1.5 font-semibold text-blue-600 dark:text-blue-400 hover:underline no-underline"
+            >
+              <UserPlus className="h-3.5 w-3.5" />
+              <span>{t('login.no_account')}</span>
+            </Link>
+            <Link
+              to={`/${currentLang}/catalog`}
+              className="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 no-underline"
+            >
+              <Grid className="h-3.5 w-3.5" />
+              <span>{t('login.explore_catalog')}</span>
+            </Link>
           </div>
         </div>
 
