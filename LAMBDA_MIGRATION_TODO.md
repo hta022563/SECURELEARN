@@ -1,4 +1,0 @@
-- [ ] Remove R2 config and budget
-- [ ] Add watermark tracing
-- [ ] Fix the alert page, remove or make it read abnormal behavior and related course
-- [ ] Free courses

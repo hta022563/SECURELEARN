@@ -57,6 +57,8 @@ services:
       MOMO_PARTNER_CODE: ${MOMO_PARTNER_CODE:?Set MOMO_PARTNER_CODE in the .env file}
       MOMO_ACCESS_KEY: ${MOMO_ACCESS_KEY:?Set MOMO_ACCESS_KEY in the .env file}
       MOMO_SECRET_KEY: ${MOMO_SECRET_KEY:?Set MOMO_SECRET_KEY in the .env file}
+      # The sandbox container reaches the backend by its compose service name, not localhost
+      MOMO_IPN_URL: ${MOMO_IPN_URL:-http://backend:8080/api/momo/ipn}
 
   # Local MoMo/VNPay/ZaloPay/Stripe simulator (dev only, never deploy)
   paySandbox:
