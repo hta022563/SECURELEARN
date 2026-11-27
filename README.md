@@ -38,7 +38,7 @@
 | **Frontend (`client/`)** | React 18.3, Vite 5.4, React Router 7, Tailwind CSS 3.4, Lucide Icons, Framer Motion, Axios, `hls.js` 1.5, `@fingerprintjs/fingerprintjs` 5.3, `i18next` / `react-i18next` (EN/VI), Nginx (Docker) |
 | **Backend (`backend/`)** | Java 25, Spring Boot 4.1.1, Spring Security & OAuth2 Resource Server (JWT), Spring Data JPA, Spring Cloud AWS 4.1.1 (S3, DynamoDB), AWS SDK v2 (Cognito IDP, MediaConvert), PostgreSQL 16, Maven |
 | **AI Anomaly Detection (`AI/file/`)** | Python 3.12, `scikit-learn` 1.9.1 (Isolation Forest), `numpy`, `pandas`, `joblib`, `boto3`, AWS Lambda Container Image (ECR), DynamoDB Streams, EventBridge, SNS |
-| **Cloud & DevOps** | AWS CloudFront, WAF, Route 53, ACM, ECS Fargate + ALB (`backend/ecs-template.yaml`), AWS SAM Lambda (`backend/template.yaml`), Docker & Docker Compose, Vercel (`client/vercel.json`) |
+| **Cloud & DevOps** | AWS CloudFront, WAF, Route 53, ACM, ECS Fargate + ALB (`backend/ecs-template.yaml`), AWS SAM Lambda (`backend/template.yaml`), Docker & Docker Compose,  |
 
 ---
 
